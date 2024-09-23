@@ -13,10 +13,10 @@ pub fn check_consistency(enzmldoc: &EnzymeMLDocument) -> Report {
         is_valid: true,
     };
 
-    check_measurements(&enzmldoc, &mut report);
-    check_parameters(&enzmldoc, &mut report);
-    check_equations(&enzmldoc, &mut report);
-    check_reactions(&enzmldoc, &mut report);
+    check_measurements(enzmldoc, &mut report);
+    check_parameters(enzmldoc, &mut report);
+    check_equations(enzmldoc, &mut report);
+    check_reactions(enzmldoc, &mut report);
 
     report
 }

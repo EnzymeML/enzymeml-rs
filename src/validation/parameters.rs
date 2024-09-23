@@ -3,7 +3,7 @@ use crate::validation::validator::{Report, Severity, ValidationResult};
 
 pub fn check_parameters(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
     for (param_idx, parameter) in enzmldoc.parameters.iter().enumerate() {
-        check_parameter_units(report, &parameter, param_idx);
+        check_parameter_units(report, parameter, param_idx);
     }
 }
 

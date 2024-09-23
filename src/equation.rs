@@ -90,7 +90,7 @@ fn extract_params_and_vars(
     equation: &Expr,
 ) -> (Vec<Parameter>, Vec<Variable>) {
     // Extract variables from equation and ids from the enzml doc
-    let symbols = extract_symbols(&equation);
+    let symbols = extract_symbols(equation);
     check_variable_consistency(&variables, &symbols);
 
     // Sort variables and parameters
@@ -109,7 +109,7 @@ fn extract_params_and_vars(
 /// # Returns
 ///
 /// Returns a vector of `Variable`.
-fn filter_variables(variables: &Vec<String>, symbols: &Vec<String>) -> Vec<Variable> {
+fn filter_variables(variables: &[String], symbols: &[String]) -> Vec<Variable> {
     variables
         .iter()
         .filter(|v| symbols.contains(v))
@@ -134,7 +134,7 @@ fn filter_variables(variables: &Vec<String>, symbols: &Vec<String>) -> Vec<Varia
 /// # Returns
 ///
 /// Returns a vector of `Parameter`.
-fn filter_params(variables: &Vec<String>, symbols: &Vec<String>) -> Vec<Parameter> {
+fn filter_params(variables: &[String], symbols: &[String]) -> Vec<Parameter> {
     symbols
         .iter()
         .filter(|s| !variables.contains(s))
@@ -180,7 +180,7 @@ pub fn extract_symbols(eq: &Expr) -> Vec<String> {
 /// # Panics
 ///
 /// Panics if a variable is not found in the symbols.
-fn check_variable_consistency(variables: &Vec<String>, symbols: &Vec<String>) {
+fn check_variable_consistency(variables: &Vec<String>, symbols: &[String]) {
     for var in variables {
         if !symbols.contains(var) {
             panic!("Variable '{}' not found in equation.", var);

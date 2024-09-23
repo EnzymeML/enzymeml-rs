@@ -81,7 +81,7 @@ impl EnzymeMLDocument {
         name: &String,
         df: &DataFrame,
     ) -> Result<Measurement, Box<dyn Error>> {
-        let mut meas = MeasurementBuilder::from_dataframe(&df)?;
+        let mut meas = MeasurementBuilder::from_dataframe(df)?;
         meas.id(name.clone());
         meas.name(name);
 
@@ -139,7 +139,7 @@ impl EnzymeMLDocumentBuilder {
         let dfs = read_excel(path)?;
 
         for (i, (name, df)) in dfs.iter().enumerate() {
-            let mut meas = MeasurementBuilder::from_dataframe(&df)?;
+            let mut meas = MeasurementBuilder::from_dataframe(df)?;
             meas.id(format!("m{}", i));
             meas.name(name);
             self.to_measurements(meas.build()?);
@@ -159,7 +159,7 @@ impl EnzymeMLDocumentBuilder {
 ///
 /// Returns a `Result` containing a `HashMap` of `DataFrame`s or an error if reading fails.
 pub fn read_excel(path: PathBuf) -> Result<HashMap<String, DataFrame>, Box<dyn Error>> {
-    let mut workbook = open_workbook_auto(&path).expect("Failed to open workbook");
+    let mut workbook = open_workbook_auto(path).expect("Failed to open workbook");
     let mut dfs: HashMap<String, DataFrame> = HashMap::new();
 
     // Iterate through the sheets in the workbook
@@ -169,7 +169,7 @@ pub fn read_excel(path: PathBuf) -> Result<HashMap<String, DataFrame>, Box<dyn E
         // Convert the HashMap to a DataFrame
         dfs.insert(
             sheet,
-            DataFrame::new(species_data.into_iter().map(|(_, series)| series).collect())?,
+            DataFrame::new(species_data.into_values().collect())?,
         );
     }
 
@@ -192,7 +192,7 @@ fn process_sheet(
 ) -> Result<HashMap<String, Series>, Box<dyn Error>> {
     let mut species_data: HashMap<String, Series> = HashMap::new();
     let range = workbook
-        .worksheet_range(&sheet)
+        .worksheet_range(sheet)
         .expect("Failed to read sheet");
 
     let header_mapping: HashMap<usize, String> = range
@@ -202,7 +202,7 @@ fn process_sheet(
         .iter()
         .enumerate()
         .map(|(i, cell)| {
-            let name = if cell.to_string() == "Time" {
+            let name = if *cell == "Time" {
                 "time".to_string()
             } else {
                 cell.to_string()
@@ -225,8 +225,8 @@ fn process_sheet(
 
             species_data
                 .entry(species_name.clone())
-                .or_insert_with(|| Series::new(&species_name, Vec::<f32>::new()))
-                .append(&Series::new(&species_name, vec![measurement_value]))?;
+                .or_insert_with(|| Series::new(species_name, Vec::<f32>::new()))
+                .append(&Series::new(species_name, vec![measurement_value]))?;
         }
     }
     Ok(species_data)

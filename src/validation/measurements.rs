@@ -60,7 +60,6 @@ fn check_time_data_consistency(
 ) {
     if meas_data.data.is_none() || meas_data.time.is_none() {
         // Check if the data and time vectors are not empty
-        return;
     } else {
         let data = meas_data.data.as_ref().unwrap();
         let time = meas_data.time.as_ref().unwrap();
@@ -88,7 +87,7 @@ fn check_species_consistency(
     meas_idx: usize,
     data_idx: usize,
     meas_data: &MeasurementData,
-    all_species: &Vec<&String>,
+    all_species: &[&String],
 ) {
     if !all_species.contains(&&meas_data.species_id) {
         let result = ValidationResult::new(

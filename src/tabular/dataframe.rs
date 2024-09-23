@@ -99,7 +99,7 @@ impl MeasurementBuilder {
                     .map(|opt| opt.unwrap_or_default())
                     .collect();
 
-                let initial = data.get(0).copied().unwrap_or_default();
+                let initial = data.first().copied().unwrap_or_default();
 
                 if data[0] != -1.0 && data.iter().skip(1).all(|&x| x == -1.0) {
                     // If the first value is not -1 and all the rest are -1,
@@ -147,7 +147,7 @@ pub fn measurement_to_dataframe(measurement: &Measurement) -> DataFrame {
     let mut times = vec![];
 
     for data in measurement.species_data.iter() {
-        collect_data(&mut series, &mut non_measured, &mut times, &data);
+        collect_data(&mut series, &mut non_measured, &mut times, data);
     }
 
     if series.is_empty() {
@@ -170,7 +170,7 @@ pub fn measurement_to_dataframe(measurement: &Measurement) -> DataFrame {
         series.push(Series::new("time", vec![0; 1]));
     }
 
-    let length = if let Some(s) = series.get(0) {
+    let length = if let Some(s) = series.first() {
         s.len()
     } else {
         1

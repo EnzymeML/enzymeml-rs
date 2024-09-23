@@ -8,7 +8,7 @@ use xlsxwriter::worksheet::validation::{
     ErrorAlertOptions,
 };
 
-use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementDataBuilder};
+use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementDataBuilder};
 use crate::validation::validator::get_species_ids;
 
 static ERROR_MESSAGE: &str = "Only positive numbers are allowed in this cell.";
@@ -130,8 +130,9 @@ fn create_meas_template(
     let all_species = get_species_ids(enzmldoc);
 
     // Create a measurement that has all species with empty data
-    let mut measurement_template = Measurement::default();
-    measurement_template.name = String::from("EnzymeML Measurement Template");
+    let mut measurement_template = MeasurementBuilder::default()
+        .name(String::from("EnzymeML Measurement Template"))
+        .build()?;
 
     for species in all_species {
         measurement_template.species_data.push(
