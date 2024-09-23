@@ -89,8 +89,8 @@ impl ODESystem {
         }
 
         for (symbol, eq) in self.equations.initial_assignments.iter() {
-            let value = eval_with_context(eq, &context.clone()).unwrap_or_else(|_| panic!("Could not evaluate equation for species {}",
-                symbol));
+            let value = eval_with_context(eq, &context.clone())
+                .unwrap_or_else(|_| panic!("Could not evaluate equation for species {}", symbol));
 
             self.initial_assignments
                 .insert(symbol.clone(), value.as_number().unwrap());
@@ -125,8 +125,8 @@ impl ODESystem {
 
         // Evaluate the assignment rules
         for (symbol, eq) in self.equations.assignments.iter() {
-            let value = eval_with_context(eq, &context.clone()).unwrap_or_else(|_| panic!("Could not evaluate equation for species {}",
-                symbol));
+            let value = eval_with_context(eq, &context.clone())
+                .unwrap_or_else(|_| panic!("Could not evaluate equation for species {}", symbol));
 
             assignments.insert(symbol.clone(), value.as_number().unwrap());
         }
@@ -186,8 +186,8 @@ impl System<f64, State> for ODESystem {
             let eq = self.equations.ode.get(species).expect("Equation not found");
 
             // Evaluate the equation
-            let value = eval_with_context(eq, &context.clone()).unwrap_or_else(|_| panic!("Could not evaluate equation for species {}",
-                species));
+            let value = eval_with_context(eq, &context.clone())
+                .unwrap_or_else(|_| panic!("Could not evaluate equation for species {}", species));
 
             // Lock the `dy` for safe mutation
             let mut dy = dy.lock().unwrap();

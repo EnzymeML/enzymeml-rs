@@ -167,10 +167,7 @@ pub fn read_excel(path: PathBuf) -> Result<HashMap<String, DataFrame>, Box<dyn E
         let species_data = process_sheet(&mut workbook, &sheet)?;
 
         // Convert the HashMap to a DataFrame
-        dfs.insert(
-            sheet,
-            DataFrame::new(species_data.into_values().collect())?,
-        );
+        dfs.insert(sheet, DataFrame::new(species_data.into_values().collect())?);
     }
 
     Ok(dfs)
