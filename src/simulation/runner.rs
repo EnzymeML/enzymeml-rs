@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::error::Error;
 
-use derive_builder::Builder;
 use ode_solvers::{DVector, Dopri5};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -11,73 +9,10 @@ use crate::prelude::{EquationType, Measurement};
 use crate::simulation::result::SimulationResult;
 use crate::simulation::system::ODESystem;
 
+use super::error::SimulationError;
+use super::SimulationSetup;
+
 pub type InitialConditionType = HashMap<String, f64>;
-
-#[derive(Debug, Clone, Builder, Serialize, Deserialize)]
-pub struct SimulationSetup {
-    #[builder(default = "0.0")]
-    t0: f64,
-    t1: f64,
-    #[builder(default = "1e-1")]
-    dt: f64,
-    #[builder(default = "1e-3")]
-    rtol: f64,
-    #[builder(default = "1e-6")]
-    atol: f64,
-}
-
-#[derive(Debug)]
-pub enum InitCondInput {
-    Single(HashMap<String, f64>),
-    Multiple(Vec<HashMap<String, f64>>),
-}
-
-impl From<Measurement> for InitCondInput {
-    fn from(measurement: Measurement) -> Self {
-        Self::Single(HashMap::from_iter(
-            measurement
-                .species_data
-                .iter()
-                .map(|species| (species.species_id.clone(), species.initial.into())),
-        ))
-    }
-}
-
-impl From<Vec<Measurement>> for InitCondInput {
-    fn from(measurements: Vec<Measurement>) -> Self {
-        let mut init_conds = Vec::new();
-
-        for measurement in measurements.iter() {
-            init_conds.push(HashMap::from_iter(
-                measurement
-                    .species_data
-                    .iter()
-                    .map(|species| (species.species_id.clone(), species.initial.into())),
-            ));
-        }
-
-        Self::Multiple(init_conds)
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
-pub struct Equations {
-    pub(crate) ode: HashMap<String, String>,
-    pub(crate) initial_assignments: HashMap<String, String>,
-    pub(crate) assignments: HashMap<String, String>,
-}
-
-impl From<InitialConditionType> for InitCondInput {
-    fn from(ic: HashMap<String, f64>) -> Self {
-        InitCondInput::Single(ic)
-    }
-}
-
-impl From<Vec<HashMap<String, f64>>> for InitCondInput {
-    fn from(ics: Vec<HashMap<String, f64>>) -> Self {
-        InitCondInput::Multiple(ics)
-    }
-}
 
 /// Simulates the given EnzymeMLDocument with the provided initial conditions and simulation parameters.
 ///
@@ -98,10 +33,16 @@ pub fn simulate(
     enzmldoc: &EnzymeMLDocument,
     initial_conditions: InitCondInput,
     setup: SimulationSetup,
-) -> Result<Vec<SimulationResult>, Box<dyn Error>> {
+    parameters: Option<HashMap<String, f64>>,
+    evaluate: Option<&Vec<f64>>,
+) -> Result<Vec<SimulationResult>, SimulationError> {
     match initial_conditions {
-        InitCondInput::Single(ic) => integrate(enzmldoc, ic, setup).map(|res| vec![res]),
-        InitCondInput::Multiple(ics) => integrate_multiple(enzmldoc, ics, setup),
+        InitCondInput::Single(ic) => {
+            integrate(enzmldoc, ic, setup, parameters, evaluate).map(|res| vec![res])
+        }
+        InitCondInput::Multiple(ics) => {
+            integrate_multiple(enzmldoc, ics, setup, parameters, evaluate)
+        }
     }
 }
 
@@ -120,14 +61,22 @@ fn integrate_multiple(
     enzmldoc: &EnzymeMLDocument,
     initial_conditions: Vec<HashMap<String, f64>>,
     setup: SimulationSetup,
-) -> Result<Vec<SimulationResult>, Box<dyn Error>> {
+    parameters: Option<HashMap<String, f64>>,
+    evaluate: Option<&Vec<f64>>,
+) -> Result<Vec<SimulationResult>, SimulationError> {
     let results: Vec<SimulationResult> = initial_conditions
         .par_iter()
         .map(|ic| {
-            let result = integrate(&enzmldoc.clone(), ic.clone(), setup.clone());
-            result.unwrap()
+            let result = integrate(
+                &enzmldoc.clone(),
+                ic.clone(),
+                setup.clone(),
+                parameters.clone(),
+                evaluate,
+            )?;
+            Ok(result)
         })
-        .collect::<Vec<SimulationResult>>();
+        .collect::<Result<Vec<SimulationResult>, SimulationError>>()?;
 
     Ok(results)
 }
@@ -139,6 +88,7 @@ fn integrate_multiple(
 /// * enzmldoc - A reference to the EnzymeMLDocument.
 /// * initial_conditions - A hashmap of initial conditions.
 /// * setup - The simulation setup parameters.
+/// * parameters - A hashmap of parameters, if using in an optimization.
 ///
 /// # Returns
 ///
@@ -147,10 +97,15 @@ fn integrate(
     enzmldoc: &EnzymeMLDocument,
     initial_conditions: HashMap<String, f64>,
     setup: SimulationSetup,
-) -> Result<SimulationResult, Box<dyn Error>> {
-    let parameters = extract_all_parameters(enzmldoc)?;
-    let equations = extract_equations(enzmldoc);
+    parameters: Option<HashMap<String, f64>>,
+    evaluate: Option<&Vec<f64>>,
+) -> Result<SimulationResult, SimulationError> {
+    let parameters = match parameters {
+        Some(params) => params,
+        None => extract_all_parameters(enzmldoc)?,
+    };
 
+    let equations = extract_equations(enzmldoc);
     let system = ODESystem::new(parameters, initial_conditions, equations)?;
 
     let y0 = system.get_y0_vector();
@@ -166,15 +121,42 @@ fn integrate(
 
     let res = stepper.integrate();
 
-    match res {
-        Ok(_) => {
-            let df = collect_results(stepper.x_out(), stepper.y_out(), &system);
-            match df {
-                Ok(df) => Ok(df),
-                Err(e) => Err(e),
-            }
+    if res.is_err() {
+        return Err(SimulationError::IntegrationError(res.err().unwrap()));
+    }
+
+    match evaluate {
+        Some(eval) => {
+            let time_points = stepper.x_out();
+            let y_out = stepper.y_out();
+
+            // Parallelize finding closest indices
+            let indices: Vec<usize> = eval
+                .par_iter()
+                .map(|&target| {
+                    time_points
+                        .par_iter()
+                        .enumerate()
+                        .min_by(|(_, a), (_, b)| {
+                            (*a - target)
+                                .abs()
+                                .partial_cmp(&(*b - target).abs())
+                                .unwrap()
+                        })
+                        .map(|(index, _)| index)
+                        .unwrap()
+                })
+                .collect();
+
+            // Parallelize collecting selected times and values
+            let selected_times: Vec<f64> = indices.par_iter().map(|&i| time_points[i]).collect();
+
+            let selected_y: Vec<DVector<f64>> =
+                indices.par_iter().map(|&i| y_out[i].clone()).collect();
+
+            collect_results(&selected_times, &selected_y, &system)
         }
-        Err(err) => Err(err.into()),
+        None => collect_results(stepper.x_out(), stepper.y_out(), &system),
     }
 }
 
@@ -193,7 +175,7 @@ fn collect_results(
     t: &Vec<f64>,
     y: &[DVector<f64>],
     system: &ODESystem,
-) -> Result<SimulationResult, Box<dyn Error>> {
+) -> Result<SimulationResult, SimulationError> {
     let mut result = SimulationResult::new(t.to_owned());
 
     // Prepare assignments
@@ -203,9 +185,18 @@ fn collect_results(
 
     // Calculate assignments
     for (t, data) in t.iter().zip(y.iter()) {
-        let values = system.calculate_assignment_rules(data, t)?;
+        let values = system
+            .calculate_assignment_rules(data, t)
+            .map_err(|e| SimulationError::CollectResultsError(e.to_string()))?;
         for (assignment, value) in values.iter() {
-            result.assignments.get_mut(assignment).unwrap().push(*value);
+            result
+                .assignments
+                .get_mut(assignment)
+                .ok_or(SimulationError::CollectResultsError(format!(
+                    "Assignment rule for {} not found",
+                    assignment
+                )))?
+                .push(*value);
         }
     }
 
@@ -225,7 +216,7 @@ fn collect_results(
 /// # Returns
 ///
 /// Returns a Result containing a hashmap of parameters or an error.
-fn extract_all_parameters(doc: &EnzymeMLDocument) -> Result<HashMap<String, f64>, Box<dyn Error>> {
+fn extract_all_parameters(doc: &EnzymeMLDocument) -> Result<HashMap<String, f64>, SimulationError> {
     let mut params = HashMap::new();
 
     for param in doc.parameters.iter() {
@@ -246,7 +237,7 @@ fn extract_all_parameters(doc: &EnzymeMLDocument) -> Result<HashMap<String, f64>
 /// Returns a Result containing a validated hashmap of parameters or an error.
 fn validate_parameters(
     params: HashMap<String, Parameter>,
-) -> Result<HashMap<String, f64>, Box<dyn Error>> {
+) -> Result<HashMap<String, f64>, SimulationError> {
     let mut validated_params: HashMap<String, f64> = HashMap::new();
     let mut errors = Vec::new();
 
@@ -254,13 +245,13 @@ fn validate_parameters(
         if param.value.is_none() {
             errors.push(format!("Parameter {} is missing a value", key));
         } else {
-            validated_params.insert(key.clone(), param.value.unwrap() as f64);
+            validated_params.insert(key.clone(), param.value.unwrap());
         }
     }
 
     if !errors.is_empty() {
         let msg = format!("Parameters missing values:\n{}", errors.join("\n"));
-        return Err(msg.into());
+        return Err(SimulationError::ValidateParametersError(msg));
     }
 
     Ok(validated_params)
@@ -314,4 +305,67 @@ fn prepare_equation(eq: &str) -> String {
     }
 
     eq
+}
+
+#[derive(Debug)]
+pub enum InitCondInput {
+    Single(HashMap<String, f64>),
+    Multiple(Vec<HashMap<String, f64>>),
+}
+
+impl From<&Measurement> for InitCondInput {
+    fn from(measurement: &Measurement) -> Self {
+        Self::Single(HashMap::from_iter(
+            measurement
+                .species_data
+                .iter()
+                .map(|species| (species.species_id.clone(), species.initial)),
+        ))
+    }
+}
+
+impl From<Vec<Measurement>> for InitCondInput {
+    fn from(measurements: Vec<Measurement>) -> Self {
+        let mut init_conds = Vec::new();
+
+        for measurement in measurements.iter() {
+            init_conds.push(HashMap::from_iter(
+                measurement
+                    .species_data
+                    .iter()
+                    .map(|species| (species.species_id.clone(), species.initial)),
+            ));
+        }
+
+        if init_conds.len() == 1 {
+            Self::Single(init_conds[0].clone())
+        } else {
+            Self::Multiple(init_conds)
+        }
+    }
+}
+
+impl From<&EnzymeMLDocument> for InitCondInput {
+    fn from(doc: &EnzymeMLDocument) -> Self {
+        Self::from(doc.measurements.clone())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct Equations {
+    pub(crate) ode: HashMap<String, String>,
+    pub(crate) initial_assignments: HashMap<String, String>,
+    pub(crate) assignments: HashMap<String, String>,
+}
+
+impl From<InitialConditionType> for InitCondInput {
+    fn from(ic: HashMap<String, f64>) -> Self {
+        InitCondInput::Single(ic)
+    }
+}
+
+impl From<Vec<HashMap<String, f64>>> for InitCondInput {
+    fn from(ics: Vec<HashMap<String, f64>>) -> Self {
+        InitCondInput::Multiple(ics)
+    }
 }
