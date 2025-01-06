@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::enzyme_ml::UnitType;
 
 lazy_static::lazy_static! {
-    pub static ref KIND_MAPPINGS: HashMap<&'static str, (UnitType, Option<f32>)> = {
+    pub static ref KIND_MAPPINGS: HashMap<&'static str, (UnitType, Option<f64>)> = {
         let mut m = HashMap::new();
         // Mole
         m.insert("mole", (UnitType::Mole, None));
@@ -19,21 +19,21 @@ lazy_static::lazy_static! {
         m.insert("s", (UnitType::Second, None));
 
         // Minute
-        m.insert("minute", (UnitType::Second, Some(60_f32)));
-        m.insert("min", (UnitType::Second, Some(60_f32)));
-        m.insert("mins", (UnitType::Second, Some(60_f32)));
-        m.insert("minutes", (UnitType::Second, Some(60_f32)));
+        m.insert("minute", (UnitType::Second, Some(60_f64)));
+        m.insert("min", (UnitType::Second, Some(60_f64)));
+        m.insert("mins", (UnitType::Second, Some(60_f64)));
+        m.insert("minutes", (UnitType::Second, Some(60_f64)));
 
         // Hour
-        m.insert("hour", (UnitType::Second, Some(60_f32*60_f32)));
-        m.insert("hours", (UnitType::Second, Some(60_f32*60_f32)));
-        m.insert("hr", (UnitType::Second, Some(60_f32*60_f32)));
-        m.insert("h", (UnitType::Second, Some(60_f32*60_f32)));
+        m.insert("hour", (UnitType::Second, Some(60_f64*60_f64)));
+        m.insert("hours", (UnitType::Second, Some(60_f64*60_f64)));
+        m.insert("hr", (UnitType::Second, Some(60_f64*60_f64)));
+        m.insert("h", (UnitType::Second, Some(60_f64*60_f64)));
 
         // Day
-        m.insert("day", (UnitType::Second, Some(60_f32*60_f32*24_f32)));
-        m.insert("days", (UnitType::Second, Some(60_f32*60_f32*24_f32)));
-        m.insert("d", (UnitType::Second, Some(60_f32*60_f32*24_f32)));
+        m.insert("day", (UnitType::Second, Some(60_f64*60_f64*24_f64)));
+        m.insert("days", (UnitType::Second, Some(60_f64*60_f64*24_f64)));
+        m.insert("d", (UnitType::Second, Some(60_f64*60_f64*24_f64)));
 
         // Gram
         m.insert("gram", (UnitType::Gram, None));
@@ -51,8 +51,8 @@ lazy_static::lazy_static! {
         m
     };
 
-    pub static ref PREFIX_MAPPING: HashMap<&'static str, f32> = {
-        let mut m: HashMap<&str, f32> = HashMap::new();
+    pub static ref PREFIX_MAPPING: HashMap<&'static str, f64> = {
+        let mut m: HashMap<&str, f64> = HashMap::new();
         m.insert("kilo", 3.0);
         m.insert("k", 3.0);
         m.insert("milli", -3.0);
