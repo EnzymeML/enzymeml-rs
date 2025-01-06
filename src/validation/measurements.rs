@@ -32,6 +32,12 @@ fn check_initial_concentrations(
         return;
     }
 
+    if let Some(data) = meas_data.data.as_ref() {
+        if data.is_empty() {
+            return;
+        }
+    }
+
     if meas_data.time.as_ref().unwrap().first().unwrap() != &0.0 {
         // If the first time point is not 0, we cannot check
         return;
