@@ -218,11 +218,11 @@ fn process_sheet(
 
         for (i, value) in row.iter().enumerate() {
             let species_name = &header_mapping[&i];
-            let measurement_value: f32 = value.parse().unwrap_or_else(|_| -1.0);
+            let measurement_value: f64 = value.parse().unwrap_or_else(|_| -1.0);
 
             species_data
                 .entry(species_name.clone())
-                .or_insert_with(|| Series::new(species_name, Vec::<f32>::new()))
+                .or_insert_with(|| Series::new(species_name, Vec::<f64>::new()))
                 .append(&Series::new(species_name, vec![measurement_value]))?;
         }
     }
