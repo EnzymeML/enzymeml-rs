@@ -71,10 +71,10 @@ impl MeasurementBuilder {
     ///
     /// Returns a `Result` containing the `MeasurementBuilder` or an error if the conversion fails.
     pub fn from_dataframe(df: &DataFrame) -> Result<MeasurementBuilder, Box<dyn Error>> {
-        let time_series: Vec<f32> = df
+        let time_series: Vec<f64> = df
             .column("time")
             .expect("Time column not found")
-            .f32()
+            .f64()
             .unwrap()
             .into_iter()
             .map(|opt| opt.unwrap_or_default())
@@ -92,8 +92,8 @@ impl MeasurementBuilder {
             if column.name() != "time" {
                 let species_id = column.name().to_string();
                 let mut time = time_series.clone();
-                let mut data: Vec<f32> = column
-                    .f32()
+                let mut data: Vec<f64> = column
+                    .f64()
                     .unwrap()
                     .into_iter()
                     .map(|opt| opt.unwrap_or_default())
@@ -151,7 +151,7 @@ pub fn measurement_to_dataframe(measurement: &Measurement) -> DataFrame {
     }
 
     if series.is_empty() {
-        series.push(Series::new("time", vec![0.0; 1])); // Use floating-point values (f32 or f64)
+        series.push(Series::new("time", vec![0.0; 1])); // Use floating-point values (f64)
         for (species, initial) in non_measured {
             series.push(Series::new(species, vec![*initial; 1])); // Dereference `initial`
         }
@@ -208,8 +208,8 @@ pub fn measurement_to_dataframe(measurement: &Measurement) -> DataFrame {
 /// * `data` - A reference to the `MeasurementData` instance from which data will be collected.
 fn collect_data<'a>(
     series: &mut Vec<Series>,
-    non_measured: &mut Vec<(&'a String, &'a f32)>, // Lifetimes tied to 'a
-    times: &mut Vec<Vec<f32>>,
+    non_measured: &mut Vec<(&'a String, &'a f64)>, // Lifetimes tied to 'a
+    times: &mut Vec<Vec<f64>>,
     data: &'a MeasurementData, // Lifetimes tied to 'a
 ) {
     if data.data.is_some() && data.time.is_some() {
