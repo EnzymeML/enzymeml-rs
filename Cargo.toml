@@ -13,13 +13,28 @@ schemars = "0.8.21"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.119"
 rayon = "1.10.0"
-ode_solvers = "0.4.0"
+ode_solvers = "0.5.0"
 evalexpr = "11.3.0"
 plotly = "0.9.0"
 polars = { version = "0.41", features = ["csv"], default-features = false }
 calamine = "0.25.0"
 xlsxwriter = "0.6.1"
 tempfile = "3.10.1"
-mdmodels-macro = "0.1.1"
+mdmodels-macro = "0.1.2"
+wasm-bindgen = { version = "0.2.92", optional = true }
+quick-xml = { version = "0.37.1", features = ["serialize"] }
+argmin = { version = "0.10.0" }
+argmin-math = { version = "0.4.0", features = ["ndarray_v0_15-nolinalg"] }
+finitediff = { version = "0.1.0", features = ["ndarray"] }
+ordered-float = { version = "4.0" }
+ndarray = "^0.15"
+thiserror = "2.0.9"
+argmin-observer-slog = "0.1.0"
+nalgebra = "0.33.2"
 
 
+[features]
+wasm = ["wasm-bindgen"]
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
