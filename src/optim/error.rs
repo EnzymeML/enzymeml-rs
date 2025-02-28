@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::prelude::error::SimulationError;
+use crate::simulation::error::SimulationError;
 
 #[derive(Error, Debug)]
 pub enum OptimizeError {
@@ -28,4 +28,24 @@ pub enum OptimizeError {
     SpeciesDataNotFound(String),
     #[error("No solution found")]
     NoSolution,
+    #[error("Non-homogenous times")]
+    NonHomogenousTimes,
+    #[error("No time points found")]
+    NoTimePoints,
+    #[error("No measurement found for species {0}")]
+    NoMeasurement(String),
+    #[error("No measurement data found for measurement {0}")]
+    NoMeasurementData(String),
+    #[error("Measurement data has wrong shape")]
+    MeasurementShapeError(#[from] ndarray::ShapeError),
+    #[error("Sensitivities not found")]
+    SensitivitiesNotFound,
+    #[error("Non-homogenous observations")]
+    NonHomogenousObservations,
+    #[error("Initial guess array has wrong length")]
+    InitialGuessLengthError { expected: usize, found: usize },
+    #[error("Missing initial guesses for parameters: {missing:?}")]
+    MissingInitialGuesses { missing: Vec<String> },
+    #[error("Problem did not converge")]
+    ConvergenceError,
 }

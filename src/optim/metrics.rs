@@ -117,32 +117,3 @@ pub fn bayesian_information_criterion(
     let sse = sum_of_squared_errors(residuals);
     num_samples * (sse / num_samples).ln() + num_parameters * num_samples.ln()
 }
-
-/// Calculates the Huber loss, a robust loss function that combines squared error for small residuals
-/// and absolute error for large residuals to reduce sensitivity to outliers.
-///
-/// The Huber loss is quadratic for residuals smaller than delta and linear for larger residuals,
-/// making it more robust than pure squared error loss while maintaining differentiability.
-///
-/// For a residual x and threshold δ (delta):
-/// Loss = x²/2        if |x| ≤ δ
-/// Loss = δ(|x| - δ/2) if |x| > δ
-///
-/// # Arguments
-/// * `residuals` - 2D array of residuals between predicted and actual values
-/// * `num_samples` - Total number of data points for normalization
-/// * `delta` - Threshold that determines transition between quadratic and linear regions
-///
-/// # Returns
-/// * `f64` - Normalized Huber loss value
-pub fn huber_loss(residuals: &Array2<f64>, num_samples: f64, delta: f64) -> f64 {
-    let residuals = residuals.mapv(|x| x.abs());
-    let huber = residuals.mapv(|x| {
-        if x < delta {
-            x * x / 2.0
-        } else {
-            delta * (x - delta / 2.0)
-        }
-    });
-    huber.sum() / num_samples
-}

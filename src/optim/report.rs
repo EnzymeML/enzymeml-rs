@@ -6,7 +6,7 @@ use plotly::Plot;
 use serde::Serialize;
 
 use crate::prelude::{
-    error::SimulationError, result::SimulationResult, runner::InitCondInput, simulate,
+    error::SimulationError, init_cond::InitCondInput, result::SimulationResult, simulate,
     EnzymeMLDocument, SimulationSetup,
 };
 
@@ -102,7 +102,7 @@ impl OptimizationReport {
 
             // Simulate the model
             let initial_conditions: InitCondInput = meas.into();
-            let fit = simulate(&doc, initial_conditions, setup, None, None).unwrap();
+            let fit = simulate(&doc, initial_conditions, setup, None, None, None).unwrap();
             fits.insert(meas.id.clone(), fit.first().unwrap().clone());
         }
 
