@@ -68,10 +68,12 @@ pub mod optim {
 
     pub mod optimizers {
         pub use crate::optim::optimizers::bfgs::*;
+        pub use crate::optim::optimizers::ego::*;
         pub use crate::optim::optimizers::lbfgs::*;
         pub use crate::optim::optimizers::optimizer::*;
         pub use crate::optim::optimizers::pso::*;
         pub mod bfgs;
+        pub mod ego;
         pub mod lbfgs;
         pub mod optimizer;
         pub mod pso;
