@@ -45,7 +45,7 @@ impl TryFrom<&EnzymeMLDocument> for Array2<f64> {
 
         let views = arrays.iter().map(|a| a.view()).collect::<Vec<_>>();
 
-        Ok(ndarray::concatenate(Axis(0), &views).map_err(OptimizeError::MeasurementShapeError)?)
+        ndarray::concatenate(Axis(0), &views).map_err(OptimizeError::MeasurementShapeError)
     }
 }
 

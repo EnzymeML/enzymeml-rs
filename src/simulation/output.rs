@@ -114,7 +114,7 @@ impl OutputFormat for SimulationResult {
         // Add species to the result
         let mut species = TimeSeriesMapping::new();
         for (i, name) in system.get_sorted_species().iter().enumerate() {
-            let values = y_out.iter().map(|row| *row.index(i as usize)).collect();
+            let values = y_out.iter().map(|row| *row.index(i)).collect();
             species.insert(name.clone(), values);
         }
 
@@ -125,10 +125,7 @@ impl OutputFormat for SimulationResult {
         let assignments = if let Some(assignments_out) = assignments_out {
             let mut assignments = TimeSeriesMapping::new();
             for (i, name) in system.get_sorted_assignments().iter().enumerate() {
-                let values = assignments_out
-                    .iter()
-                    .map(|row| *row.index(i as usize))
-                    .collect();
+                let values = assignments_out.iter().map(|row| *row.index(i)).collect();
                 assignments.insert(name.clone(), values);
             }
             Some(assignments)

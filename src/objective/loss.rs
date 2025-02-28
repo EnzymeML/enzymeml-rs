@@ -26,7 +26,7 @@
 /// allowing easy extension and runtime selection of loss functions.
 use ndarray::{Array1, Array2, Array3, Axis};
 
-use super::{error::ObjectiveError, objective::ObjectiveFunction};
+use super::{error::ObjectiveError, objfun::ObjectiveFunction};
 
 /// Enumeration of different loss functions available for optimization
 ///
@@ -387,7 +387,7 @@ impl ObjectiveFunction for MeanAbsoluteError {
         let expanded = sign_residuals.insert_axis(Axis(2));
         let sign_residuals_expanded = expanded
             .broadcast((n_timepoints, n_species, n_params))
-            .ok_or_else(|| ObjectiveError::ShapeError)?;
+            .ok_or(ObjectiveError::ShapeError)?;
 
         // Multiply signs with sensitivities and sum
         let product = &sign_residuals_expanded * sensitivities;

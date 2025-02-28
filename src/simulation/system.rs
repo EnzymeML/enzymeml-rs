@@ -98,7 +98,7 @@ pub struct ODESystem {
 /// main system implementation separate from solver-specific traits.
 struct StepperSystem<'a>(&'a ODESystem);
 
-impl<'a> System<f64, State> for StepperSystem<'a> {
+impl System<f64, State> for StepperSystem<'_> {
     fn system(&self, t: Time, y: &State, dy: &mut State) {
         self.0.system(t, y, dy)
     }
@@ -325,7 +325,7 @@ impl ODESystem {
 
         // If we want to evaluate at specific times, we need to interpolate the output to match the evaluation times
         let (x_out, y_out) = if let Some(evaluate) = evaluate {
-            let interpolated_output = interpolate(stepper.y_out(), stepper.x_out(), &evaluate);
+            let interpolated_output = interpolate(stepper.y_out(), stepper.x_out(), evaluate);
             (evaluate.to_vec(), interpolated_output)
         } else {
             (
@@ -348,7 +348,7 @@ impl ODESystem {
             y_out,
             assignment_out,
             Array1::from_vec(x_out.to_vec()),
-            &self,
+            self,
             matches!(mode, Mode::Sensitivity),
         );
 
@@ -408,7 +408,7 @@ impl ODESystem {
                     setup,
                     initial_conditions.clone(),
                     parameters,
-                    evaluate.clone(),
+                    *evaluate,
                     mode.clone(),
                 )
             })
@@ -439,7 +439,7 @@ impl ODESystem {
     /// - Err(SimulationError): If any required mapping is missing
     fn derive_mapping(
         var_map: &HashMap<String, u32>,
-        variables: &Vec<String>,
+        variables: &[String],
     ) -> Result<HashMap<String, u32>, SimulationError> {
         let mut mapping = HashMap::new();
         for (key, index) in var_map.iter() {

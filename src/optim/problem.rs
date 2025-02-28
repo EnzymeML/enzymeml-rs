@@ -105,12 +105,7 @@ impl Problem {
         let species_order = ode_system.get_sorted_species();
         let observable_species: Vec<usize> = Self::get_observable_species(&doc)?
             .iter()
-            .filter_map(|s| {
-                species_order
-                    .iter()
-                    .position(|sp| sp == s)
-                    .map(|i| i as usize)
-            })
+            .filter_map(|s| species_order.iter().position(|sp| sp == s))
             .collect();
 
         Ok(Self {
@@ -252,7 +247,7 @@ impl Problem {
                 measurement
                     .species_data
                     .iter()
-                    .filter(|species| species.data.as_ref().map_or(false, |data| !data.is_empty()))
+                    .filter(|species| species.data.as_ref().is_some_and(|data| !data.is_empty()))
                     .map(|species| species.species_id.clone())
                     .collect()
             })

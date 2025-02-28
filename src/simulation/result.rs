@@ -162,7 +162,7 @@ impl SimulationResult {
             .as_mut()
             .unwrap()
             .entry(parameter)
-            .or_insert(HashMap::new())
+            .or_default()
             .insert(species, values);
     }
 

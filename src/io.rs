@@ -26,8 +26,8 @@ use crate::prelude::EnzymeMLDocument;
 /// * The file contents cannot be parsed as valid JSON (`IOError::JsonParseError`)
 /// * The JSON structure does not match the expected EnzymeML document format
 pub fn load_enzmldoc(path: &PathBuf) -> Result<EnzymeMLDocument, IOError> {
-    let file = std::fs::File::open(path).map_err(|e| IOError::FileNotFound(e))?;
-    serde_json::from_reader(file).map_err(|e| IOError::JsonParseError(e))
+    let file = std::fs::File::open(path).map_err(IOError::FileNotFound)?;
+    serde_json::from_reader(file).map_err(IOError::JsonParseError)
 }
 
 /// Represents errors that can occur during EnzymeML document I/O operations.

@@ -106,5 +106,5 @@ fn setup_splines(
 ///
 /// A single matrix containing all the elements of the input vectors.
 fn concantenate_vectors(vectors: &StepperOutput) -> DMatrix<f64> {
-    DMatrix::from_columns(&vectors).transpose()
+    DMatrix::from_columns(vectors).transpose()
 }

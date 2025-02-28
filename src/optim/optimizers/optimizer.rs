@@ -73,8 +73,8 @@ impl TryInto<InitialGuesses> for &EnzymeMLDocument {
     }
 }
 
-impl Into<InitialGuesses> for Array1<f64> {
-    fn into(self) -> InitialGuesses {
-        InitialGuesses(self)
+impl From<Array1<f64>> for InitialGuesses {
+    fn from(value: Array1<f64>) -> Self {
+        InitialGuesses(value)
     }
 }

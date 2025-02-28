@@ -6,7 +6,7 @@ use finitediff::FiniteDiff;
 use ndarray::{Array1, Array2, Array3, Axis, ShapeError};
 
 use crate::{
-    objective::objective::ObjectiveFunction,
+    objective::objfun::ObjectiveFunction,
     prelude::{MatrixResult, Mode},
 };
 
@@ -47,7 +47,7 @@ impl CostFunction for Problem {
 
         // Extract the columns of the species and sensitivities arrays
         // that correspond to the observable species
-        let species = species.select(Axis(1), &self.observable_species());
+        let species = species.select(Axis(1), self.observable_species());
 
         let residuals = species - self.measurement_buffer();
         let cost = self.objective().cost(&residuals, self.n_points()).unwrap();
@@ -70,7 +70,7 @@ impl Gradient for Problem {
     /// # Returns
     /// * `Result<Array1<f64>, argmin::core::Error>` - The computed gradient vector or an error
     fn gradient(&self, params: &Self::Param) -> Result<Self::Gradient, argmin::core::Error> {
-        let gradient = params.central_diff(&|x| self.cost(&x).unwrap());
+        let gradient = params.central_diff(&|x| self.cost(x).unwrap());
         Ok(gradient)
     }
 }
@@ -88,7 +88,7 @@ impl Hessian for Problem {
     type Hessian = Array2<f64>;
 
     fn hessian(&self, params: &Self::Param) -> Result<Self::Hessian, argmin::core::Error> {
-        let hessian = params.central_hessian(&|x| self.gradient(&x).unwrap());
+        let hessian = params.central_hessian(&|x| self.gradient(x).unwrap());
         Ok(hessian)
     }
 }

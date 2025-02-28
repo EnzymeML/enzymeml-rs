@@ -81,7 +81,7 @@ pub mod optim {
 pub mod objective {
     pub mod error;
     pub mod loss;
-    pub mod objective;
+    pub mod objfun;
 }
 
 /// Validation of EnzymeML documents and components

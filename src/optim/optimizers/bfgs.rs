@@ -136,23 +136,6 @@ pub struct BFGSBuilder {
 }
 
 impl BFGSBuilder {
-    /// Creates a new BFGSBuilder with default settings.
-    ///
-    /// Default values:
-    /// - c1: 1e-4 (sufficient decrease parameter)
-    /// - c2: 0.9 (curvature condition parameter)
-    /// - m: 5 (history size)
-    /// - max_iters: 500
-    /// - target_cost: 1e-6
-    pub fn default() -> Self {
-        Self {
-            c1: 1e-4,
-            c2: 0.9,
-            max_iters: 500,
-            target_cost: 1e-6,
-        }
-    }
-
     /// Sets the line search parameters.
     ///
     /// # Arguments
@@ -196,6 +179,25 @@ impl BFGSBuilder {
             c2: self.c2,
             max_iters: self.max_iters,
             target_cost: self.target_cost,
+        }
+    }
+}
+
+impl Default for BFGSBuilder {
+    /// Creates a new BFGSBuilder with default settings.
+    ///
+    /// Default values:
+    /// - c1: 1e-4 (sufficient decrease parameter)
+    /// - c2: 0.9 (curvature condition parameter)
+    /// - m: 5 (history size)
+    /// - max_iters: 500
+    /// - target_cost: 1e-6
+    fn default() -> Self {
+        Self {
+            c1: 1e-4,
+            c2: 0.9,
+            max_iters: 500,
+            target_cost: 1e-6,
         }
     }
 }
