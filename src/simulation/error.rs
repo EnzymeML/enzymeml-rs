@@ -1,11 +1,32 @@
-use evalexpr::EvalexprError;
+//! Simulation Error Module
+//!
+//! This module provides a comprehensive error handling mechanism for ODE simulations.
+//!
+//! # Key Error Types
+//!
+//! The [`SimulationError`] enum covers various potential failure points in the simulation process:
+//! - Equation evaluation errors
+//! - ODE integration errors
+//! - ODE system creation errors
+//! - Parameter validation errors
+//! - Result collection errors
+//! - Initial assignment calculation errors
+//! - Output type mismatches
+//!
+//! # Usage
+//!
+//! This error type can be used to provide detailed error information
+//! when simulation processes encounter issues, allowing for precise
+//! error diagnosis and handling.
+
+use evalexpr_jit::errors::EquationError;
 use ode_solvers::dop_shared::IntegrationError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum SimulationError {
-    #[error("Error evaluating expression")]
-    EvalExpressionError(EvalexprError),
+    #[error("Error evaluating expression: {0}")]
+    EquationError(EquationError),
     #[error("Error integrating ODEs: {0}")]
     IntegrationError(IntegrationError),
     #[error("Error creating ODE system")]
@@ -18,4 +39,10 @@ pub enum SimulationError {
     CalculateInitialAssignmentsError(String),
     #[error("Other error: {0}")]
     Other(String),
+    #[error("Invalid output type: Expected '{0}'")]
+    InvalidOutputType(String),
+    #[error("Equation error: {0}")]
+    AssigmentRecalculationError(#[from] EquationError),
+    #[error("Failed to convert EnzymeMLDocument to {0}")]
+    ConversionError(String),
 }
