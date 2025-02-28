@@ -12,10 +12,13 @@
 mod test_optim {
     use approx::assert_relative_eq;
     use enzymeml::{
-        optim::{BFGSBuilder, LBFGSBuilder, Optimizer, PSOBuilder, ProblemBuilder, Transformation},
+        optim::{
+            BFGSBuilder, EGOBuilder, LBFGSBuilder, Optimizer, PSOBuilder, ProblemBuilder,
+            Transformation,
+        },
         prelude::*,
     };
-    use ndarray::Array1;
+    use ndarray::{Array1, Array2};
     use std::path::PathBuf;
 
     fn get_doc() -> EnzymeMLDocument {
@@ -111,6 +114,27 @@ mod test_optim {
         let res = pso
             .optimize(&problem, None::<Array1<f64>>)
             .expect("Failed to optimize");
+
+        // ASSERT
+        let k_m = res[0];
+        let k_cat = res[1];
+        let k_ie = res[2];
+        assert_relative_eq!(k_m, 82.0, epsilon = 5.0);
+        assert_relative_eq!(k_cat, 0.85, epsilon = 0.1);
+        assert_relative_eq!(k_ie, 0.001, epsilon = 0.01);
+    }
+
+    #[test]
+    fn test_ego() {
+        // ARRANGE
+        let doc = get_doc();
+        let bounds =
+            Array2::from_shape_vec((3, 2), vec![1e-6, 120.0, 1e-6, 1.0, 1e-6, 0.005]).unwrap();
+        let problem = ProblemBuilder::new(&doc).dt(10.0).build().unwrap();
+
+        // ACT
+        let ego = EGOBuilder::new(bounds).max_iters(50).build();
+        let res = ego.optimize(&problem, None::<Array1<f64>>).unwrap();
 
         // ASSERT
         let k_m = res[0];
