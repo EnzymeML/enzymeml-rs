@@ -5,8 +5,8 @@ use plotly::{
 };
 
 use crate::prelude::{
-    error::SimulationError, result::PlotTraces, runner::InitCondInput, simulate, EnzymeMLDocument,
-    Measurement, SimulationSetup,
+    error::SimulationError, init_cond::InitialCondition, result::PlotTraces, system::ODESystem,
+    EnzymeMLDocument, Measurement, SimulationResult, SimulationSetup,
 };
 
 impl EnzymeMLDocument {
@@ -144,11 +144,13 @@ fn get_simulation_traces(
     meas: &Measurement,
 ) -> Result<PlotTraces, SimulationError> {
     let setup: SimulationSetup = meas.try_into().unwrap();
-    let initial_conditions: InitCondInput = meas.into();
+    let initial_conditions: InitialCondition = meas.into();
 
-    let result = simulate(doc, initial_conditions, setup, None, None)?;
-    let result = result.first().unwrap();
-    let traces: Vec<Box<Scatter<f64, f64>>> = result.into();
+    let system: ODESystem = doc.try_into().unwrap();
 
+    let result =
+        system.integrate::<SimulationResult>(&setup, initial_conditions, None, None, None)?;
+
+    let traces: Vec<Box<Scatter<f64, f64>>> = (&result).into();
     Ok(traces)
 }
