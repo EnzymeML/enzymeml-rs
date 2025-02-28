@@ -33,7 +33,6 @@ pub fn check_consistency(enzmldoc: &EnzymeMLDocument) -> Report {
 }
 
 /// The `Report` struct is used to store the results of the validation checks.
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Report {
     pub is_valid: bool,
