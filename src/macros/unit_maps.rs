@@ -1,3 +1,28 @@
+//! Unit Mapping Module
+//!
+//! This module provides static mappings for unit kinds and prefixes used in EnzymeML unit definitions.
+//!
+//! # Key Features
+//!
+//! - Comprehensive mapping of unit names to their corresponding `UnitType`
+//! - Support for multiple unit representations (full names, abbreviations)
+//! - Conversion factors for time-based units (minutes, hours, days)
+//!
+//! # Unit Mappings
+//!
+//! The module defines mappings for various units including:
+//! - Mole
+//! - Liter
+//! - Time units (seconds, minutes, hours, days)
+//! - Mass (grams)
+//! - Dimensionless quantities
+//! - Temperature (Kelvin)
+//!
+//! # Usage
+//!
+//! The mappings are used internally by unit conversion and definition macros
+//! to standardize and validate unit specifications.
+
 use std::collections::HashMap;
 
 use crate::enzyme_ml::UnitType;

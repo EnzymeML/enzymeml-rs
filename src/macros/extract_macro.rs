@@ -1,3 +1,21 @@
+//! Extraction Macro Module
+//!
+//! This module provides a powerful macro `extract_all` for flexible field extraction from structs.
+//!
+//! # Key Features
+//!
+//! - Extract single fields from structs
+//! - Access nested fields through dot notation
+//! - Extract elements from vectors using wildcard `[*]` or specific indices
+//!
+//! # Macro Behavior
+//!
+//! The macro supports multiple extraction patterns:
+//! - Simple field access
+//! - Nested field traversal
+//! - Vector element extraction
+//! - Recursive nested vector element extraction
+
 #[macro_export]
 /// `extract_all` is a macro that allows for the extraction of nested fields from a struct.
 /// It supports accessing single fields, nested fields, and elements within vectors.
