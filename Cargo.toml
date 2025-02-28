@@ -24,17 +24,27 @@ mdmodels-macro = "0.1.2"
 wasm-bindgen = { version = "0.2.92", optional = true }
 quick-xml = { version = "0.37.1", features = ["serialize"] }
 argmin = { version = "0.10.0" }
-argmin-math = { version = "0.4.0", features = ["ndarray_v0_15-nolinalg"] }
-finitediff = { version = "0.1.0", features = ["ndarray"] }
-ordered-float = { version = "4.0" }
-ndarray = "^0.15"
+argmin-math = { version = "0.4.0", features = ["ndarray_latest-nolinalg"] }
+ordered-float = "4.0"
+ndarray = "^0.15.6"
 thiserror = "2.0.9"
 argmin-observer-slog = "0.1.0"
 nalgebra = "0.33.2"
+evalexpr-jit = { version = "0.2.0", features = ["nalgebra"] }
+splines = { version = "4.4.2", features = ["nalgebra"] }
+charming = "0.4.0"
+sha2 = "0.10.8"
+finitediff = { version = "0.1.4", features = ["ndarray"] }
 
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false
 
 [features]
 wasm = ["wasm-bindgen"]
 
 [dev-dependencies]
+approx = "0.5.1"
 pretty_assertions = "1.4.1"
