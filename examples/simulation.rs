@@ -102,10 +102,10 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
     let result = system.integrate::<SimulationResult>(
         &setup,
         initial_conditions,
-        None, // We could also dynamically set new parameters
-        None, // We could also provide specific time points to extract
-        RK5::default(),
-        Some(Mode::Regular),
+        None,                // We could also dynamically set new parameters
+        None,                // We could also provide specific time points to extract
+        RK5::default(),      // We could also use a different solver
+        Some(Mode::Regular), // We could also use a different mode (e.g. Sensitivity)
     );
 
     if let Ok(result) = result {

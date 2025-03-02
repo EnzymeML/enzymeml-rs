@@ -74,7 +74,9 @@ pub mod optim {
 
     pub mod bound;
     pub mod error;
+    pub mod metrics;
     pub mod problem;
+    pub mod report;
     pub mod system;
     pub mod transformation;
 

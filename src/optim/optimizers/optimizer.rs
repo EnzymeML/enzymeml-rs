@@ -9,6 +9,7 @@
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 
+use crate::optim::report::OptimizationReport;
 use crate::{optim::problem::Problem, prelude::EnzymeMLDocument};
 
 use crate::optim::error::OptimizeError;
@@ -27,7 +28,7 @@ pub trait Optimizer<S: ODEIntegrator + Copy> {
         &self,
         problem: &Problem<S>,
         initial_guess: Option<T>,
-    ) -> Result<Array1<f64>, OptimizeError>
+    ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>;
 }

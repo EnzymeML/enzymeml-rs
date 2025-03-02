@@ -18,9 +18,9 @@ use argmin::core::State;
 use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::LBFGS as ArgminLBFGS;
 use argmin_observer_slog::SlogLogger;
-use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 
+use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 
 /// Implementation of the L-BFGS optimization algorithm.
@@ -84,7 +84,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
         &self,
         problem: &Problem<S>,
         initial_guess: Option<T>,
-    ) -> Result<Array1<f64>, OptimizeError>
+    ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,
     {
@@ -108,10 +108,18 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
             .run()
             .unwrap();
 
-        res.state
+        let best_params = res
+            .state
             .get_best_param()
             .cloned()
-            .ok_or(OptimizeError::ConvergenceError)
+            .ok_or(OptimizeError::ConvergenceError)?;
+
+        OptimizationReport::new(
+            problem,
+            problem.enzmldoc().clone(),
+            &best_params.to_vec(),
+            None,
+        )
     }
 }
 

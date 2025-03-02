@@ -14,10 +14,13 @@
 
 use argmin::core::CostFunction;
 use egobox_ego::EgorBuilder;
-use ndarray::{Array1, Array2, ArrayView2};
+use ndarray::{Array2, ArrayView2};
 use peroxide::fuga::ODEIntegrator;
 
-use crate::optim::{bounds_to_array2, Bound, InitialGuesses, OptimizeError, Optimizer, Problem};
+use crate::optim::{
+    bounds_to_array2, report::OptimizationReport, Bound, InitialGuesses, OptimizeError, Optimizer,
+    Problem,
+};
 
 /// Implementation of the Efficient Global Optimization algorithm.
 ///
@@ -56,7 +59,11 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
     ///
     /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-    fn optimize<T>(&self, problem: &Problem<S>, _: Option<T>) -> Result<Array1<f64>, OptimizeError>
+    fn optimize<T>(
+        &self,
+        problem: &Problem<S>,
+        _: Option<T>,
+    ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,
     {
@@ -82,7 +89,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
 
         // Return best parameters
         if let Some(params) = result.state.best_param {
-            Ok(params)
+            OptimizationReport::new(problem, problem.enzmldoc().clone(), &params.to_vec(), None)
         } else {
             Err(OptimizeError::ConvergenceError)
         }

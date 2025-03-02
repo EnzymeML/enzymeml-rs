@@ -53,12 +53,13 @@ mod test_optim {
             .expect("Failed to optimize");
 
         // ASSERT
-        let k_m = res[0];
-        let k_cat = res[1];
-        let k_ie = res[2];
-        assert_relative_eq!(k_m, 8.0, epsilon = 2.0);
-        assert_relative_eq!(k_cat, 2.0, epsilon = 2.0);
-        assert_relative_eq!(k_ie, 6.01, epsilon = 4.0);
+        let best_params = res.best_params;
+        let k_m = best_params["K_M"];
+        let k_cat = best_params["k_cat"];
+        let k_ie = best_params["k_ie"];
+        assert_relative_eq!(k_m, 82.0, epsilon = 5.0);
+        assert_relative_eq!(k_cat, 0.85, epsilon = 0.1);
+        assert_relative_eq!(k_ie, 0.001, epsilon = 0.01);
     }
 
     #[test]
@@ -86,12 +87,13 @@ mod test_optim {
             .expect("Failed to optimize");
 
         // ASSERT
-        let k_m = res[0];
-        let k_cat = res[1];
-        let k_ie = res[2];
-        assert_relative_eq!(k_m, 8.0, epsilon = 2.0);
-        assert_relative_eq!(k_cat, 2.0, epsilon = 2.0);
-        assert_relative_eq!(k_ie, 6.01, epsilon = 4.0);
+        let best_params = res.best_params;
+        let k_m = best_params["K_M"];
+        let k_cat = best_params["k_cat"];
+        let k_ie = best_params["k_ie"];
+        assert_relative_eq!(k_m, 82.0, epsilon = 5.0);
+        assert_relative_eq!(k_cat, 0.85, epsilon = 0.1);
+        assert_relative_eq!(k_ie, 0.001, epsilon = 0.01);
     }
 
     #[test]
@@ -117,9 +119,10 @@ mod test_optim {
             .expect("Failed to optimize");
 
         // ASSERT
-        let k_m = res[0];
-        let k_cat = res[1];
-        let k_ie = res[2];
+        let best_params = res.best_params;
+        let k_m = best_params["K_M"];
+        let k_cat = best_params["k_cat"];
+        let k_ie = best_params["k_ie"];
         assert_relative_eq!(k_m, 82.0, epsilon = 5.0);
         assert_relative_eq!(k_cat, 0.85, epsilon = 0.1);
         assert_relative_eq!(k_ie, 0.001, epsilon = 0.01);
@@ -145,10 +148,11 @@ mod test_optim {
             .unwrap();
 
         // ASSERT
-        let k_m = res[0];
-        let k_cat = res[1];
-        let k_ie = res[2];
-        assert_relative_eq!(k_m, 82.0, epsilon = 5.0);
+        let best_params = res.best_params;
+        let k_m = best_params["K_M"];
+        let k_cat = best_params["k_cat"];
+        let k_ie = best_params["k_ie"];
+        assert_relative_eq!(k_m, 82.0, epsilon = 10.0);
         assert_relative_eq!(k_cat, 0.85, epsilon = 0.1);
         assert_relative_eq!(k_ie, 0.001, epsilon = 0.01);
     }

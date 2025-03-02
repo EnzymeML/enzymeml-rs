@@ -15,10 +15,13 @@ use argmin::core::observers::ObserverMode;
 use argmin::core::Executor;
 use argmin::solver::particleswarm::ParticleSwarm;
 use argmin_observer_slog::SlogLogger;
-use ndarray::{s, Array1};
+use ndarray::s;
 use peroxide::fuga::ODEIntegrator;
 
-use crate::optim::{bounds_to_array2, Bound, InitialGuesses, OptimizeError, Optimizer, Problem};
+use crate::optim::{
+    bounds_to_array2, report::OptimizationReport, Bound, InitialGuesses, OptimizeError, Optimizer,
+    Problem,
+};
 
 /// Implementation of the BFGS optimization algorithm.
 ///
@@ -68,7 +71,11 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for ParticleSwarmOpt {
     ///
     /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-    fn optimize<T>(&self, problem: &Problem<S>, _: Option<T>) -> Result<Array1<f64>, OptimizeError>
+    fn optimize<T>(
+        &self,
+        problem: &Problem<S>,
+        _: Option<T>,
+    ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,
     {
@@ -89,9 +96,17 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for ParticleSwarmOpt {
                 .run()
                 .unwrap();
 
-        let best_individual = res.state.take_best_individual();
-        let best_individual = best_individual.ok_or(OptimizeError::ConvergenceError)?;
-        Ok(best_individual.position)
+        let best_individual = res
+            .state
+            .take_best_individual()
+            .ok_or(OptimizeError::ConvergenceError)?;
+
+        OptimizationReport::new(
+            problem,
+            problem.enzmldoc().clone(),
+            &best_individual.position.to_vec(),
+            None,
+        )
     }
 }
 

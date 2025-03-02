@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use ndarray::{Array2, Array3};
 use peroxide::fuga::ODEIntegrator;
@@ -266,6 +266,37 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
 
         // Convert the set to a sorted vector for consistent ordering
         Ok(first_set.iter().cloned().collect())
+    }
+
+    /// Applies transformations to a parameter vector
+    ///
+    /// # Arguments
+    /// * `param_vec` - The parameter vector to apply transformations to
+    ///
+    /// # Returns
+    /// * `Result<Vec<f64>, OptimizeError>` - The transformed parameter vector
+    ///
+    /// # Errors
+    /// Returns `OptimizeError::UnknownParameter` if an unknown parameter is encountered
+    pub fn apply_transformations(&self, param_vec: &Vec<f64>) -> Result<Vec<f64>, OptimizeError> {
+        let mut transformed_params = param_vec.clone();
+        let param_order = self.ode_system.get_sorted_params();
+
+        // Create a map of parameter name to transformation
+        let transform_map: HashMap<_, _> = self
+            .transformations
+            .iter()
+            .map(|t| (t.symbol(), t))
+            .collect();
+
+        // Apply transformations in one pass
+        for (i, param) in param_order.iter().enumerate() {
+            if let Some(transformation) = transform_map.get(param) {
+                transformed_params[i] = transformation.apply(transformed_params[i]);
+            }
+        }
+
+        Ok(transformed_params)
     }
 
     /// Returns the total number of parameters in the optimization problem
