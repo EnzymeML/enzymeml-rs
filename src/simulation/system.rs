@@ -805,6 +805,24 @@ impl ODESystem {
         &self.params_mapping
     }
 
+    /// Returns a sorted vector of parameter names.
+    ///
+    /// This method retrieves all parameter names from the parameters mapping and returns them
+    /// in numerically sorted order. This can be useful for consistent iteration over
+    /// parameters or displaying parameters in a deterministic order.
+    ///
+    /// # Returns
+    ///
+    /// A Vec<String> containing all parameter names in numerically sorted order
+    pub fn get_sorted_params(&self) -> Vec<String> {
+        let mut param_pairs: Vec<_> = self.params_mapping.iter().collect();
+        param_pairs.sort_by_key(|(_, &idx)| idx);
+        param_pairs
+            .into_iter()
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
     /// Returns a reference to the initial assignments mapping.
     ///
     /// The initial assignments mapping contains the mapping between variable names and their
