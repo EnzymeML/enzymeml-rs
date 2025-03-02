@@ -20,11 +20,18 @@ pub mod enzyme_ml {
 pub mod prelude {
     pub use crate::enzyme_ml::*;
     pub use crate::io::*;
+    pub use crate::simulation::init_cond::*;
     pub use crate::simulation::output::*;
     pub use crate::simulation::result::*;
     pub use crate::simulation::setup::*;
     pub use crate::simulation::system::*;
-    pub use crate::simulation::*;
+
+    #[cfg(feature = "optimization")]
+    pub use crate::objective::loss::*;
+    #[cfg(feature = "optimization")]
+    pub use crate::objective::objfun::*;
+    #[cfg(feature = "optimization")]
+    pub use crate::optim::*;
 }
 
 /// Core equation handling and manipulation
@@ -33,6 +40,7 @@ pub mod equation;
 /// Simulation functionality for enzyme kinetics
 pub mod simulation {
     pub use crate::simulation::setup::SimulationSetup;
+    pub use peroxide::fuga::*;
 
     /// Error types for simulation failures
     pub mod error;
@@ -56,8 +64,13 @@ pub mod optim {
     pub use crate::optim::error::*;
     pub use crate::optim::optimizers::*;
     pub use crate::optim::problem::*;
+    pub use crate::optim::transformation::*;
     pub use argmin::core::CostFunction;
     pub use argmin::core::Gradient;
+    use argmin_math as _;
+    pub use peroxide::fuga::{
+        ImplicitSolver, BS23, DP45, GL4, RALS3, RALS4, RK4, RK5, RKF45, TSIT45,
+    };
 
     pub mod bound;
     pub mod error;
@@ -81,6 +94,9 @@ pub mod optim {
 
 #[cfg(feature = "optimization")]
 pub mod objective {
+    pub use crate::objective::loss::*;
+    pub use crate::objective::objfun::*;
+
     pub mod error;
     pub mod loss;
     pub mod objfun;

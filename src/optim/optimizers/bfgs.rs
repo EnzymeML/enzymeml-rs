@@ -20,6 +20,7 @@ use argmin::solver::quasinewton::BFGS as ArgminBFGS;
 use argmin_observer_slog::SlogLogger;
 use ndarray::Array1;
 use ndarray::Array2;
+use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 
@@ -64,7 +65,7 @@ impl BFGS {
     }
 }
 
-impl Optimizer for BFGS {
+impl<S: ODEIntegrator + Copy> Optimizer<S> for BFGS {
     /// Optimizes the given problem using the BFGS algorithm.
     ///
     /// # Arguments
@@ -78,7 +79,7 @@ impl Optimizer for BFGS {
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
     fn optimize<T>(
         &self,
-        problem: &Problem,
+        problem: &Problem<S>,
         initial_guess: Option<T>,
     ) -> Result<Array1<f64>, OptimizeError>
     where

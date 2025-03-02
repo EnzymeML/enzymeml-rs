@@ -45,4 +45,8 @@ pub enum SimulationError {
     AssigmentRecalculationError(#[from] EquationError),
     #[error("Failed to convert EnzymeMLDocument to {0}")]
     ConversionError(String),
+    #[error("ArgMinMath error: {0}")]
+    ArgMinMathError(#[from] argmin_math::Error),
+    #[error("No data provided for interpolation")]
+    NoDataForInterpolation,
 }

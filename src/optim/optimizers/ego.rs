@@ -15,6 +15,7 @@
 use argmin::core::CostFunction;
 use egobox_ego::EgorBuilder;
 use ndarray::{Array1, Array2, ArrayView2};
+use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::{bounds_to_array2, Bound, InitialGuesses, OptimizeError, Optimizer, Problem};
 
@@ -43,7 +44,7 @@ impl EfficientGlobalOptimization {
     }
 }
 
-impl Optimizer for EfficientGlobalOptimization {
+impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
     /// Optimizes the given problem using the EGO algorithm.
     ///
     /// # Arguments
@@ -55,7 +56,7 @@ impl Optimizer for EfficientGlobalOptimization {
     ///
     /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-    fn optimize<T>(&self, problem: &Problem, _: Option<T>) -> Result<Array1<f64>, OptimizeError>
+    fn optimize<T>(&self, problem: &Problem<S>, _: Option<T>) -> Result<Array1<f64>, OptimizeError>
     where
         T: Into<InitialGuesses>,
     {
@@ -70,7 +71,7 @@ impl Optimizer for EfficientGlobalOptimization {
         };
 
         // Convert bounds to Array2
-        let bounds = bounds_to_array2(&problem, &self.bounds).unwrap();
+        let bounds = bounds_to_array2(&problem, &self.bounds)?;
 
         // Build and run EGO optimizer
         let result = EgorBuilder::optimize(objective)

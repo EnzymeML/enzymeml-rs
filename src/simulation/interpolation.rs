@@ -20,10 +20,9 @@
 //! The module is typically used to resample simulation results at specific time points,
 //! enabling more flexible analysis and visualization of simulation data.
 
-use nalgebra::{DMatrix, DVector};
 use splines::{Interpolation, Key, Spline};
 
-use super::system::StepperOutput;
+use super::{error::SimulationError, system::StepperOutput};
 
 /// Interpolates values at specified query times using both cubic and linear splines.
 ///
@@ -42,13 +41,14 @@ use super::system::StepperOutput;
 /// A vector of matrices where each matrix corresponds to a query time and contains the interpolated
 /// values for all variables at that time point. The interpolation uses cubic splines where possible,
 /// falling back to linear interpolation when cubic interpolation fails.
-pub fn interpolate(data: &StepperOutput, times: &[f64], query_times: &[f64]) -> StepperOutput {
-    // Concatenate the data into a single matrix
-    let concat_data = concantenate_vectors(data);
-
+pub fn interpolate(
+    data: &[Vec<f64>],
+    times: &[f64],
+    query_times: &[f64],
+) -> Result<StepperOutput, SimulationError> {
     // Setup the splines
-    let cubic_splines = setup_splines(&concat_data, times, Interpolation::CatmullRom);
-    let linear_splines = setup_splines(&concat_data, times, Interpolation::Linear);
+    let cubic_splines = setup_splines(data, times, Interpolation::CatmullRom)?;
+    let linear_splines = setup_splines(data, times, Interpolation::Linear)?;
 
     // Interpolate the values
     let mut interpolated_values: StepperOutput = Vec::with_capacity(query_times.len());
@@ -60,10 +60,10 @@ pub fn interpolate(data: &StepperOutput, times: &[f64], query_times: &[f64]) -> 
                 None => interpolated_values_row.push(linear_spline.clamped_sample(*t).unwrap()),
             }
         }
-        interpolated_values.push(DVector::from_row_slice(&interpolated_values_row));
+        interpolated_values.push(interpolated_values_row);
     }
 
-    interpolated_values
+    Ok(interpolated_values)
 }
 
 /// Creates a vector of splines, one for each column of simulation data.
@@ -78,33 +78,24 @@ pub fn interpolate(data: &StepperOutput, times: &[f64], query_times: &[f64]) -> 
 ///
 /// A vector of splines, where each spline interpolates one column of the simulation data
 fn setup_splines(
-    sim_data: &DMatrix<f64>,
+    sim_data: &[Vec<f64>],
     sim_times: &[f64],
     interpol: Interpolation<f64, f64>,
-) -> Vec<Spline<f64, f64>> {
+) -> Result<Vec<Spline<f64, f64>>, SimulationError> {
     // Return a spline for each column
-    let ncols = sim_data.ncols();
-    let mut splines = Vec::with_capacity(ncols);
+    let n_species = sim_data
+        .first()
+        .ok_or(SimulationError::NoDataForInterpolation)?
+        .len();
+    let mut splines = Vec::with_capacity(n_species);
 
-    for col in 0..ncols {
+    for species in 0..n_species {
         let mut keys = Vec::with_capacity(sim_times.len());
         for i in 0..sim_times.len() {
-            keys.push(Key::new(sim_times[i], sim_data[(i, col)], interpol));
+            keys.push(Key::new(sim_times[i], sim_data[i][species], interpol));
         }
         splines.push(Spline::from_vec(keys));
     }
-    splines
-}
 
-/// Concantenates a vector of vectors into a single vector.
-///
-/// # Arguments
-///
-/// * `vectors` - A vector of vectors to concantenate
-///
-/// # Returns
-///
-/// A single matrix containing all the elements of the input vectors.
-fn concantenate_vectors(vectors: &StepperOutput) -> DMatrix<f64> {
-    DMatrix::from_columns(vectors).transpose()
+    Ok(splines)
 }

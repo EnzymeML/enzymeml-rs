@@ -2,12 +2,14 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use ndarray::{Array2, Array3};
+use peroxide::fuga::ODEIntegrator;
 use sha2::{Digest, Sha256};
 
 use crate::prelude::{Measurement, ODESystem};
 use crate::{
     objective::loss::LossFunction,
-    prelude::{init_cond::InitialCondition, EnzymeMLDocument, SimulationSetup},
+    prelude::{EnzymeMLDocument, SimulationSetup},
+    simulation::init_cond::InitialCondition,
 };
 
 use super::error::OptimizeError;
@@ -26,7 +28,7 @@ use super::transformation::Transformation;
 /// * `transformations` - Optional parameter transformations to enforce constraints
 /// * `objective` - Objective function to optimize
 #[derive(Debug, Clone)]
-pub struct Problem {
+pub struct Problem<S: ODEIntegrator + Copy> {
     /// EnzymeML document containing the model definition, parameters and experimental data
     doc: EnzymeMLDocument,
     /// Optional user-provided initial conditions, otherwise derived from the document
@@ -41,6 +43,8 @@ pub struct Problem {
     ode_system: ODESystem,
     /// Observable species indices
     observable_species: Vec<usize>,
+    /// Solver
+    solver: S,
 
     // Buffer for measurement data
     measurement_buffer: Array2<f64>,
@@ -54,7 +58,7 @@ pub struct Problem {
     evaluation_times: Vec<Vec<f64>>,
 }
 
-impl Problem {
+impl<S: ODEIntegrator + Copy> Problem<S> {
     /// Creates a new optimization problem from an EnzymeML document
     ///
     /// # Arguments
@@ -64,9 +68,8 @@ impl Problem {
     pub fn new(
         enzmldoc: &EnzymeMLDocument,
         objective: LossFunction,
+        solver: S,
         dt: Option<f64>,
-        rtol: Option<f64>,
-        atol: Option<f64>,
         transformations: Option<Vec<Transformation>>,
     ) -> Result<Self, OptimizeError> {
         // Cloning the enzymeml document to avoid modifying the original document
@@ -84,13 +87,9 @@ impl Problem {
 
         // Adjust the integration settings for all setups
         let dt = dt.unwrap_or(0.1f64);
-        let rtol = rtol.unwrap_or(1e-4f64);
-        let atol = atol.unwrap_or(1e-8f64);
 
         for setup in simulation_setup.iter_mut() {
             setup.dt = dt;
-            setup.rtol = rtol;
-            setup.atol = atol;
         }
 
         // JIT the ODE system
@@ -111,6 +110,7 @@ impl Problem {
         Ok(Self {
             doc,
             initials,
+            solver,
             simulation_setup,
             transformations,
             objective,
@@ -311,6 +311,14 @@ impl Problem {
         &self.ode_system
     }
 
+    /// Returns a clone of the solver
+    ///
+    /// # Returns
+    /// * `S` - Clone of the solver used for numerical integration
+    pub fn solver(&self) -> S {
+        self.solver.clone()
+    }
+
     /// Returns a reference to the vector of simulation setups
     ///
     /// # Returns
@@ -411,16 +419,15 @@ impl Problem {
     }
 }
 
-pub struct ProblemBuilder {
+pub struct ProblemBuilder<S: ODEIntegrator + Copy> {
     doc: EnzymeMLDocument,
     objective: LossFunction,
     dt: f64,
-    rtol: f64,
-    atol: f64,
     transformations: Vec<Transformation>,
+    solver: S,
 }
 
-impl ProblemBuilder {
+impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
     /// Creates a new ProblemBuilder with default settings
     ///
     /// # Arguments
@@ -430,17 +437,14 @@ impl ProblemBuilder {
     /// A new ProblemBuilder instance with default settings:
     /// - MSE objective function
     /// - dt = 0.1
-    /// - rtol = 1e-4
-    /// - atol = 1e-8
     /// - no transformations
-    pub fn new(enzmldoc: &EnzymeMLDocument) -> Self {
+    pub fn new(enzmldoc: &EnzymeMLDocument, solver: S) -> Self {
         Self {
             doc: enzmldoc.clone(),
             objective: LossFunction::MSE,
             dt: 0.1,
-            rtol: 1e-4,
-            atol: 1e-8,
             transformations: vec![],
+            solver,
         }
     }
 
@@ -459,24 +463,6 @@ impl ProblemBuilder {
     /// * `dt` - Time step size
     pub fn dt(mut self, dt: f64) -> Self {
         self.dt = dt;
-        self
-    }
-
-    /// Sets the absolute tolerance for numerical integration
-    ///
-    /// # Arguments
-    /// * `atol` - Absolute tolerance value
-    pub fn atol(mut self, atol: f64) -> Self {
-        self.atol = atol;
-        self
-    }
-
-    /// Sets the relative tolerance for numerical integration
-    ///
-    /// # Arguments
-    /// * `rtol` - Relative tolerance value
-    pub fn rtol(mut self, rtol: f64) -> Self {
-        self.rtol = rtol;
         self
     }
 
@@ -502,7 +488,7 @@ impl ProblemBuilder {
     ///
     /// # Returns
     /// Result containing either the constructed Problem or an OptimizeError
-    pub fn build(self) -> Result<Problem, OptimizeError> {
+    pub fn build(self) -> Result<Problem<S>, OptimizeError> {
         let transformations = if self.transformations.is_empty() {
             None
         } else {
@@ -511,9 +497,8 @@ impl ProblemBuilder {
         Problem::new(
             &self.doc,
             self.objective,
+            self.solver,
             Some(self.dt),
-            Some(self.rtol),
-            Some(self.atol),
             transformations,
         )
     }

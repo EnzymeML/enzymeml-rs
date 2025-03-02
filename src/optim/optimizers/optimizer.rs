@@ -7,13 +7,14 @@
 //! - Initial guess handling via `InitialGuesses` and conversion from EnzymeML documents
 
 use ndarray::Array1;
+use peroxide::fuga::ODEIntegrator;
 
 use crate::{optim::problem::Problem, prelude::EnzymeMLDocument};
 
 use crate::optim::error::OptimizeError;
 
 /// Trait defining the interface for optimization algorithms.
-pub trait Optimizer {
+pub trait Optimizer<S: ODEIntegrator + Copy> {
     /// Optimizes the given problem to find optimal parameters.
     ///
     /// # Arguments
@@ -24,7 +25,7 @@ pub trait Optimizer {
     /// * `Result<Array1<f64>, OptimizeError>` - The optimal parameters or an error
     fn optimize<T>(
         &self,
-        problem: &Problem,
+        problem: &Problem<S>,
         initial_guess: Option<T>,
     ) -> Result<Array1<f64>, OptimizeError>
     where

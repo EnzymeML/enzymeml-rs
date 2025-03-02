@@ -20,23 +20,17 @@ use std::{
 use evalexpr_jit::prelude::*;
 use nalgebra::{DMatrix, DMatrixView, DMatrixViewMut};
 use ndarray::Array1;
-use ode_solvers::*;
+use peroxide::fuga::{BasicODESolver, ODEIntegrator, ODEProblem, ODESolver};
 
-use crate::prelude::{interpolation::interpolate, EnzymeMLDocument, Equation, EquationType};
+use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
 
-use super::{error::SimulationError, output::OutputFormat, SimulationSetup};
-
-/// Type alias for the state vector used in the ODE system.
-/// Uses DVector<f64> from the ode_solvers crate.
-type State = DVector<f64>;
-
-/// Type alias for time values used in the ODE system.
-/// Uses f64 to represent time values.
-type Time = f64;
+use super::{
+    error::SimulationError, interpolation::interpolate, output::OutputFormat, SimulationSetup,
+};
 
 /// Type alias for the output of the ODE system.
 /// Uses a vector of DMatrix<f64> to represent the output.
-pub type StepperOutput = Vec<DVector<f64>>;
+pub type StepperOutput = Vec<Vec<f64>>;
 
 /// Represents an ODE system for simulating reaction networks.
 ///
@@ -89,19 +83,6 @@ pub struct ODESystem {
     parameters_range: (usize, usize),
     initial_assignments_range: (usize, usize),
     assignment_rules_range: (usize, usize),
-}
-
-/// A thin wrapper around ODESystem that implements the System trait.
-///
-/// This struct acts as an adapter between ODESystem and the System trait required by the ODE solver.
-/// It simply forwards system calls to the underlying ODESystem instance, allowing us to keep the
-/// main system implementation separate from solver-specific traits.
-struct StepperSystem<'a>(&'a ODESystem);
-
-impl System<f64, State> for StepperSystem<'_> {
-    fn system(&self, t: Time, y: &State, dy: &mut State) {
-        self.0.system(t, y, dy)
-    }
 }
 
 impl ODESystem {
@@ -278,8 +259,10 @@ impl ODESystem {
         initial_conditions: HashMap<String, f64>,
         parameters: Option<&[f64]>,
         evaluate: Option<&Vec<f64>>,
+        solver: impl ODEIntegrator + Copy,
         mode: Option<Mode>,
     ) -> Result<T::Output, SimulationError> {
+        let solver = BasicODESolver::new(solver);
         let mode = mode.unwrap_or(Mode::Regular);
         self.mode.replace(mode.clone());
 
@@ -309,33 +292,16 @@ impl ODESystem {
             );
         }
 
-        let mut stepper = Dopri5::new(
-            StepperSystem(self),
-            setup.t0,
-            setup.t1,
-            setup.dt,
-            initial_conditions.into(),
-            setup.rtol,
-            setup.atol,
-        );
-
-        stepper
-            .integrate()
-            .map_err(SimulationError::IntegrationError)?;
+        // Solve the ODE system
+        let (x_out, y_out) =
+            solver.solve(self, (setup.t0, setup.t1), setup.dt, &initial_conditions)?;
 
         // If we want to evaluate at specific times, we need to interpolate the output to match the evaluation times
         let (x_out, y_out) = if let Some(evaluate) = evaluate {
-            let interpolated_output = interpolate(stepper.y_out(), stepper.x_out(), evaluate);
+            let interpolated_output = interpolate(&y_out, &x_out, evaluate)?;
             (evaluate.to_vec(), interpolated_output)
         } else {
-            (
-                stepper.x_out().to_vec(),
-                stepper
-                    .y_out()
-                    .iter()
-                    .map(|v| v.clone().into_owned())
-                    .collect(),
-            )
+            (x_out.to_vec(), y_out.to_vec())
         };
 
         let assignment_out: Option<StepperOutput> = if self.has_assignments() {
@@ -382,6 +348,7 @@ impl ODESystem {
         initial_conditions: &[HashMap<String, f64>],
         parameters: Option<&[f64]>,
         evaluate: Option<&[Vec<f64>]>,
+        solver: impl ODEIntegrator + Copy,
         mode: Option<Mode>,
     ) -> Result<Vec<T::Output>, SimulationError>
     where
@@ -409,6 +376,7 @@ impl ODESystem {
                     initial_conditions.clone(),
                     parameters,
                     *evaluate,
+                    solver,
                     mode.clone(),
                 )
             })
@@ -533,8 +501,8 @@ impl ODESystem {
     ///
     pub(crate) fn set_input_vector(
         &self,
-        t: Time,
-        y: &State,
+        t: f64,
+        y: &[f64],
         params: &[f64],
         assignments: &[f64],
         initial_assignments: &[f64],
@@ -542,7 +510,7 @@ impl ODESystem {
         let mut input_vec = self.input_buffer.borrow_mut();
         input_vec.clear();
         input_vec.push(t);
-        input_vec.extend_from_slice(&y.as_slice()[..self.num_equations()]);
+        input_vec.extend_from_slice(&y[..self.num_equations()]);
         input_vec.extend_from_slice(params);
         input_vec.extend_from_slice(assignments);
         input_vec.extend_from_slice(initial_assignments);
@@ -551,7 +519,7 @@ impl ODESystem {
     fn recalculate_assignments(
         &self,
         x_out: &[f64],
-        y_out: &[DVector<f64>],
+        y_out: &[Vec<f64>],
     ) -> Result<StepperOutput, SimulationError> {
         // Create input vectors
         let mut input_vecs = Vec::with_capacity(x_out.len());
@@ -570,10 +538,7 @@ impl ODESystem {
         // Compute the assignments in parallel
         let assignments = self.assignment_jit.eval_parallel(&input_vecs)?;
 
-        Ok(assignments
-            .iter()
-            .map(|v| DVector::from_row_slice(v.as_slice()))
-            .collect())
+        Ok(assignments)
     }
 
     /// Arranges initial conditions into a vector matching the species ordering.
@@ -963,7 +928,7 @@ impl ODESystem {
     }
 }
 
-impl System<f64, State> for ODESystem {
+impl ODEProblem for ODESystem {
     /// Defines the ODE system by computing derivatives at the current state.
     ///
     /// This method implements the system of ODEs by:
@@ -982,7 +947,7 @@ impl System<f64, State> for ODESystem {
     /// # Panics
     ///
     /// May panic if equation evaluation fails (which shouldn't happen with valid equations)
-    fn system(&self, t: Time, y: &State, dy: &mut State) {
+    fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
         self.set_input_vector(
             t,
             y,
@@ -1018,15 +983,13 @@ impl System<f64, State> for ODESystem {
         match *self.mode.borrow() {
             Mode::Sensitivity => {
                 let params_len = self.params_buffer.borrow().len();
-                let (species_slice, sensitivity_slice) =
-                    dy.as_mut_slice().split_at_mut(species_len);
+                let (species_slice, sensitivity_slice) = dy.split_at_mut(species_len);
 
                 // Calculate species derivatives
                 self.ode_jit.fun()(&input_vec, species_slice);
 
                 // Calculate sensitivity
-                let s =
-                    DMatrixView::from_slice(&y.as_slice()[species_len..], species_len, params_len);
+                let s = DMatrixView::from_slice(&y[species_len..], species_len, params_len);
                 let mut ds = DMatrixViewMut::from_slice(sensitivity_slice, species_len, params_len);
                 calculate_sensitivity(
                     &input_vec,
@@ -1037,9 +1000,10 @@ impl System<f64, State> for ODESystem {
                 );
             }
             Mode::Regular => {
-                self.ode_jit.fun()(&input_vec, dy.as_mut_slice());
+                self.ode_jit.fun()(&input_vec, dy);
             }
         }
+        Ok(())
     }
 }
 
@@ -1190,10 +1154,14 @@ pub enum Mode {
 #[cfg(test)]
 mod tests {
     use output::MatrixResult;
+    use peroxide::fuga::DP45;
     use setup::SimulationSetupBuilder;
 
     use super::*;
-    use crate::prelude::*;
+    use crate::{
+        prelude::*,
+        simulation::{output, setup},
+    };
 
     fn create_enzmldoc() -> Result<EnzymeMLDocument, EnzymeMLDocumentBuilderError> {
         EnzymeMLDocumentBuilder::default()
@@ -1234,6 +1202,8 @@ mod tests {
         let t0 = 0.0;
         let t1 = 5.0;
 
+        let solver = DP45::default();
+
         let setup = SimulationSetupBuilder::default()
             .dt(dt)
             .t0(t0)
@@ -1252,6 +1222,7 @@ mod tests {
             initial_conditions,
             None,
             Some(&vec![2.0, 3.0, 4.0, 5.0]),
+            solver,
             Some(Mode::Sensitivity),
         );
 
@@ -1302,6 +1273,8 @@ mod tests {
         let t0 = 0.0;
         let t1 = 5.0;
 
+        let solver = DP45::default();
+
         let setup = SimulationSetupBuilder::default()
             .dt(dt)
             .t0(t0)
@@ -1319,6 +1292,7 @@ mod tests {
             initial_conditions,
             None,
             Some(&vec![2.0, 3.0, 4.0, 5.0]),
+            solver,
             None,
         );
 
@@ -1347,6 +1321,7 @@ mod tests {
         // Arrange
         let doc = create_enzmldoc().unwrap();
         let system: ODESystem = doc.try_into().unwrap();
+        let solver = DP45::default();
 
         let setup = SimulationSetupBuilder::default()
             .dt(0.1)
@@ -1358,7 +1333,8 @@ mod tests {
         let initial_conditions =
             HashMap::from([("no_sub".to_string(), 100.0), ("product".to_string(), 0.0)]);
 
-        let result = system.integrate::<MatrixResult>(&setup, initial_conditions, None, None, None);
+        let result =
+            system.integrate::<MatrixResult>(&setup, initial_conditions, None, None, solver, None);
 
         // Assert
         assert!(result.is_err(), "Result should be an error");
@@ -1369,7 +1345,7 @@ mod tests {
         // Arrange
         let doc = create_enzmldoc().unwrap();
         let system: ODESystem = doc.try_into().unwrap();
-
+        let solver = DP45::default();
         let setup = SimulationSetupBuilder::default()
             .dt(0.1)
             .t0(0.0)
@@ -1380,7 +1356,8 @@ mod tests {
         let initial_conditions = HashMap::from([("product".to_string(), 0.0)]);
 
         // Act
-        let result = system.integrate::<MatrixResult>(&setup, initial_conditions, None, None, None);
+        let result =
+            system.integrate::<MatrixResult>(&setup, initial_conditions, None, None, solver, None);
 
         // Assert
         assert!(result.is_err(), "Result should be an error");

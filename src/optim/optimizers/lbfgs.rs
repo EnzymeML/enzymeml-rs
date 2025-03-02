@@ -19,6 +19,7 @@ use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::LBFGS as ArgminLBFGS;
 use argmin_observer_slog::SlogLogger;
 use ndarray::Array1;
+use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 
@@ -67,7 +68,7 @@ impl LBFGS {
     }
 }
 
-impl Optimizer for LBFGS {
+impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
     /// Optimizes the given problem using the L-BFGS algorithm.
     ///
     /// # Arguments
@@ -81,7 +82,7 @@ impl Optimizer for LBFGS {
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
     fn optimize<T>(
         &self,
-        problem: &Problem,
+        problem: &Problem<S>,
         initial_guess: Option<T>,
     ) -> Result<Array1<f64>, OptimizeError>
     where

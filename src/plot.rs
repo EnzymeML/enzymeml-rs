@@ -1,12 +1,15 @@
+use peroxide::fuga::RK5;
 use plotly::{
     common::Mode,
     layout::{Axis, GridPattern, LayoutGrid},
     Layout, Plot, Scatter,
 };
 
-use crate::prelude::{
-    error::SimulationError, init_cond::InitialCondition, result::PlotTraces, system::ODESystem,
-    EnzymeMLDocument, Measurement, SimulationResult, SimulationSetup,
+use crate::{
+    prelude::{
+        EnzymeMLDocument, Measurement, ODESystem, PlotTraces, SimulationResult, SimulationSetup,
+    },
+    simulation::{error::SimulationError, init_cond::InitialCondition},
 };
 
 impl EnzymeMLDocument {
@@ -145,11 +148,17 @@ fn get_simulation_traces(
 ) -> Result<PlotTraces, SimulationError> {
     let setup: SimulationSetup = meas.try_into().unwrap();
     let initial_conditions: InitialCondition = meas.into();
-
+    let solver = RK5::default();
     let system: ODESystem = doc.try_into().unwrap();
 
-    let result =
-        system.integrate::<SimulationResult>(&setup, initial_conditions, None, None, None)?;
+    let result = system.integrate::<SimulationResult>(
+        &setup,
+        initial_conditions,
+        None,
+        None,
+        solver,
+        None,
+    )?;
 
     let traces: Vec<Box<Scatter<f64, f64>>> = (&result).into();
     Ok(traces)

@@ -16,6 +16,7 @@ use argmin::core::Executor;
 use argmin::solver::particleswarm::ParticleSwarm;
 use argmin_observer_slog::SlogLogger;
 use ndarray::{s, Array1};
+use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::{bounds_to_array2, Bound, InitialGuesses, OptimizeError, Optimizer, Problem};
 
@@ -55,7 +56,7 @@ impl ParticleSwarmOpt {
     }
 }
 
-impl Optimizer for ParticleSwarmOpt {
+impl<S: ODEIntegrator + Copy> Optimizer<S> for ParticleSwarmOpt {
     /// Optimizes the given problem using the PSO algorithm.
     ///
     /// # Arguments
@@ -67,7 +68,7 @@ impl Optimizer for ParticleSwarmOpt {
     ///
     /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-    fn optimize<T>(&self, problem: &Problem, _: Option<T>) -> Result<Array1<f64>, OptimizeError>
+    fn optimize<T>(&self, problem: &Problem<S>, _: Option<T>) -> Result<Array1<f64>, OptimizeError>
     where
         T: Into<InitialGuesses>,
     {
@@ -81,7 +82,7 @@ impl Optimizer for ParticleSwarmOpt {
         let solver = ParticleSwarm::new(bounds, self.pop_size);
 
         // Run optimization
-        let mut res: argmin::core::OptimizationResult<Problem, _, _> =
+        let mut res: argmin::core::OptimizationResult<Problem<S>, _, _> =
             Executor::new(problem.clone(), solver)
                 .configure(|state| state.max_iters(self.max_iters))
                 .add_observer(SlogLogger::term(), ObserverMode::Always)

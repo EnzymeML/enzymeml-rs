@@ -1,8 +1,5 @@
 use enzymeml::prelude::*;
-use init_cond::InitialCondition;
 use plotly::{Layout, Plot};
-use setup::SimulationSetupBuilder;
-use system::{Mode, ODESystem};
 
 fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
     // First, we create the EnzymeMLDocument that contains the model and the measurements
@@ -107,6 +104,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         initial_conditions,
         None, // We could also dynamically set new parameters
         None, // We could also provide specific time points to extract
+        RK5::default(),
         Some(Mode::Regular),
     );
 

@@ -1,4 +1,5 @@
 use ndarray::Array2;
+use peroxide::fuga::ODEIntegrator;
 
 use super::{OptimizeError, Problem};
 
@@ -33,8 +34,8 @@ impl Bound {
     }
 }
 
-pub(crate) fn bounds_to_array2(
-    problem: &Problem,
+pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy>(
+    problem: &Problem<S>,
     bounds: &Vec<Bound>,
 ) -> Result<Array2<f64>, OptimizeError> {
     let bound_params = bounds.iter().map(|b| b.param.clone()).collect::<Vec<_>>();

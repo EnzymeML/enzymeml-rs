@@ -4,6 +4,7 @@
 use argmin::core::{CostFunction, Gradient, Hessian};
 use finitediff::FiniteDiff;
 use ndarray::{Array1, Array2, Array3, Axis, ShapeError};
+use peroxide::fuga::ODEIntegrator;
 
 use crate::{
     objective::objfun::ObjectiveFunction,
@@ -14,7 +15,7 @@ use super::problem::Problem;
 
 /// Implementation of the CostFunction trait for Problem to enable parameter optimization.
 /// This allows using the Problem with optimization algorithms that minimize a cost function.
-impl CostFunction for Problem {
+impl<S: ODEIntegrator + Copy> CostFunction for Problem<S> {
     type Param = Array1<f64>;
     type Output = f64;
 
@@ -40,6 +41,7 @@ impl CostFunction for Problem {
             self.initials(),
             params.as_slice(),
             Some(self.evaluation_times()),
+            self.solver(),
             Some(Mode::Regular),
         )?;
 
@@ -58,7 +60,7 @@ impl CostFunction for Problem {
 
 /// Implementation of the Gradient trait for Problem to enable gradient-based optimization.
 /// The gradient is computed using central finite differences for better accuracy.
-impl Gradient for Problem {
+impl<S: ODEIntegrator + Copy> Gradient for Problem<S> {
     type Param = Array1<f64>;
     type Gradient = Array1<f64>;
 
@@ -83,7 +85,7 @@ impl Gradient for Problem {
 ///
 /// # Returns
 /// * `Result<Array2<f64>, argmin::core::Error>` - The computed Hessian matrix or an error
-impl Hessian for Problem {
+impl<S: ODEIntegrator + Copy> Hessian for Problem<S> {
     type Param = Array1<f64>;
     type Hessian = Array2<f64>;
 

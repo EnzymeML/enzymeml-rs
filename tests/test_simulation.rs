@@ -1,6 +1,5 @@
 use enzymeml::prelude::StepperOutput;
-use nalgebra::DVector;
-use ode_solvers::{Dopri5, System};
+use peroxide::fuga::{BasicODESolver, ODEProblem, ODESolver, RK5};
 
 #[cfg(test)]
 mod test_simulation {
@@ -9,12 +8,12 @@ mod test_simulation {
     use super::*;
     use approx::assert_relative_eq;
     use enzymeml::prelude::{
-        setup::SimulationSetupBuilder,
-        system::{Mode, ODESystem},
         EnzymeMLDocument, EnzymeMLDocumentBuilder, EnzymeMLDocumentBuilderError, EquationBuilder,
-        EquationType, MatrixResult, ParameterBuilder, SimulationResult,
+        EquationType, MatrixResult, Mode, ODESystem, ParameterBuilder, SimulationResult,
+        SimulationSetupBuilder,
     };
     use ndarray::Axis;
+    use peroxide::fuga::RK5;
 
     /// Tests the basic simulation of a Michaelis-Menten enzyme kinetics system.
     /// Compares results between a reference implementation and an EnzymeML-based system.
@@ -48,8 +47,6 @@ mod test_simulation {
             setup.t0,
             setup.t1,
             setup.dt,
-            setup.rtol,
-            setup.atol,
         );
 
         // ACT
@@ -61,6 +58,7 @@ mod test_simulation {
             initial_conditions.clone(),
             None,
             None,
+            RK5::default(),
             Some(Mode::Regular),
         );
 
@@ -115,8 +113,6 @@ mod test_simulation {
             setup.t0,
             setup.t1,
             setup.dt,
-            setup.rtol,
-            setup.atol,
         );
 
         // Create a vector of initial conditions
@@ -150,6 +146,7 @@ mod test_simulation {
                 &initial_conditions,
                 None,
                 None,
+                RK5::default(),
                 Some(Mode::Regular),
             )
             .expect("Simulation failed");
@@ -205,8 +202,6 @@ mod test_simulation {
             setup.t0,
             setup.t1,
             setup.dt,
-            setup.rtol,
-            setup.atol,
         );
 
         // ACT
@@ -218,6 +213,7 @@ mod test_simulation {
             initial_conditions.clone(),
             None,
             None,
+            RK5::default(),
             Some(Mode::Sensitivity),
         );
 
@@ -283,8 +279,6 @@ mod test_simulation {
             setup.t0,
             setup.t1,
             setup.dt,
-            setup.rtol,
-            setup.atol,
         );
 
         // ACT
@@ -297,6 +291,7 @@ mod test_simulation {
             initial_conditions.clone(),
             None,
             None,
+            RK5::default(),
             Some(Mode::Regular),
         );
 
@@ -398,13 +393,6 @@ mod test_simulation {
     }
 }
 
-/// Represents the state vector for the Michaelis-Menten system.
-/// Contains:
-/// - [0]: Substrate concentration
-/// - [1]: Sensitivity with respect to KM
-/// - [2]: Sensitivity with respect to Vmax
-type State = DVector<f64>;
-
 /// Implementation of a Michaelis-Menten system with analytical sensitivity analysis.
 ///
 /// This serves as a reference implementation to validate the EnzymeML-based system.
@@ -426,15 +414,14 @@ impl MentenSystem {
         }
     }
 
-    fn integrate(self, s0: f64, t0: f64, t1: f64, dt: f64, rtol: f64, atol: f64) -> StepperOutput {
-        let initial_state = State::from_vec(vec![s0, 0.0, 0.0]);
-        let mut stepper = Dopri5::new(self, t0, t1, dt, initial_state, rtol, atol);
-        let result = stepper.integrate();
+    fn integrate(self, s0: f64, t0: f64, t1: f64, dt: f64) -> StepperOutput {
+        let initial_state = vec![s0, 0.0, 0.0];
+        let solver = BasicODESolver::new(RK5::default());
+        let (_, y_out) = solver
+            .solve(&self, (t0, t1), dt, &initial_state)
+            .expect("Integration failed");
 
-        if let Err(e) = result {
-            panic!("Integration failed: {:?}", e);
-        }
-        stepper.y_out().to_vec()
+        y_out.to_vec()
     }
 }
 
@@ -444,8 +431,8 @@ impl Default for MentenSystem {
     }
 }
 
-impl System<f64, State> for MentenSystem {
-    fn system(&self, _t: f64, y: &State, dy: &mut State) {
+impl ODEProblem for MentenSystem {
+    fn rhs(&self, _t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
         let s = y[0];
         let dsdkm = y[1];
         let dsdvmax = y[2];
@@ -458,5 +445,7 @@ impl System<f64, State> for MentenSystem {
         dy[1] = (self.dvds)(s) * dsdkm + (self.dvdkm)(s);
         // dvmax
         dy[2] = (self.dvds)(s) * dsdvmax + (self.dvmax)(s);
+
+        Ok(())
     }
 }
