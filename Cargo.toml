@@ -12,39 +12,47 @@ meval = { version = "0.2.0", features = ["serde"] }
 schemars = "0.8.21"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.119"
-rayon = "1.10.0"
-ode_solvers = "0.5.0"
-evalexpr = "11.3.0"
-plotly = "0.9.0"
-polars = { version = "0.41", features = ["csv"], default-features = false }
-calamine = "0.25.0"
-xlsxwriter = "0.6.1"
-tempfile = "3.10.1"
+ode_solvers = "0.6.0"
+plotly = "0.12.1"
 mdmodels-macro = "0.1.2"
 wasm-bindgen = { version = "0.2.92", optional = true }
-quick-xml = { version = "0.37.1", features = ["serialize"] }
-argmin = { version = "0.10.0" }
-argmin-math = { version = "0.4.0", features = ["ndarray_latest-nolinalg"] }
-ordered-float = "4.0"
+ordered-float = "5.0"
 ndarray = "^0.15.6"
 thiserror = "2.0.9"
-argmin-observer-slog = "0.1.0"
 nalgebra = "0.33.2"
+sha2 = "0.10.8"
 evalexpr-jit = { version = "0.2.0", features = ["nalgebra"] }
 splines = { version = "4.4.2", features = ["nalgebra"] }
-charming = "0.4.0"
-sha2 = "0.10.8"
-finitediff = { version = "0.1.4", features = ["ndarray"] }
-egobox-ego = "0.26.0"
+polars = { version = "0.41", features = [
+    "csv",
+], default-features = false, optional = true }
+calamine = { version = "0.26.1", optional = true }
+xlsxwriter = { version = "0.6.1", optional = true }
+argmin-observer-slog = { version = "0.1.0", optional = true }
+argmin = { version = "0.10.0", optional = true }
+argmin-math = { version = "0.4.0", features = [
+    "ndarray_latest-nolinalg",
+], optional = true }
+finitediff = { version = "0.1.4", features = ["ndarray"], optional = true }
+egobox-ego = { version = "0.26.0", optional = true }
 
 [profile.release]
-opt-level = 3
+opt-level = 2
 lto = true
 codegen-units = 1
 debug = false
 
 [features]
+default = ["optimization"]
+tabular = ["polars", "calamine", "xlsxwriter"]
 wasm = ["wasm-bindgen"]
+optimization = [
+    "argmin-math",
+    "argmin",
+    "finitediff",
+    "egobox-ego",
+    "argmin-observer-slog",
+]
 
 [dev-dependencies]
 approx = "0.5.1"
