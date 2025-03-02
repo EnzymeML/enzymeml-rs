@@ -4,6 +4,7 @@
 //! - BFGS (Broyden-Fletcher-Goldfarb-Shanno)
 //! - L-BFGS (Limited-memory BFGS)
 //! - PSO (Particle Swarm Optimization)
+//! - EGO (Efficient Global Optimization)
 //!
 //! Each test verifies that the optimizer can find the correct parameters
 //! for a simple enzyme kinetics model with known parameters.
@@ -18,7 +19,7 @@ mod test_optim {
         },
         prelude::*,
     };
-    use ndarray::{Array1, Array2};
+    use ndarray::Array1;
     use std::path::PathBuf;
 
     fn get_doc() -> EnzymeMLDocument {
@@ -103,13 +104,13 @@ mod test_optim {
             .expect("Failed to build problem");
 
         // ACT
-        let pso = PSOBuilder::default(
-            Array1::from_vec(vec![1e-6, 1e-6, 1e-6]),
-            Array1::from_vec(vec![490.0, 5.0, 0.05]),
-        )
-        .pop_size(100)
-        .max_iters(20)
-        .build();
+        let pso = PSOBuilder::default()
+            .pop_size(100)
+            .max_iters(20)
+            .bound("K_M", 1e-6, 120.0)
+            .bound("k_cat", 1e-6, 1.0)
+            .bound("k_ie", 1e-6, 0.005)
+            .build();
 
         let res = pso
             .optimize(&problem, None::<Array1<f64>>)
@@ -128,13 +129,17 @@ mod test_optim {
     fn test_ego() {
         // ARRANGE
         let doc = get_doc();
-        let bounds =
-            Array2::from_shape_vec((3, 2), vec![1e-6, 120.0, 1e-6, 1.0, 1e-6, 0.005]).unwrap();
         let problem = ProblemBuilder::new(&doc).dt(10.0).build().unwrap();
 
         // ACT
-        let ego = EGOBuilder::new(bounds).max_iters(50).build();
-        let res = ego.optimize(&problem, None::<Array1<f64>>).unwrap();
+        let res = EGOBuilder::default()
+            .max_iters(50)
+            .bound("K_m", 1e-6, 120.0)
+            .bound("k_cat", 1e-6, 1.0)
+            .bound("k_ie", 1e-6, 0.005)
+            .build()
+            .optimize(&problem, None::<Array1<f64>>)
+            .unwrap();
 
         // ASSERT
         let k_m = res[0];
