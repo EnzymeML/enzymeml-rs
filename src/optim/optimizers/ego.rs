@@ -16,7 +16,7 @@ use argmin::core::CostFunction;
 use egobox_ego::EgorBuilder;
 use ndarray::{Array1, Array2, ArrayView2};
 
-use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
+use crate::optim::{bounds_to_array2, Bound, InitialGuesses, OptimizeError, Optimizer, Problem};
 
 /// Implementation of the Efficient Global Optimization algorithm.
 ///
@@ -26,7 +26,7 @@ use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 pub struct EfficientGlobalOptimization {
     /// Bounds for the optimization parameters, stored as an Nx2 array where N is the number
     /// of parameters and each row contains (lower_bound, upper_bound) for that parameter
-    bounds: Array2<f64>,
+    bounds: Vec<Bound>,
     /// Maximum number of iterations before stopping
     max_iters: usize,
 }
@@ -36,9 +36,9 @@ impl EfficientGlobalOptimization {
     ///
     /// # Arguments
     ///
-    /// * `bounds` - An Nx2 array specifying the bounds for each parameter, where N is the
-    ///             number of parameters and each row contains (lower_bound, upper_bound)
-    pub fn new(bounds: Array2<f64>, max_iters: usize) -> Self {
+    /// * `bounds` - A vector of `Bound` structs specifying the bounds for each parameter
+    /// * `max_iters` - Maximum number of iterations before stopping
+    pub fn new(bounds: Vec<Bound>, max_iters: usize) -> Self {
         Self { bounds, max_iters }
     }
 }
@@ -59,24 +59,27 @@ impl Optimizer for EfficientGlobalOptimization {
     where
         T: Into<InitialGuesses>,
     {
+        // Closure to evaluate the objective function
         let objective = |params: &ArrayView2<f64>| {
-            // Preallocate results vector with capacity
             let mut results = Vec::with_capacity(params.nrows());
-
-            // Iterate over rows and evaluate cost function
             for row in params.axis_iter(ndarray::Axis(0)) {
                 results.push(problem.cost(&row.to_owned()).unwrap());
             }
 
-            // Convert to Array2 in one allocation
             Array2::from_shape_vec((results.len(), 1), results).unwrap()
         };
 
+        // Convert bounds to Array2
+        let bounds = bounds_to_array2(&problem, &self.bounds).unwrap();
+
+        // Build and run EGO optimizer
         let result = EgorBuilder::optimize(objective)
             .configure(|config| config.max_iters(self.max_iters))
-            .min_within(&self.bounds)
+            .min_within(&bounds)
             .run()
             .map_err(|_| OptimizeError::ConvergenceError)?;
+
+        // Return best parameters
         if let Some(params) = result.state.best_param {
             Ok(params)
         } else {
@@ -92,25 +95,12 @@ impl Optimizer for EfficientGlobalOptimization {
 pub struct EGOBuilder {
     /// Bounds for each parameter as an Nx2 array where N is the number of parameters
     /// and each row contains (lower_bound, upper_bound)
-    bounds: Array2<f64>,
+    bounds: Vec<Bound>,
     /// Maximum number of iterations before stopping
     max_iters: usize,
 }
 
 impl EGOBuilder {
-    /// Creates a new EGOBuilder with the specified parameter bounds.
-    ///
-    /// # Arguments
-    ///
-    /// * `bounds` - An Nx2 array specifying bounds for each parameter, where N is the
-    ///             number of parameters and each row contains (lower_bound, upper_bound)
-    pub fn new(bounds: Array2<f64>) -> Self {
-        Self {
-            bounds,
-            max_iters: 100,
-        }
-    }
-
     /// Sets the maximum number of iterations.
     ///
     /// # Arguments
@@ -121,6 +111,29 @@ impl EGOBuilder {
         self
     }
 
+    /// Sets the bounds for the optimization parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `bounds` - A vector of `Bound` structs specifying the bounds for each parameter
+    pub fn bounds(mut self, bounds: Vec<Bound>) -> Self {
+        self.bounds = bounds;
+        self
+    }
+
+    /// Sets the lower and upper bounds for a single parameter.
+    ///
+    /// # Arguments
+    ///
+    /// * `param` - The name of the parameter
+    /// * `lower` - The lower bound for the parameter
+    /// * `upper` - The upper bound for the parameter
+    pub fn bound(mut self, param: &str, lower: f64, upper: f64) -> Self {
+        self.bounds
+            .push(Bound::new(param.to_string(), lower, upper));
+        self
+    }
+
     /// Builds and returns an EfficientGlobalOptimization instance with the configured settings.
     ///
     /// # Returns
@@ -128,5 +141,14 @@ impl EGOBuilder {
     /// A new EfficientGlobalOptimization optimizer instance with all configured parameters
     pub fn build(self) -> EfficientGlobalOptimization {
         EfficientGlobalOptimization::new(self.bounds, self.max_iters)
+    }
+}
+
+impl Default for EGOBuilder {
+    fn default() -> Self {
+        Self {
+            bounds: vec![],
+            max_iters: 100,
+        }
     }
 }

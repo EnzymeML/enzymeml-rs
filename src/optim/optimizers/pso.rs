@@ -10,29 +10,14 @@
 //!
 //! The PSO algorithm is a population-based optimization algorithm that uses a swarm of particles to search for the optimal solution.
 //! Each particle has a position and a velocity, and the particles move in the search space according to the following equations:
-//!
-//! v_i(t+1) = w * v_i(t) + c1 * r1 * (p_i - x_i(t)) + c2 * r2 * (g_i - x_i(t))
-//! x_i(t+1) = x_i(t) + v_i(t+1)
-//!
-//! where:
-//! - v_i(t) is the velocity of particle i at time t
-//! - x_i(t) is the position of particle i at time t
-//! - p_i is the best position of particle i
-//! - g_i is the best position of the entire swarm
-//! - r1 and r2 are random numbers between 0 and 1
-//! - c1 and c2 are the cognitive and social parameters, respectively
-//! - w is the inertia weight
-//! - r1 and r2 are random numbers between 0 and 1
-//! - c1 and c2 are the cognitive and social parameters, respectively
-//! - w is the inertia weight
 
 use argmin::core::observers::ObserverMode;
 use argmin::core::Executor;
 use argmin::solver::particleswarm::ParticleSwarm;
 use argmin_observer_slog::SlogLogger;
-use ndarray::Array1;
+use ndarray::{s, Array1};
 
-use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
+use crate::optim::{bounds_to_array2, Bound, InitialGuesses, OptimizeError, Optimizer, Problem};
 
 /// Implementation of the BFGS optimization algorithm.
 ///
@@ -49,10 +34,8 @@ pub struct ParticleSwarmOpt {
     pub pop_size: usize,
     /// Target cost function value for convergence criteria
     pub max_iters: u64,
-    /// Lower bound for the parameters
-    pub lower_bound: Array1<f64>,
-    /// Upper bound for the parameters
-    pub upper_bound: Array1<f64>,
+    /// Parameter bounds
+    pub bounds: Vec<Bound>,
 }
 
 impl ParticleSwarmOpt {
@@ -62,19 +45,12 @@ impl ParticleSwarmOpt {
     ///
     /// * `pop_size` - Size of the population
     /// * `max_iters` - Maximum number of iterations
-    /// * `lower_bound` - Lower bound for the parameters
-    /// * `upper_bound` - Upper bound for the parameters
-    pub fn new(
-        pop_size: usize,
-        max_iters: u64,
-        lower_bound: Array1<f64>,
-        upper_bound: Array1<f64>,
-    ) -> Self {
+    /// * `bounds` - Parameter bounds
+    pub fn new(pop_size: usize, max_iters: u64, bounds: Vec<Bound>) -> Self {
         Self {
             pop_size,
             max_iters,
-            lower_bound,
-            upper_bound,
+            bounds,
         }
     }
 }
@@ -95,9 +71,16 @@ impl Optimizer for ParticleSwarmOpt {
     where
         T: Into<InitialGuesses>,
     {
-        let bounds = (self.lower_bound.clone(), self.upper_bound.clone());
+        // Get bounds and split into (Array1<f64>, Array1<f64>)
+        let bounds = bounds_to_array2(problem, &self.bounds)?;
+        let lower_bound = bounds.slice(s![.., 0]);
+        let upper_bound = bounds.slice(s![.., 1]);
+        let bounds = (lower_bound.to_owned(), upper_bound.to_owned());
 
+        // Create PSO solver
         let solver = ParticleSwarm::new(bounds, self.pop_size);
+
+        // Run optimization
         let mut res: argmin::core::OptimizationResult<Problem, _, _> =
             Executor::new(problem.clone(), solver)
                 .configure(|state| state.max_iters(self.max_iters))
@@ -125,25 +108,32 @@ pub struct PSOBuilder {
     max_iters: u64,
     /// Population size
     pop_size: usize,
-    /// Lower bound for the parameters
-    lower_bound: Array1<f64>,
-    /// Upper bound for the parameters
-    upper_bound: Array1<f64>,
+    /// Parameter bounds
+    bounds: Vec<Bound>,
 }
 
 impl PSOBuilder {
-    /// Creates a new PSOBuilder with default settings.
+    /// Sets the parameter bounds.
     ///
-    /// Default values:
-    /// - max_iters: 500
-    /// - pop_size: 100
-    pub fn default(lower_bound: Array1<f64>, upper_bound: Array1<f64>) -> Self {
-        Self {
-            max_iters: 500,
-            pop_size: 100,
-            lower_bound,
-            upper_bound,
-        }
+    /// # Arguments
+    ///
+    /// * `bounds` - Parameter bounds
+    pub fn bounds(mut self, bounds: Vec<Bound>) -> Self {
+        self.bounds = bounds;
+        self
+    }
+
+    /// Sets the lower and upper bounds for a single parameter.
+    ///
+    /// # Arguments
+    ///
+    /// * `param` - The name of the parameter
+    /// * `lower` - The lower bound for the parameter
+    /// * `upper` - The upper bound for the parameter
+    pub fn bound(mut self, param: &str, lower: f64, upper: f64) -> Self {
+        self.bounds
+            .push(Bound::new(param.to_string(), lower, upper));
+        self
     }
 
     /// Sets the maximum number of iterations.
@@ -175,8 +165,17 @@ impl PSOBuilder {
         ParticleSwarmOpt {
             max_iters: self.max_iters,
             pop_size: self.pop_size,
-            lower_bound: self.lower_bound,
-            upper_bound: self.upper_bound,
+            bounds: self.bounds,
+        }
+    }
+}
+
+impl Default for PSOBuilder {
+    fn default() -> Self {
+        Self {
+            max_iters: 500,
+            pop_size: 100,
+            bounds: vec![],
         }
     }
 }
