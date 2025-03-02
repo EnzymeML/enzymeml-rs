@@ -7,17 +7,13 @@
 //! - Validating EnzymeML documents
 //! - Reading/writing tabular data
 //! - Plotting results
-//!
-//! The main modules are organized as follows:
+
+#![warn(unused_imports)]
+#![warn(unused_crate_dependencies)]
 
 /// Module for generating EnzymeML model code from markdown specifications
 pub mod enzyme_ml {
     mdmodels_macro::parse_mdmodel!("model.md");
-}
-
-/// Legacy structs and functionality maintained for backwards compatibility
-pub mod legacy {
-    pub mod structs;
 }
 
 /// Commonly used types and functionality re-exported for convenience
@@ -54,13 +50,16 @@ pub mod simulation {
     pub mod system;
 }
 
+#[cfg(feature = "optimization")]
 pub mod optim {
+    pub use crate::optim::bound::*;
     pub use crate::optim::error::*;
     pub use crate::optim::optimizers::*;
     pub use crate::optim::problem::*;
-    pub use crate::optim::transformation::Transformation;
     pub use argmin::core::CostFunction;
     pub use argmin::core::Gradient;
+
+    pub mod bound;
     pub mod error;
     pub mod problem;
     pub mod system;
@@ -80,6 +79,7 @@ pub mod optim {
     }
 }
 
+#[cfg(feature = "optimization")]
 pub mod objective {
     pub mod error;
     pub mod loss;
@@ -119,6 +119,7 @@ pub mod macros {
 }
 
 /// Tabular data handling
+#[cfg(feature = "tabular")]
 pub mod tabular {
     /// DataFrame implementation
     mod dataframe;
