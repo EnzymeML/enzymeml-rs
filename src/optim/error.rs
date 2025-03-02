@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::simulation::error::SimulationError;
+use crate::{conversion::ConversionError, simulation::error::SimulationError};
 
 #[derive(Error, Debug)]
 pub enum OptimizeError {
@@ -48,4 +48,11 @@ pub enum OptimizeError {
     MissingInitialGuesses { missing: Vec<String> },
     #[error("Problem did not converge")]
     ConvergenceError,
+    #[error("Invalid bounds")]
+    InvalidBounds {
+        expected: Vec<String>,
+        found: Vec<String>,
+    },
+    #[error("Failed to convert measurement data")]
+    ConversionError(#[from] ConversionError),
 }

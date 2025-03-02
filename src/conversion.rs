@@ -8,11 +8,9 @@
 //! - Helper functions for extracting and formatting measurement data
 
 use ndarray::{Array2, Axis};
+use thiserror::Error;
 
-use crate::{
-    optim::error::OptimizeError,
-    prelude::{EnzymeMLDocument, Measurement},
-};
+use crate::prelude::{EnzymeMLDocument, Measurement};
 
 /// Converts an EnzymeML document into a 2D array of measurement data.
 ///
@@ -32,7 +30,7 @@ use crate::{
 /// - No measurement data is found
 /// - Measurements cannot be concatenated due to shape mismatch
 impl TryFrom<&EnzymeMLDocument> for Array2<f64> {
-    type Error = OptimizeError;
+    type Error = ConversionError;
 
     fn try_from(enzmldoc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
         let arrays: Result<Vec<Array2<f64>>, _> =
@@ -40,12 +38,12 @@ impl TryFrom<&EnzymeMLDocument> for Array2<f64> {
         let arrays = arrays?;
 
         if arrays.is_empty() {
-            return Err(OptimizeError::NoMeasurementData("all".to_string()));
+            return Err(ConversionError::NoMeasurementData("all".to_string()));
         }
 
         let views = arrays.iter().map(|a| a.view()).collect::<Vec<_>>();
 
-        ndarray::concatenate(Axis(0), &views).map_err(OptimizeError::MeasurementShapeError)
+        ndarray::concatenate(Axis(0), &views).map_err(ConversionError::MeasurementShapeError)
     }
 }
 
@@ -65,7 +63,7 @@ impl TryFrom<&EnzymeMLDocument> for Array2<f64> {
 ///
 /// Returns an error if no measurement data is found for any species
 impl TryFrom<&Measurement> for Array2<f64> {
-    type Error = OptimizeError;
+    type Error = ConversionError;
 
     fn try_from(measurement: &Measurement) -> Result<Self, Self::Error> {
         let species_w_data = measurement
@@ -98,7 +96,7 @@ impl TryFrom<&Measurement> for Array2<f64> {
 fn get_measurement_data(
     measurements: &Measurement,
     species: &[String],
-) -> Result<Array2<f64>, OptimizeError> {
+) -> Result<Array2<f64>, ConversionError> {
     let mut data = Vec::with_capacity(species.len());
 
     for species_id in species {
@@ -106,25 +104,35 @@ fn get_measurement_data(
             .species_data
             .iter()
             .find(|s| s.species_id == *species_id)
-            .ok_or_else(|| OptimizeError::NoMeasurement(species_id.clone()))?;
+            .ok_or_else(|| ConversionError::NoMeasurement(species_id.clone()))?;
 
         let data_vec = meas_data
             .data
             .as_ref()
-            .ok_or_else(|| OptimizeError::NoMeasurement(species_id.clone()))?;
+            .ok_or_else(|| ConversionError::NoMeasurement(species_id.clone()))?;
 
         data.push(data_vec);
     }
 
     let ncols = data.len();
     if ncols == 0 {
-        return Err(OptimizeError::NoMeasurementData(measurements.id.clone()));
+        return Err(ConversionError::NoMeasurementData(measurements.id.clone()));
     }
 
     let nrows = data[0].len();
 
     // Create array directly from collected data
     Ok(Array2::from_shape_fn((nrows, ncols), |(i, j)| data[j][i]))
+}
+
+#[derive(Error, Debug)]
+pub enum ConversionError {
+    #[error("Could not concatenate measurements")]
+    MeasurementShapeError(#[from] ndarray::ShapeError),
+    #[error("No measurement data found")]
+    NoMeasurementData(String),
+    #[error("No measurement found for species {0}")]
+    NoMeasurement(String),
 }
 
 #[cfg(test)]
