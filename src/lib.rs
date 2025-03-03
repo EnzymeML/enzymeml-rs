@@ -20,10 +20,16 @@ pub mod enzyme_ml {
 pub mod prelude {
     pub use crate::enzyme_ml::*;
     pub use crate::io::*;
+
+    #[cfg(feature = "simulation")]
     pub use crate::simulation::init_cond::*;
+    #[cfg(feature = "simulation")]
     pub use crate::simulation::output::*;
+    #[cfg(feature = "simulation")]
     pub use crate::simulation::result::*;
+    #[cfg(feature = "simulation")]
     pub use crate::simulation::setup::*;
+    #[cfg(feature = "simulation")]
     pub use crate::simulation::system::*;
 
     #[cfg(feature = "optimization")]
@@ -38,6 +44,7 @@ pub mod prelude {
 pub mod equation;
 
 /// Simulation functionality for enzyme kinetics
+#[cfg(feature = "simulation")]
 pub mod simulation {
     pub use crate::simulation::setup::SimulationSetup;
     pub use peroxide::fuga::*;
@@ -136,6 +143,11 @@ pub mod macros {
     pub mod unit_maps;
 }
 
+pub mod bindings {
+    #[cfg(feature = "wasm")]
+    pub mod wasm;
+}
+
 /// Tabular data handling
 #[cfg(feature = "tabular")]
 pub mod tabular {
@@ -148,6 +160,7 @@ pub mod tabular {
 }
 
 /// Plotting and visualization functionality
+#[cfg(not(feature = "wasm"))]
 pub mod plot;
 
 /// IO functionality

@@ -187,3 +187,74 @@ fn check_variable_consistency(variables: &Vec<String>, symbols: &[String]) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_symbols() {
+        let expr: Expr = "2*x + y*z + k".parse().unwrap();
+        let symbols = extract_symbols(&expr);
+        let mut expected = vec!["x", "y", "z", "k"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        expected.sort();
+        let mut symbols = symbols;
+        symbols.sort();
+        assert_eq!(symbols, expected);
+    }
+
+    #[test]
+    fn test_filter_variables() {
+        let variables = vec!["x".to_string(), "y".to_string()];
+        let symbols = vec!["x".to_string(), "y".to_string(), "k".to_string()];
+        let vars = filter_variables(&variables, &symbols);
+        assert_eq!(vars.len(), 2);
+        assert_eq!(vars[0].id, "x");
+        assert_eq!(vars[1].id, "y");
+    }
+
+    #[test]
+    fn test_filter_params() {
+        let variables = vec!["x".to_string(), "y".to_string()];
+        let symbols = vec!["x".to_string(), "y".to_string(), "k".to_string()];
+        let params = filter_params(&variables, &symbols);
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0].id, "k");
+    }
+
+    #[test]
+    #[should_panic(expected = "Variable 'w' not found in equation.")]
+    fn test_check_variable_consistency_panic() {
+        let variables = vec!["x".to_string(), "w".to_string()];
+        let symbols = vec!["x".to_string(), "y".to_string()];
+        check_variable_consistency(&variables, &symbols);
+    }
+
+    #[test]
+    fn test_create_equation() {
+        let mut doc_builder = EnzymeMLDocumentBuilder::default();
+        let eq = "2*x + y";
+        let variables = vec!["x".to_string(), "y".to_string()];
+        let eq_type = enzyme_ml::EquationType::RateLaw;
+
+        let result = create_equation(
+            eq,
+            variables,
+            eq_type,
+            EnzymeMLDocState::from(&mut doc_builder),
+        );
+
+        assert!(result.is_ok());
+        let eq_builder = result
+            .expect("Could not build EqBuilder.")
+            .build()
+            .expect("Could not build EqBuilder.");
+
+        assert_eq!(eq_builder.equation, "2*x + y");
+        assert_eq!(eq_builder.equation_type, enzyme_ml::EquationType::RateLaw);
+        assert_eq!(eq_builder.variables.len(), 2);
+    }
+}

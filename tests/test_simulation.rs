@@ -1,6 +1,4 @@
-use enzymeml::prelude::StepperOutput;
-use peroxide::fuga::{BasicODESolver, ODEProblem, ODESolver, RK5};
-
+#[cfg(not(feature = "wasm"))]
 #[cfg(test)]
 mod test_simulation {
     use std::collections::HashMap;
@@ -9,8 +7,8 @@ mod test_simulation {
     use approx::assert_relative_eq;
     use enzymeml::prelude::{
         EnzymeMLDocument, EnzymeMLDocumentBuilder, EnzymeMLDocumentBuilderError, EquationBuilder,
-        EquationType, MatrixResult, Mode, ODESystem, ParameterBuilder, SimulationResult,
-        SimulationSetupBuilder,
+        EquationType, MatrixResult, Mode, ODESystem, ParameterBuilder, PlotConfig,
+        SimulationResult, SimulationSetupBuilder,
     };
     use ndarray::Axis;
     use peroxide::fuga::RK5;
@@ -324,6 +322,32 @@ mod test_simulation {
         }
     }
 
+    #[test]
+    fn test_plot() {
+        let enzmldoc = create_enzmldoc().unwrap();
+        let system: ODESystem = enzmldoc.try_into().unwrap();
+        let initial_conditions = HashMap::from([("substrate".to_string(), 100.0)]);
+        let setup = SimulationSetupBuilder::default()
+            .t0(0.0)
+            .t1(10.0)
+            .dt(1.0)
+            .build()
+            .unwrap();
+        let result = system
+            .integrate::<SimulationResult>(
+                &setup,
+                initial_conditions.clone(),
+                None,
+                None,
+                RK5::default(),
+                Some(Mode::Regular),
+            )
+            .expect("Simulation failed");
+
+        let plot = result.plot(PlotConfig::default(), false);
+        plot.to_html();
+    }
+
     /// Creates a test EnzymeML document representing a Michaelis-Menten system
     /// with KM = 100.0 and Vmax = 10.0
     ///
@@ -391,61 +415,61 @@ mod test_simulation {
                 .unwrap(),
         );
     }
-}
 
-/// Implementation of a Michaelis-Menten system with analytical sensitivity analysis.
-///
-/// This serves as a reference implementation to validate the EnzymeML-based system.
-/// It includes both the basic kinetic equations and their derivatives for sensitivity analysis.
-struct MentenSystem {
-    v: Box<dyn Fn(f64) -> f64>,     // Rate equation
-    dvds: Box<dyn Fn(f64) -> f64>,  // Derivative with respect to substrate
-    dvdkm: Box<dyn Fn(f64) -> f64>, // Derivative with respect to KM
-    dvmax: Box<dyn Fn(f64) -> f64>, // Derivative with respect to Vmax
-}
+    /// Implementation of a Michaelis-Menten system with analytical sensitivity analysis.
+    ///
+    /// This serves as a reference implementation to validate the EnzymeML-based system.
+    /// It includes both the basic kinetic equations and their derivatives for sensitivity analysis.
+    struct MentenSystem {
+        v: Box<dyn Fn(f64) -> f64>,     // Rate equation
+        dvds: Box<dyn Fn(f64) -> f64>,  // Derivative with respect to substrate
+        dvdkm: Box<dyn Fn(f64) -> f64>, // Derivative with respect to KM
+        dvmax: Box<dyn Fn(f64) -> f64>, // Derivative with respect to Vmax
+    }
 
-impl MentenSystem {
-    fn new(km: f64, v_max: f64) -> Self {
-        Self {
-            v: Box::new(move |s| -v_max * s / (km + s)),
-            dvds: Box::new(move |s| -v_max * km / (km + s).powi(2)),
-            dvdkm: Box::new(move |s| v_max * s / (km + s).powi(2)),
-            dvmax: Box::new(move |s| -s / (km + s)),
+    impl MentenSystem {
+        fn new(km: f64, v_max: f64) -> Self {
+            Self {
+                v: Box::new(move |s| -v_max * s / (km + s)),
+                dvds: Box::new(move |s| -v_max * km / (km + s).powi(2)),
+                dvdkm: Box::new(move |s| v_max * s / (km + s).powi(2)),
+                dvmax: Box::new(move |s| -s / (km + s)),
+            }
+        }
+
+        fn integrate(self, s0: f64, t0: f64, t1: f64, dt: f64) -> StepperOutput {
+            let initial_state = vec![s0, 0.0, 0.0];
+            let solver = BasicODESolver::new(RK5::default());
+            let (_, y_out) = solver
+                .solve(&self, (t0, t1), dt, &initial_state)
+                .expect("Integration failed");
+
+            y_out.to_vec()
         }
     }
 
-    fn integrate(self, s0: f64, t0: f64, t1: f64, dt: f64) -> StepperOutput {
-        let initial_state = vec![s0, 0.0, 0.0];
-        let solver = BasicODESolver::new(RK5::default());
-        let (_, y_out) = solver
-            .solve(&self, (t0, t1), dt, &initial_state)
-            .expect("Integration failed");
-
-        y_out.to_vec()
+    impl Default for MentenSystem {
+        fn default() -> Self {
+            Self::new(100.0, 10.0)
+        }
     }
-}
 
-impl Default for MentenSystem {
-    fn default() -> Self {
-        Self::new(100.0, 10.0)
-    }
-}
+    impl ODEProblem for MentenSystem {
+        fn rhs(&self, _t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
+            let s = y[0];
+            let dsdkm = y[1];
+            let dsdvmax = y[2];
 
-impl ODEProblem for MentenSystem {
-    fn rhs(&self, _t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
-        let s = y[0];
-        let dsdkm = y[1];
-        let dsdvmax = y[2];
+            // Perform the rhs step
+            dy[0] = (self.v)(s);
 
-        // Perform the rhs step
-        dy[0] = (self.v)(s);
+            // Calculate sensitivities
+            // dsdkm
+            dy[1] = (self.dvds)(s) * dsdkm + (self.dvdkm)(s);
+            // dvmax
+            dy[2] = (self.dvds)(s) * dsdvmax + (self.dvmax)(s);
 
-        // Calculate sensitivities
-        // dsdkm
-        dy[1] = (self.dvds)(s) * dsdkm + (self.dvdkm)(s);
-        // dvmax
-        dy[2] = (self.dvds)(s) * dsdvmax + (self.dvmax)(s);
-
-        Ok(())
+            Ok(())
+        }
     }
 }

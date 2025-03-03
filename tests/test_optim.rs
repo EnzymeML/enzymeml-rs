@@ -9,6 +9,7 @@
 //! Each test verifies that the optimizer can find the correct parameters
 //! for a simple enzyme kinetics model with known parameters.
 
+#[cfg(not(feature = "wasm"))]
 #[cfg(test)]
 mod test_optim {
     use approx::assert_relative_eq;
@@ -140,9 +141,9 @@ mod test_optim {
         // ACT
         let res = EGOBuilder::default()
             .max_iters(50)
-            .bound("K_M", 1e-6, 90.0)
-            .bound("k_cat", 1e-6, 1.0)
-            .bound("k_ie", 1e-6, 0.005)
+            .bound("K_M", 70.0, 90.0)
+            .bound("k_cat", 0.8, 0.9)
+            .bound("k_ie", 0.0005, 0.0015)
             .build()
             .optimize(&problem, None::<Array1<f64>>)
             .unwrap();

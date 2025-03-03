@@ -20,15 +20,12 @@
 //! error diagnosis and handling.
 
 use evalexpr_jit::errors::EquationError;
-use ode_solvers::dop_shared::IntegrationError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum SimulationError {
     #[error("Error evaluating expression: {0}")]
     EquationError(EquationError),
-    #[error("Error integrating ODEs: {0}")]
-    IntegrationError(IntegrationError),
     #[error("Error creating ODE system")]
     ODESystemError(String),
     #[error("Error validating parameters")]

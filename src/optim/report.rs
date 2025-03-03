@@ -129,7 +129,7 @@ impl OptimizationReport {
     /// * `Result<Plot, SimulationError>` - A Plotly Plot object containing the visualization if successful,
     ///   or a SimulationError if plotting fails
     pub fn plot_fit(&self, show: bool) -> Result<Plot, SimulationError> {
-        let plot = self.doc.plot(Some(2), show, None, true)?;
+        let plot = self.doc.plot(Some(2), show, None, true).unwrap();
         Ok(plot)
     }
 }

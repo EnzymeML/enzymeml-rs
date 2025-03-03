@@ -1,16 +1,19 @@
-use peroxide::fuga::RK5;
 use plotly::{
     common::Mode,
     layout::{Axis, GridPattern, LayoutGrid},
     Layout, Plot, Scatter,
 };
 
+use crate::prelude::{EnzymeMLDocument, Measurement};
+
+#[cfg(feature = "simulation")]
 use crate::{
-    prelude::{
-        EnzymeMLDocument, Measurement, ODESystem, PlotTraces, SimulationResult, SimulationSetup,
-    },
+    prelude::{ODESystem, PlotTraces, SimulationResult, SimulationSetup},
     simulation::{error::SimulationError, init_cond::InitialCondition},
 };
+
+#[cfg(feature = "simulation")]
+use peroxide::fuga::RK5;
 
 impl EnzymeMLDocument {
     /// Creates a plot visualization of an EnzymeML document's measurement data.
@@ -30,7 +33,7 @@ impl EnzymeMLDocument {
         show: bool,
         measurement_ids: Option<Vec<String>>,
         show_fit: bool,
-    ) -> Result<Plot, SimulationError> {
+    ) -> Result<Plot, Box<dyn std::error::Error>> {
         // Determine the number of rows
         let n_meas = self.measurements.len();
         let columns = if n_meas == 1 { 1 } else { columns.unwrap_or(2) };
@@ -54,6 +57,7 @@ impl EnzymeMLDocument {
                 plot.add_trace(trace);
             }
 
+            #[cfg(feature = "simulation")]
             if show_fit {
                 let traces = get_simulation_traces(self, meas)?;
                 for trace in traces {
@@ -142,6 +146,8 @@ impl From<&Measurement> for Vec<Box<Scatter<f64, f64>>> {
 /// Returns a SimulationError if:
 /// * The simulation fails to run
 /// * The measurement conditions cannot be converted to simulation inputs
+///
+#[cfg(feature = "simulation")]
 fn get_simulation_traces(
     doc: &EnzymeMLDocument,
     meas: &Measurement,
@@ -162,4 +168,28 @@ fn get_simulation_traces(
 
     let traces: Vec<Box<Scatter<f64, f64>>> = (&result).into();
     Ok(traces)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::io::load_enzmldoc;
+
+    use super::*;
+
+    #[test]
+    fn test_plot() {
+        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+        enzmldoc.plot(None, true, None, true).unwrap();
+    }
+
+    #[test]
+    fn test_get_simulation_traces() {
+        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+        let measurement = enzmldoc.measurements.iter().next().unwrap();
+
+        let traces = get_simulation_traces(&enzmldoc, measurement).unwrap();
+        assert_eq!(traces.len(), 2);
+    }
 }
