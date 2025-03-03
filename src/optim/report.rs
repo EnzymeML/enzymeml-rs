@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use argmin::core::CostFunction;
+use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 use plotly::Plot;
 use serde::Serialize;
@@ -9,7 +11,7 @@ use crate::{
     simulation::error::SimulationError,
 };
 
-use super::{error::OptimizeError, problem::Problem};
+use super::{error::OptimizeError, metrics::akaike_information_criterion, problem::Problem};
 
 /// A report containing optimization results and evaluation metrics
 ///
@@ -33,6 +35,8 @@ pub struct OptimizationReport {
     pub best_params: HashMap<String, f64>,
     /// Fits to experimental data, mapping measurement IDs to simulation results
     pub fits: HashMap<String, SimulationResult>,
+    /// Akaike Information Criterion
+    pub aic: f64,
     /// Relative uncertainties of the best parameters
     pub uncertainties: Option<HashMap<String, f64>>,
 }
@@ -97,10 +101,16 @@ impl OptimizationReport {
             .map(|(fit, measurement)| (measurement.id.clone(), fit.clone()))
             .collect::<HashMap<String, SimulationResult>>();
 
+        let aic = akaike_information_criterion(
+            problem.cost(&Array1::from_vec(param_vec)).unwrap(),
+            system.get_sorted_params().len(),
+        );
+
         Ok(Self {
             doc,
             best_params,
             fits,
+            aic,
             uncertainties: None,
         })
     }

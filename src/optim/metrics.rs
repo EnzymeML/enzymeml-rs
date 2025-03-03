@@ -1,7 +1,5 @@
 use ndarray::Array2;
 
-use crate::prelude::ObjectiveFunction;
-
 /// Calculates the sum of squared errors (SSE) between predicted and actual values.
 ///
 /// SSE = Σ(y_pred - y_actual)²
@@ -76,20 +74,14 @@ pub fn mean_absolute_error(residuals: &Array2<f64>, num_samples: f64) -> f64 {
 /// - k is the number of model parameters
 ///
 /// # Arguments
-/// * `residuals` - 2D array of residuals (differences between predicted and actual values)
+/// * `cost` - Cost of the model
 /// * `num_samples` - Total number of data points across all measurements
 /// * `num_parameters` - Number of parameters in the model (model complexity)
 ///
 /// # Returns
 /// * `f64` - AIC value
-pub fn akaike_information_criterion<L: ObjectiveFunction>(
-    loss: &L,
-    residuals: &Array2<f64>,
-    num_samples: usize,
-    num_parameters: usize,
-) -> f64 {
-    let sse = loss.cost(residuals, num_samples).unwrap();
-    num_samples as f64 * (sse / num_samples as f64).ln() + 2.0 * num_parameters as f64
+pub fn akaike_information_criterion(cost: f64, num_parameters: usize) -> f64 {
+    2.0 * num_parameters as f64 - 2.0 * (cost).ln()
 }
 
 /// Calculates Bayesian Information Criterion (BIC), similar to AIC but with a stronger penalty
