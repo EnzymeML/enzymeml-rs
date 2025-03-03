@@ -3,15 +3,14 @@
 mod test_simulation {
     use std::collections::HashMap;
 
-    use super::*;
     use approx::assert_relative_eq;
     use enzymeml::prelude::{
         EnzymeMLDocument, EnzymeMLDocumentBuilder, EnzymeMLDocumentBuilderError, EquationBuilder,
         EquationType, MatrixResult, Mode, ODESystem, ParameterBuilder, PlotConfig,
-        SimulationResult, SimulationSetupBuilder,
+        SimulationResult, SimulationSetupBuilder, StepperOutput,
     };
     use ndarray::Axis;
-    use peroxide::fuga::RK5;
+    use peroxide::fuga::{BasicODESolver, ODEProblem, ODESolver, RK5};
 
     /// Tests the basic simulation of a Michaelis-Menten enzyme kinetics system.
     /// Compares results between a reference implementation and an EnzymeML-based system.
