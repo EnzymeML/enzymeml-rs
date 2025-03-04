@@ -4,10 +4,16 @@ use plotly::{
     Layout, Plot, Scatter,
 };
 
-use crate::prelude::{
-    error::SimulationError, result::PlotTraces, runner::InitCondInput, simulate, EnzymeMLDocument,
-    Measurement, SimulationSetup,
+use crate::prelude::{EnzymeMLDocument, Measurement};
+
+#[cfg(feature = "simulation")]
+use crate::{
+    prelude::{ODESystem, PlotTraces, SimulationResult, SimulationSetup},
+    simulation::{error::SimulationError, init_cond::InitialCondition},
 };
+
+#[cfg(feature = "simulation")]
+use peroxide::fuga::RK5;
 
 impl EnzymeMLDocument {
     /// Creates a plot visualization of an EnzymeML document's measurement data.
@@ -27,7 +33,7 @@ impl EnzymeMLDocument {
         show: bool,
         measurement_ids: Option<Vec<String>>,
         show_fit: bool,
-    ) -> Result<Plot, SimulationError> {
+    ) -> Result<Plot, Box<dyn std::error::Error>> {
         // Determine the number of rows
         let n_meas = self.measurements.len();
         let columns = if n_meas == 1 { 1 } else { columns.unwrap_or(2) };
@@ -51,6 +57,7 @@ impl EnzymeMLDocument {
                 plot.add_trace(trace);
             }
 
+            #[cfg(feature = "simulation")]
             if show_fit {
                 let traces = get_simulation_traces(self, meas)?;
                 for trace in traces {
@@ -139,16 +146,50 @@ impl From<&Measurement> for Vec<Box<Scatter<f64, f64>>> {
 /// Returns a SimulationError if:
 /// * The simulation fails to run
 /// * The measurement conditions cannot be converted to simulation inputs
+///
+#[cfg(feature = "simulation")]
 fn get_simulation_traces(
     doc: &EnzymeMLDocument,
     meas: &Measurement,
 ) -> Result<PlotTraces, SimulationError> {
     let setup: SimulationSetup = meas.try_into().unwrap();
-    let initial_conditions: InitCondInput = meas.into();
+    let initial_conditions: InitialCondition = meas.into();
+    let solver = RK5::default();
+    let system: ODESystem = doc.try_into().unwrap();
 
-    let result = simulate(doc, initial_conditions, setup, None, None)?;
-    let result = result.first().unwrap();
-    let traces: Vec<Box<Scatter<f64, f64>>> = result.into();
+    let result = system.integrate::<SimulationResult>(
+        &setup,
+        initial_conditions,
+        None,
+        None,
+        solver,
+        None,
+    )?;
 
+    let traces: Vec<Box<Scatter<f64, f64>>> = (&result).into();
     Ok(traces)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use crate::io::load_enzmldoc;
+
+    use super::*;
+
+    #[test]
+    fn test_plot() {
+        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+        enzmldoc.plot(None, true, None, true).unwrap();
+    }
+
+    #[test]
+    fn test_get_simulation_traces() {
+        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+        let measurement = enzmldoc.measurements.iter().next().unwrap();
+
+        let traces = get_simulation_traces(&enzmldoc, measurement).unwrap();
+        assert_eq!(traces.len(), 2);
+    }
 }

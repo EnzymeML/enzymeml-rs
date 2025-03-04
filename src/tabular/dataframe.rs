@@ -1,3 +1,27 @@
+//! Tabular Data Conversion Module
+//!
+//! This module provides functionality for converting between `Measurement` and `DataFrame`
+//! representations, enabling seamless data manipulation and analysis.
+//!
+//! # Key Features
+//!
+//! - Convert `Measurement` objects to Polars DataFrames
+//! - Convert DataFrames back to `MeasurementBuilder`
+//! - Handle time series and species data transformations
+//!
+//! # Conversion Methods
+//!
+//! - `From<Measurement>` and `From<&Measurement>` trait implementations for DataFrame conversion
+//! - `to_dataframe()` method on `Measurement`
+//! - `from_dataframe()` static method on `Measurement` and `MeasurementBuilder`
+//!
+//! # Data Handling
+//!
+//! The module supports:
+//! - Extracting time series data
+//! - Managing initial conditions
+//! - Handling missing or placeholder data
+
 use std::error::Error;
 
 use polars::prelude::*;

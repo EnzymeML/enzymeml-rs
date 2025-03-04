@@ -1,3 +1,20 @@
+//! Reaction Macro Module
+//!
+//! This module provides a powerful macro `build_reaction` for flexible and concise reaction construction.
+//!
+//! # Key Features
+//!
+//! - Create reactions with a single macro invocation
+//! - Specify reaction ID, name, and reversibility
+//! - Define species and their stoichiometric coefficients
+//!
+//! # Macro Behavior
+//!
+//! The macro simplifies reaction creation by:
+//! - Automatically using `ReactionBuilder`
+//! - Constructing `ReactionElementBuilder` for each species
+//! - Handling error propagation with `?` operator
+
 #[macro_export]
 macro_rules! build_reaction {
     (

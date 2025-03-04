@@ -1,3 +1,22 @@
+//! Unit Macro Module
+//!
+//! This module provides a powerful macro `unit` for flexible and concise unit definition creation.
+//!
+//! # Key Features
+//!
+//! - Create unit definitions with a single macro invocation
+//! - Support for inverse unit definitions (1 / [prefix unit])
+//! - Automatic parsing of prefixes and base units
+//! - Flexible handling of unit scales and exponents
+//!
+//! # Macro Behavior
+//!
+//! The macro simplifies unit definition creation by:
+//! - Automatically converting prefixes and units to a standardized format
+//! - Generating base unit representations
+//! - Handling unit scale and exponent calculations
+//! - Providing error checking for unknown prefixes or units
+
 #[macro_export]
 macro_rules! unit {
 

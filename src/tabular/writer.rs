@@ -1,3 +1,26 @@
+//! Tabular Data Writing Module
+//!
+//! This module provides functionality for writing tabular data to Excel files,
+//! supporting conversion of `EnzymeMLDocument` and `Measurement` objects to spreadsheets.
+//!
+//! # Key Features
+//!
+//! - Convert `EnzymeMLDocument` to Excel spreadsheets
+//! - Convert individual `Measurement` objects to Excel files
+//! - Support for creating templates and full data export
+//!
+//! # Usage
+//!
+//! The module enables:
+//! - Exporting complete enzyme kinetics documents
+//! - Generating measurement templates
+//! - Flexible spreadsheet generation with validation options
+//!
+//! # Methods
+//!
+//! - `to_excel()` on `EnzymeMLDocument` and `Measurement`
+//! - Conversion of data with optional template creation
+
 use std::error::Error;
 use std::path::{Path, PathBuf};
 

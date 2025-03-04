@@ -74,19 +74,14 @@ pub fn mean_absolute_error(residuals: &Array2<f64>, num_samples: f64) -> f64 {
 /// - k is the number of model parameters
 ///
 /// # Arguments
-/// * `residuals` - 2D array of residuals (differences between predicted and actual values)
+/// * `cost` - Cost of the model
 /// * `num_samples` - Total number of data points across all measurements
 /// * `num_parameters` - Number of parameters in the model (model complexity)
 ///
 /// # Returns
 /// * `f64` - AIC value
-pub fn akaike_information_criterion(
-    residuals: &Array2<f64>,
-    num_samples: f64,
-    num_parameters: f64,
-) -> f64 {
-    let sse = sum_of_squared_errors(residuals);
-    num_samples * (sse / num_samples).ln() + 2.0 * num_parameters
+pub fn akaike_information_criterion(cost: f64, num_parameters: usize) -> f64 {
+    2.0 * num_parameters as f64 - 2.0 * (cost).ln()
 }
 
 /// Calculates Bayesian Information Criterion (BIC), similar to AIC but with a stronger penalty
@@ -116,33 +111,4 @@ pub fn bayesian_information_criterion(
 ) -> f64 {
     let sse = sum_of_squared_errors(residuals);
     num_samples * (sse / num_samples).ln() + num_parameters * num_samples.ln()
-}
-
-/// Calculates the Huber loss, a robust loss function that combines squared error for small residuals
-/// and absolute error for large residuals to reduce sensitivity to outliers.
-///
-/// The Huber loss is quadratic for residuals smaller than delta and linear for larger residuals,
-/// making it more robust than pure squared error loss while maintaining differentiability.
-///
-/// For a residual x and threshold δ (delta):
-/// Loss = x²/2        if |x| ≤ δ
-/// Loss = δ(|x| - δ/2) if |x| > δ
-///
-/// # Arguments
-/// * `residuals` - 2D array of residuals between predicted and actual values
-/// * `num_samples` - Total number of data points for normalization
-/// * `delta` - Threshold that determines transition between quadratic and linear regions
-///
-/// # Returns
-/// * `f64` - Normalized Huber loss value
-pub fn huber_loss(residuals: &Array2<f64>, num_samples: f64, delta: f64) -> f64 {
-    let residuals = residuals.mapv(|x| x.abs());
-    let huber = residuals.mapv(|x| {
-        if x < delta {
-            x * x / 2.0
-        } else {
-            delta * (x - delta / 2.0)
-        }
-    });
-    huber.sum() / num_samples
 }
