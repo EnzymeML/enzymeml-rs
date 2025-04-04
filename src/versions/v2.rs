@@ -3,9 +3,9 @@
 //! WARNING: This is an auto-generated file.
 //! Do not edit directly - any changes will be overwritten.
 
-use serde::{Deserialize, Serialize};
-use schemars::JsonSchema;
 use derive_builder::Builder;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 //
 // Type definitions
@@ -84,9 +84,7 @@ pub struct EnzymeMLDocument {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_references")))]
     pub references: Vec<String>,
-
 }
-
 
 /// The Creator object represents an individual author or contributor who
 /// has participated in creating or modifying the EnzymeML Document.
@@ -108,9 +106,7 @@ pub struct Creator {
 
     #[builder(setter(into))]
     pub mail: String,
-
 }
-
 
 /// The Vessel object represents containers used to conduct experiments,
 /// such as reaction vessels, microplates, or bioreactors. It captures
@@ -139,9 +135,7 @@ pub struct Vessel {
     #[serde(default)]
     #[builder(default = "true.into()", setter(into))]
     pub constant: bool,
-
 }
-
 
 /// The Protein object represents enzymes and other proteins involved in
 /// the experiment.
@@ -187,9 +181,7 @@ pub struct Protein {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_references")))]
     pub references: Vec<String>,
-
 }
-
 
 /// The Complex object allows the grouping of multiple species using
 /// their . This enables the representation of protein-small molecule
@@ -219,9 +211,7 @@ pub struct Complex {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_participants")))]
     pub participants: Vec<String>,
-
 }
-
 
 /// The SmallMolecule object represents small chemical compounds that
 /// participate in the experiment as substrates, products, or
@@ -268,9 +258,7 @@ pub struct SmallMolecule {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_references")))]
     pub references: Vec<String>,
-
 }
-
 
 /// The Reaction object represents a chemical or enzymatic reaction and
 /// holds the different species and modifiers that are part of the
@@ -303,9 +291,7 @@ pub struct Reaction {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_modifiers")))]
     pub modifiers: Vec<String>,
-
 }
-
 
 /// This object is part of the object and describes a species
 /// (SmallMolecule, Protein, Complex) participating in the reaction.
@@ -327,9 +313,7 @@ pub struct ReactionElement {
 
     #[builder(setter(into))]
     pub stoichiometry: f64,
-
 }
-
 
 /// The Equation object describes a mathematical equation used to model
 /// parts of a reaction system.
@@ -354,9 +338,7 @@ pub struct Equation {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_variables")))]
     pub variables: Vec<Variable>,
-
 }
-
 
 /// This object describes a variable that is part of an equation.
 /// Variables can represent species concentrations, time, or other
@@ -378,9 +360,7 @@ pub struct Variable {
 
     #[builder(setter(into))]
     pub symbol: String,
-
 }
-
 
 /// This object describes parameters used in kinetic models, including
 /// estimated values, bounds, and associated uncertainties.
@@ -432,9 +412,7 @@ pub struct Parameter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default = "true.into()", setter(into))]
     pub constant: Option<bool>,
-
 }
-
 
 /// This object describes a single measurement, which includes time
 /// course data of any type defined in DataTypes. It contains initial
@@ -474,9 +452,7 @@ pub struct Measurement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub temperature_unit: Option<UnitDefinition>,
-
 }
-
 
 /// This object describes a single entity of a measurement, which
 /// corresponds to one species (Protein, Complex, SmallMolecule). It
@@ -529,9 +505,7 @@ pub struct MeasurementData {
 
     #[builder(setter(into))]
     pub is_simulated: bool,
-
 }
-
 
 /// Represents a unit definition that is based on the SI unit system.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Builder, Default)]
@@ -549,9 +523,7 @@ pub struct UnitDefinition {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_base_units")))]
     pub base_units: Vec<BaseUnit>,
-
 }
-
 
 /// Represents a base unit in the unit definition.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Builder, Default)]
@@ -573,9 +545,7 @@ pub struct BaseUnit {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub scale: Option<f64>,
-
 }
-
 
 //
 // Enum definitions
@@ -597,7 +567,6 @@ pub enum EquationType {
     #[serde(rename = "rateLaw")]
     RATE_LAW,
 }
-
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, PartialEq, Eq)]
@@ -621,7 +590,6 @@ pub enum DataTypes {
     #[serde(rename = "transmittance")]
     TRANSMITTANCE,
 }
-
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, PartialEq, Eq)]
