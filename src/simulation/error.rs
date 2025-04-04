@@ -22,6 +22,8 @@
 use evalexpr_jit::errors::EquationError;
 use thiserror::Error;
 
+use crate::plot::PlotError;
+
 #[derive(Error, Debug)]
 pub enum SimulationError {
     #[error("Error evaluating expression: {0}")]
@@ -46,4 +48,6 @@ pub enum SimulationError {
     ArgMinMathError(#[from] argmin_math::Error),
     #[error("No data provided for interpolation")]
     NoDataForInterpolation,
+    #[error("Failed to plot")]
+    PlotError(#[from] PlotError),
 }

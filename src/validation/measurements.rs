@@ -1,4 +1,4 @@
-use crate::enzyme_ml::{EnzymeMLDocument, MeasurementData};
+use crate::prelude::{EnzymeMLDocument, MeasurementData};
 
 use super::validator::{get_species_ids, Report, Severity, ValidationResult};
 
@@ -46,27 +46,23 @@ fn check_initial_concentrations(
     data_idx: usize,
     meas_data: &MeasurementData,
 ) {
-    let has_data = meas_data.data.as_ref().is_some();
-    let has_time = meas_data.time.as_ref().is_some();
+    let has_data = !meas_data.data.is_empty();
+    let has_time = !meas_data.time.is_empty();
 
     if !has_data || !has_time {
         // Check if the data and time vectors are not empty
         return;
+    } else if !has_data {
+        return;
     }
 
-    if let Some(data) = meas_data.data.as_ref() {
-        if data.is_empty() {
-            return;
-        }
-    }
-
-    if meas_data.time.as_ref().unwrap().first().unwrap() != &0.0 {
+    if meas_data.time.first().unwrap() != &0.0 {
         // If the first time point is not 0, we cannot check
         return;
     }
 
     // Check if the initial concentration matches the first data point
-    if meas_data.data.as_ref().unwrap().first().unwrap() != &meas_data.initial {
+    if meas_data.data.first().unwrap() != &meas_data.initial {
         let result = ValidationResult::new(
             format!("/measurements/{}/species/{}", meas_idx, data_idx),
             format!(
@@ -97,9 +93,9 @@ fn check_time_data_consistency(
     data_idx: usize,
     meas_data: &MeasurementData,
 ) {
-    if meas_data.data.is_some() && meas_data.time.is_some() {
-        let data = meas_data.data.as_ref().unwrap();
-        let time = meas_data.time.as_ref().unwrap();
+    if !meas_data.data.is_empty() && !meas_data.time.is_empty() {
+        let data = &meas_data.data;
+        let time = &meas_data.time;
 
         if data.len() != time.len() {
             let result = ValidationResult::new(
@@ -108,15 +104,15 @@ fn check_time_data_consistency(
                     "Data and time vectors have different lengths for species '{}'. \
                 Got {} data points and {} time points.",
                     meas_data.species_id,
-                    meas_data.data.clone().unwrap().len(),
-                    meas_data.time.clone().unwrap().len()
+                    data.len(),
+                    time.len()
                 ),
                 Severity::Error,
             );
 
             report.add_result(result);
         }
-    } else if meas_data.data.is_some() && meas_data.time.is_none() {
+    } else if meas_data.data.is_empty() && !meas_data.time.is_empty() {
         let result = ValidationResult::new(
             format!("/measurements/{}/species/{}", meas_idx, data_idx),
             format!(
@@ -127,7 +123,7 @@ fn check_time_data_consistency(
         );
 
         report.add_result(result);
-    } else if meas_data.data.is_none() && meas_data.time.is_some() {
+    } else if !meas_data.data.is_empty() && meas_data.time.is_empty() {
         let result = ValidationResult::new(
             format!("/measurements/{}/species/{}", meas_idx, data_idx),
             format!(
@@ -158,9 +154,9 @@ fn check_species_consistency(
     meas_idx: usize,
     data_idx: usize,
     meas_data: &MeasurementData,
-    all_species: &[&String],
+    all_species: &[String],
 ) {
-    if !all_species.contains(&&meas_data.species_id) {
+    if !all_species.contains(&meas_data.species_id) {
         let result = ValidationResult::new(
             format!("/measurements/{}/species/{}", meas_idx, data_idx),
             format!(
@@ -178,7 +174,8 @@ fn check_species_consistency(
 mod tests {
     use super::*;
     use crate::prelude::{
-        EnzymeMLDocumentBuilder, MeasurementBuilder, MeasurementDataBuilder, SmallMoleculeBuilder,
+        DataTypes, EnzymeMLDocumentBuilder, MeasurementBuilder, MeasurementDataBuilder,
+        SmallMoleculeBuilder, UnitDefinitionBuilder,
     };
 
     /// Test that a valid measurement is valid
@@ -186,20 +183,28 @@ mod tests {
     fn test_valid_measurement() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_measurements(
                 MeasurementBuilder::default()
+                    .id("M1".to_string())
+                    .name("M1".to_string())
                     .to_species_data(
                         MeasurementDataBuilder::default()
                             .species_id("S1".to_string())
                             .initial(1.0)
+                            .data_unit(UnitDefinitionBuilder::default().build().unwrap())
+                            .data_type(DataTypes::CONCENTRATION)
                             .time(vec![0.0, 1.0])
                             .data(vec![1.0, 2.0])
+                            .is_simulated(false)
                             .build()
                             .expect("Failed to build measurement data"),
                     )
@@ -218,10 +223,19 @@ mod tests {
     fn test_invalid_measurement_no_species_id() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_measurements(
                 MeasurementBuilder::default()
+                    .id("M1".to_string())
+                    .name("M1".to_string())
                     .to_species_data(
                         MeasurementDataBuilder::default()
+                            .data_unit(UnitDefinitionBuilder::default().build().unwrap())
+                            .initial(1.0)
+                            .data_type(DataTypes::CONCENTRATION)
+                            .time(vec![0.0, 1.0])
+                            .data(vec![1.0, 2.0])
+                            .is_simulated(false)
                             .species_id("S1".to_string())
                             .build()
                             .expect("Failed to build measurement data"),
@@ -242,18 +256,26 @@ mod tests {
     fn test_invalid_measurement_inconsistent_time_and_data_vectors() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_measurements(
                 MeasurementBuilder::default()
+                    .id("M1".to_string())
+                    .name("M1".to_string())
                     .to_species_data(
                         MeasurementDataBuilder::default()
                             .species_id("S1".to_string())
                             .initial(1.0)
+                            .data_unit(UnitDefinitionBuilder::default().build().unwrap())
+                            .data_type(DataTypes::CONCENTRATION)
+                            .is_simulated(false)
                             .time(vec![0.0, 1.0])
                             .data(vec![1.0, 2.0, 3.0])
                             .build()
@@ -276,18 +298,26 @@ mod tests {
     fn test_invalid_measurement_missing_time_vector() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_measurements(
                 MeasurementBuilder::default()
+                    .id("M1".to_string())
+                    .name("M1".to_string())
                     .to_species_data(
                         MeasurementDataBuilder::default()
                             .species_id("S1".to_string())
                             .initial(1.0)
+                            .data_unit(UnitDefinitionBuilder::default().build().unwrap())
+                            .data_type(DataTypes::CONCENTRATION)
+                            .is_simulated(false)
                             .data(vec![1.0, 2.0, 3.0])
                             .build()
                             .expect("Failed to build measurement data"),
@@ -309,18 +339,26 @@ mod tests {
     fn test_invalid_measurement_missing_data_vector() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_measurements(
                 MeasurementBuilder::default()
+                    .id("M1".to_string())
+                    .name("M1".to_string())
                     .to_species_data(
                         MeasurementDataBuilder::default()
                             .species_id("S1".to_string())
                             .initial(1.0)
+                            .data_unit(UnitDefinitionBuilder::default().build().unwrap())
+                            .data_type(DataTypes::CONCENTRATION)
+                            .is_simulated(false)
                             .time(vec![0.0, 1.0])
                             .build()
                             .expect("Failed to build measurement data"),
@@ -342,17 +380,26 @@ mod tests {
     fn test_invalid_measurement_inconsistent_species_id() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S2".to_string())
+                    .name("S2".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_measurements(
                 MeasurementBuilder::default()
+                    .id("M1".to_string())
+                    .name("M1".to_string())
                     .to_species_data(
                         MeasurementDataBuilder::default()
                             .species_id("S1".to_string())
+                            .initial(1.0)
+                            .data_unit(UnitDefinitionBuilder::default().build().unwrap())
+                            .data_type(DataTypes::CONCENTRATION)
+                            .is_simulated(false)
                             .build()
                             .expect("Failed to build measurement data"),
                     )

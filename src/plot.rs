@@ -1,8 +1,10 @@
+use itertools::Itertools;
 use plotly::{
-    common::Mode,
-    layout::{Axis, GridPattern, LayoutGrid},
+    common::{Line, Marker, Mode},
+    layout::Axis,
     Layout, Plot, Scatter,
 };
+use thiserror::Error;
 
 use crate::prelude::{EnzymeMLDocument, Measurement};
 
@@ -14,6 +16,10 @@ use crate::{
 
 #[cfg(feature = "simulation")]
 use peroxide::fuga::RK5;
+
+const COLORS: &[&str] = &[
+    "green", "blue", "red", "purple", "orange", "yellow", "brown", "pink", "gray", "cyan",
+];
 
 impl EnzymeMLDocument {
     /// Creates a plot visualization of an EnzymeML document's measurement data.
@@ -27,55 +33,50 @@ impl EnzymeMLDocument {
     /// # Returns
     ///
     /// A Plot object containing the measurement data visualization in a grid layout.
-    pub fn plot(
+    pub fn plot_measurement(
         &self,
-        columns: Option<usize>,
+        measurement_id: String,
         show: bool,
-        measurement_ids: Option<Vec<String>>,
         show_fit: bool,
-    ) -> Result<Plot, Box<dyn std::error::Error>> {
-        // Determine the number of rows
-        let n_meas = self.measurements.len();
-        let columns = if n_meas == 1 { 1 } else { columns.unwrap_or(2) };
-        let rows = (n_meas as f32 / columns as f32).ceil() as usize;
-
+    ) -> Result<Plot, PlotError> {
         // Filter measurements if measurement_ids are provided
-        let measurements: Vec<&Measurement> = match measurement_ids {
-            Some(ids) => ids
-                .into_iter()
-                .map(|id| self.measurements.iter().find(|meas| meas.id == id).unwrap())
-                .collect(),
-            None => self.measurements.iter().collect(),
-        };
+        let measurement: &Measurement = self
+            .measurements
+            .iter()
+            .find(|meas| meas.id == measurement_id)
+            .ok_or(PlotError::MeasurementNotFound(measurement_id))?;
 
         // Create a plot
         let mut plot = Plot::new();
 
-        for meas in measurements {
-            let traces: Vec<Box<Scatter<f64, f64>>> = meas.into();
-            for trace in traces {
-                plot.add_trace(trace);
-            }
+        let traces: Vec<Box<Scatter<f64, f64>>> = measurement.into();
+        for (i, trace) in traces.into_iter().enumerate() {
+            plot.add_trace(
+                trace
+                    .clone()
+                    .marker(Marker::new().color(COLORS[i % COLORS.len()]).size(10)),
+            );
+        }
 
-            #[cfg(feature = "simulation")]
-            if show_fit {
-                let traces = get_simulation_traces(self, meas)?;
-                for trace in traces {
-                    plot.add_trace(trace);
-                }
+        #[cfg(feature = "simulation")]
+        if show_fit {
+            let traces =
+                get_simulation_traces(self, measurement).map_err(|_| PlotError::SimulationError)?;
+            for (i, trace) in traces.into_iter().enumerate() {
+                plot.add_trace(
+                    trace
+                        .clone()
+                        .line(Line::new().color(COLORS[i % COLORS.len()]).width(2.0)),
+                );
             }
         }
 
         // Create a layout
         let layout = Layout::new()
             .title(self.name.clone())
-            .grid(
-                LayoutGrid::new()
-                    .rows(rows)
-                    .columns(columns)
-                    .pattern(GridPattern::Independent),
-            )
             .show_legend(true) // Always show the legend
+            .width(800)
+            .height(600)
             .x_axis(Axis::new().range(vec![0.0]).auto_range(true).title("Time"))
             .y_axis(
                 Axis::new()
@@ -111,15 +112,17 @@ impl From<&Measurement> for Vec<Box<Scatter<f64, f64>>> {
     fn from(measurement: &Measurement) -> Self {
         let mut plots = Vec::new();
 
-        for meas_data in measurement.species_data.iter() {
-            if let (Some(time), Some(data)) = (&meas_data.time, &meas_data.data) {
-                let plot = Scatter::new(time.clone(), data.clone())
-                    .name(&meas_data.species_id)
-                    .mode(Mode::Markers)
-                    .x_axis("Time")
-                    .y_axis("Concentration");
-                plots.push(plot);
-            }
+        for meas_data in measurement
+            .species_data
+            .iter()
+            .sorted_by_key(|d| &d.species_id)
+        {
+            let plot = Scatter::new(meas_data.time.clone(), meas_data.data.clone())
+                .name(&meas_data.species_id)
+                .mode(Mode::Markers)
+                .x_axis("Time")
+                .y_axis("Concentration");
+            plots.push(plot);
         }
 
         plots
@@ -170,6 +173,14 @@ fn get_simulation_traces(
     Ok(traces)
 }
 
+#[derive(Error, Debug)]
+pub enum PlotError {
+    #[error("Measurement with id {0} not found")]
+    MeasurementNotFound(String),
+    #[error("Simulation failed")]
+    SimulationError,
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -181,7 +192,9 @@ mod tests {
     #[test]
     fn test_plot() {
         let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
-        enzmldoc.plot(None, true, None, true).unwrap();
+        enzmldoc
+            .plot_measurement("measurement0".to_string(), true, true)
+            .unwrap();
     }
 
     #[test]

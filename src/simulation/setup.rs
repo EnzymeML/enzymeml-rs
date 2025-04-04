@@ -156,7 +156,7 @@ impl TryFrom<&EnzymeMLDocument> for Vec<SimulationSetup> {
 
     fn try_from(enzmldoc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
         enzmldoc
-            .get_measurements()
+            .measurements
             .iter()
             .map(|m| {
                 m.try_into()
@@ -218,10 +218,10 @@ impl TryFrom<&Measurement> for SimulationSetup {
 fn get_t0(measurement: &Measurement) -> Result<f64, Box<dyn Error>> {
     let mut min_times: BTreeSet<OrderedFloat<f64>> = BTreeSet::new();
     for species in measurement.species_data.iter() {
-        if let Some(time) = &species.time {
+        if !species.time.is_empty() {
             let mut min_time = BTreeSet::new();
 
-            for t in time.iter() {
+            for t in species.time.iter() {
                 min_time.insert(OrderedFloat(*t));
             }
 
@@ -267,10 +267,10 @@ fn get_t1(measurement: &Measurement) -> Result<f64, Box<dyn Error>> {
     let mut max_times: BTreeSet<OrderedFloat<f64>> = BTreeSet::new();
 
     for species in measurement.species_data.iter() {
-        if let Some(time) = &species.time {
+        if !species.time.is_empty() {
             let mut max_time = BTreeSet::new();
 
-            for t in time.iter() {
+            for t in species.time.iter() {
                 max_time.insert(OrderedFloat(*t));
             }
 
@@ -303,7 +303,7 @@ mod tests {
         let mut measurement = Measurement::default();
         let mut species = MeasurementData::default();
 
-        species.time = Some(vec![0.0, 1.0, 2.0]);
+        species.time = vec![0.0, 1.0, 2.0];
         measurement.species_data.push(species);
 
         let t0 = get_t0(&measurement).unwrap();
@@ -316,7 +316,7 @@ mod tests {
         let mut measurement = Measurement::default();
         let mut species = MeasurementData::default();
 
-        species.time = None;
+        species.time = vec![];
         measurement.species_data.push(species);
 
         get_t0(&measurement).expect("No time data found in measurement");
@@ -327,7 +327,7 @@ mod tests {
         let mut measurement = Measurement::default();
         let mut species = MeasurementData::default();
 
-        species.time = Some(vec![0.0, 1.0, 2.0]);
+        species.time = vec![0.0, 1.0, 2.0];
         measurement.species_data.push(species);
 
         let t1 = get_t1(&measurement).unwrap();
@@ -340,7 +340,7 @@ mod tests {
         let mut measurement = Measurement::default();
         let mut species = MeasurementData::default();
 
-        species.time = None;
+        species.time = vec![];
         measurement.species_data.push(species);
 
         get_t1(&measurement).expect("No time data found in measurement");

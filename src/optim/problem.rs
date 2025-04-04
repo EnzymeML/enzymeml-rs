@@ -167,7 +167,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
         measurement
             .species_data
             .iter()
-            .find_map(|s| s.time.as_ref())
+            .find_map(|s| (!s.time.is_empty()).then_some(&s.time))
             .ok_or(OptimizeError::NoTimePoints)
     }
 
@@ -227,7 +227,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
         measurement
             .species_data
             .iter()
-            .filter_map(|s| s.time.as_ref())
+            .filter_map(|s| (!s.time.is_empty()).then_some(&s.time))
             .collect()
     }
 
@@ -247,7 +247,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
                 measurement
                     .species_data
                     .iter()
-                    .filter(|species| species.data.as_ref().is_some_and(|data| !data.is_empty()))
+                    .filter(|species| !species.data.is_empty())
                     .map(|species| species.species_id.clone())
                     .collect()
             })
@@ -315,15 +315,13 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     /// # Returns
     /// * `usize` - Total number of data points
     pub fn get_n_points(&self) -> usize {
-        let mut n_points = 0;
-        for m in &self.doc.measurements {
-            for s in &m.species_data {
-                if let Some(data) = &s.data {
-                    n_points += data.len();
-                }
-            }
-        }
-        n_points
+        self.doc
+            .measurements
+            .iter()
+            .flat_map(|m| &m.species_data)
+            .filter(|s| !s.data.is_empty())
+            .map(|s| s.data.len())
+            .sum()
     }
 
     /// Returns a reference to the underlying EnzymeML document

@@ -1,4 +1,4 @@
-use crate::enzyme_ml::{EnzymeMLDocument, Parameter};
+use crate::prelude::{EnzymeMLDocument, Parameter};
 use crate::validation::validator::{Report, Severity, ValidationResult};
 
 /// Validates parameters in an EnzymeML document by checking units
@@ -51,9 +51,12 @@ mod tests {
     fn test_invalid_parameter_no_unit() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_parameters(
                 ParameterBuilder::default()
                     .id("P1".to_string())
+                    .symbol("k".to_string())
+                    .name("P1".to_string())
                     .build()
                     .expect("Failed to build parameter"),
             )

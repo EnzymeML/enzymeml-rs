@@ -55,4 +55,8 @@ pub enum OptimizeError {
     },
     #[error("Failed to convert measurement data")]
     ConversionError(#[from] ConversionError),
+    #[error("Missing lower bound for parameter {param}")]
+    MissingLowerBound { param: String },
+    #[error("Missing upper bound for parameter {param}")]
+    MissingUpperBound { param: String },
 }

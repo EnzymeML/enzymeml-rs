@@ -1,6 +1,8 @@
 use ndarray::Array2;
 use peroxide::fuga::ODEIntegrator;
 
+use crate::prelude::{EnzymeMLDocument, Parameter};
+
 use super::{OptimizeError, Problem};
 
 /// Represents bounds on an optimization parameter.
@@ -34,6 +36,17 @@ impl Bound {
     }
 }
 
+/// Converts a vector of bounds into a 2D array format required by optimization algorithms.
+///
+/// # Arguments
+///
+/// * `problem` - The optimization problem containing system parameters
+/// * `bounds` - Vector of parameter bounds
+///
+/// # Returns
+///
+/// * `Ok(Array2<f64>)` - 2D array where each row contains [lower_bound, upper_bound] for a parameter
+/// * `Err(OptimizeError)` - Error if bounds are invalid or missing parameters
 pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy>(
     problem: &Problem<S>,
     bounds: &Vec<Bound>,
@@ -66,16 +79,71 @@ pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy>(
     Ok(array)
 }
 
+/// Checks if all system parameters have corresponding bounds.
+///
+/// # Arguments
+///
+/// * `bound_params` - List of parameter names that have bounds defined
+/// * `system_params` - List of parameter names required by the system
+///
+/// # Returns
+///
+/// `true` if all system parameters have bounds, `false` otherwise
 fn has_all_params(bound_params: &[String], system_params: &[String]) -> bool {
     system_params
         .iter()
         .all(|p| bound_params.contains(&p.to_string()))
 }
 
+/// Sorts bounds to match the order of parameters in the system.
+///
+/// # Arguments
+///
+/// * `bounds` - Vector of parameter bounds to sort
+/// * `sorted_params` - Reference parameter order to sort by
+///
+/// # Returns
+///
+/// New vector of bounds sorted to match the parameter order
 fn sort_by_system_params(bounds: Vec<Bound>, sorted_params: &[String]) -> Vec<Bound> {
     let mut sorted_bounds = bounds.clone();
     sorted_bounds.sort_by_key(|b| sorted_params.iter().position(|p| p == &b.param).unwrap());
     sorted_bounds
+}
+
+impl TryFrom<&EnzymeMLDocument> for Vec<Bound> {
+    type Error = OptimizeError;
+
+    /// Attempts to create bounds from an EnzymeML document.
+    ///
+    /// Extracts parameter bounds from the document's parameters section.
+    fn try_from(doc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
+        Ok(doc
+            .parameters
+            .iter()
+            .map(|p| p.try_into().unwrap())
+            .collect())
+    }
+}
+
+impl TryFrom<&Parameter> for Bound {
+    type Error = OptimizeError;
+
+    /// Attempts to create a bound from a parameter definition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either the lower or upper bound is missing from the parameter.
+    fn try_from(param: &Parameter) -> Result<Self, Self::Error> {
+        let lower = param.lower_bound.ok_or(OptimizeError::MissingLowerBound {
+            param: param.id.clone(),
+        })?;
+        let upper = param.upper_bound.ok_or(OptimizeError::MissingUpperBound {
+            param: param.id.clone(),
+        })?;
+
+        Ok(Bound::new(param.id.clone(), lower, upper))
+    }
 }
 
 #[cfg(test)]

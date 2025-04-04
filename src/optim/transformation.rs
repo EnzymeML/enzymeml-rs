@@ -57,7 +57,7 @@ impl Transformation {
         EquationBuilder::default()
             .species_id(format!("{variable}_transformed"))
             .equation(equation_string.clone())
-            .equation_type(EquationType::InitialAssignment)
+            .equation_type(EquationType::INITIAL_ASSIGNMENT)
             .build()
             .map_err(|e| OptimizeError::TransformationError {
                 variable: variable.to_string(),
@@ -153,7 +153,7 @@ impl Transformation {
         doc.equations.push(equation);
 
         for equation in doc.equations.iter_mut() {
-            if equation.species_id != Some(self.transform_symbol()) {
+            if equation.species_id != self.transform_symbol() {
                 equation.equation = equation
                     .equation
                     .replace(&self.symbol(), &self.transform_symbol());

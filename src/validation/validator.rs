@@ -9,8 +9,8 @@
 //! The main entry point is the `check_consistency` function which runs all validation
 //! checks and returns a `Report` with the results.
 
-use crate::enzyme_ml::EnzymeMLDocument;
 use crate::extract_all;
+use crate::prelude::EnzymeMLDocument;
 use crate::validation::equations::check_equations;
 use crate::validation::measurements::check_measurements;
 use crate::validation::parameters::check_parameters;
@@ -152,12 +152,17 @@ pub enum Severity {
 /// - Small molecules
 /// - Proteins  
 /// - Complexes
-pub fn get_species_ids(enzmldoc: &EnzymeMLDocument) -> Vec<&String> {
+pub fn get_species_ids(enzmldoc: &EnzymeMLDocument) -> Vec<String> {
     let small_mols = extract_all!(enzmldoc, small_molecules[*].id);
     let proteins = extract_all!(enzmldoc, proteins[*].id);
     let complexes = extract_all!(enzmldoc, complexes[*].id);
 
-    small_mols.chain(proteins).chain(complexes).collect()
+    small_mols
+        .into_iter()
+        .chain(proteins)
+        .chain(complexes)
+        .map(|id| id.to_string())
+        .collect()
 }
 
 #[cfg(test)]
@@ -198,21 +203,28 @@ mod tests {
     #[test]
     fn test_get_species_ids() {
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_complexes(
                 ComplexBuilder::default()
                     .id("C1".to_string())
+                    .name("C1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build complex"),
             )
             .to_proteins(
                 ProteinBuilder::default()
                     .id("P1".to_string())
+                    .name("P1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build protein"),
             )

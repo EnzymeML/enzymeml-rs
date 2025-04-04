@@ -33,15 +33,13 @@
       "id": "substrate",
       "name": "substrate",
       "constant": false,
-      "canonical_smiles": "C",
-      "references": null
+      "canonical_smiles": "C"
     },
     {
       "id": "product",
       "name": "product",
       "constant": false,
-      "canonical_smiles": "O",
-      "references": null
+      "canonical_smiles": "O"
     }
   ],
   "reactions": [
@@ -58,8 +56,7 @@
           "species_id": "product",
           "stoichiometry": 1.0
         }
-      ],
-      "modifiers": null
+      ]
     }
   ],
   "measurements": [

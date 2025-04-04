@@ -20,6 +20,7 @@ use argmin::solver::quasinewton::BFGS as ArgminBFGS;
 use argmin_observer_slog::SlogLogger;
 use ndarray::Array2;
 use peroxide::fuga::ODEIntegrator;
+use serde::Serialize;
 
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
@@ -34,6 +35,7 @@ use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 ///
 /// * `I` - The state type that implements the `State` trait
 /// * `O` - The observer type that implements the `Observe` trait
+#[derive(Debug, Clone, Serialize)]
 pub struct BFGS {
     /// Maximum number of iterations before stopping
     pub max_iters: u64,

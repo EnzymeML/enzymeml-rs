@@ -1,4 +1,4 @@
-use crate::enzyme_ml::{EnzymeMLDocument, Reaction};
+use crate::prelude::{EnzymeMLDocument, Reaction};
 use crate::validation::validator::{get_species_ids, Report, Severity, ValidationResult};
 
 /// Validates reactions in an EnzymeML document by checking that all referenced species exist
@@ -35,7 +35,7 @@ pub fn check_reactions(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
 fn check_reaction_species(
     report: &mut Report,
     reaction: &Reaction,
-    all_species: &[&String],
+    all_species: &[String],
     reaction_idx: usize,
 ) {
     for (elem_idx, reac_elem) in reaction.species.iter().enumerate() {
@@ -92,21 +92,28 @@ mod tests {
     fn test_valid_reaction() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S2".to_string())
+                    .name("S2".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_reactions(
                 ReactionBuilder::default()
                     .id("R1".to_string())
+                    .name("R1".to_string())
+                    .reversible(true)
                     .to_species(
                         ReactionElementBuilder::default()
                             .species_id("S1".to_string())
@@ -136,15 +143,20 @@ mod tests {
     fn test_invalid_reaction_undefined_species() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_reactions(
                 ReactionBuilder::default()
                     .id("R1".to_string())
+                    .name("R1".to_string())
+                    .reversible(true)
                     .to_species(
                         ReactionElementBuilder::default()
                             .species_id("S2".to_string())
@@ -176,9 +188,12 @@ mod tests {
     fn test_invalid_reaction_no_reactants_or_products() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_reactions(
                 ReactionBuilder::default()
                     .id("R1".to_string())
+                    .name("R1".to_string())
+                    .reversible(true)
                     .build()
                     .expect("Failed to build reaction"),
             )
@@ -196,15 +211,20 @@ mod tests {
     fn test_invalid_reaction_no_reactants() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_reactions(
                 ReactionBuilder::default()
                     .id("R1".to_string())
+                    .name("R1".to_string())
+                    .reversible(true)
                     .to_species(
                         ReactionElementBuilder::default()
                             .species_id("S1".to_string())
@@ -229,15 +249,20 @@ mod tests {
     fn test_invalid_reaction_no_products() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_reactions(
                 ReactionBuilder::default()
                     .id("R1".to_string())
+                    .name("R1".to_string())
+                    .reversible(true)
                     .to_species(
                         ReactionElementBuilder::default()
                             .species_id("S1".to_string())

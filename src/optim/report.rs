@@ -30,10 +30,12 @@ use super::{error::OptimizeError, metrics::akaike_information_criterion, problem
 #[derive(Debug, Clone, Serialize)]
 pub struct OptimizationReport {
     /// The EnzymeML document containing model and data
+    #[serde(skip_serializing)]
     pub doc: EnzymeMLDocument,
     /// Map of parameter names to their optimized values
     pub best_params: HashMap<String, f64>,
     /// Fits to experimental data, mapping measurement IDs to simulation results
+    #[serde(skip_serializing)]
     pub fits: HashMap<String, SimulationResult>,
     /// Akaike Information Criterion
     pub aic: f64,
@@ -123,13 +125,14 @@ impl OptimizationReport {
     /// - Error bars if experimental uncertainties are available
     ///
     /// # Arguments
+    /// * `measurement_id` - The ID of the measurement to plot
     /// * `show` - Whether to display the plot immediately in the default browser
     ///
     /// # Returns
     /// * `Result<Plot, SimulationError>` - A Plotly Plot object containing the visualization if successful,
     ///   or a SimulationError if plotting fails
-    pub fn plot_fit(&self, show: bool) -> Result<Plot, SimulationError> {
-        let plot = self.doc.plot(Some(2), show, None, true).unwrap();
+    pub fn plot_fit(&self, measurement_id: String, show: bool) -> Result<Plot, SimulationError> {
+        let plot = self.doc.plot_measurement(measurement_id, show, true)?;
         Ok(plot)
     }
 }
