@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use argmin::core::CostFunction;
 use ndarray::Array1;
@@ -33,7 +33,7 @@ pub struct OptimizationReport {
     #[serde(skip_serializing)]
     pub doc: EnzymeMLDocument,
     /// Map of parameter names to their optimized values
-    pub best_params: HashMap<String, f64>,
+    pub best_params: BTreeMap<String, f64>,
     /// Fits to experimental data, mapping measurement IDs to simulation results
     #[serde(skip_serializing)]
     pub fits: HashMap<String, SimulationResult>,
@@ -75,7 +75,7 @@ impl OptimizationReport {
             .iter()
             .enumerate()
             .map(|(i, p)| (p.to_string(), param_vec[i]))
-            .collect::<HashMap<String, f64>>();
+            .collect::<BTreeMap<String, f64>>();
 
         // First we need to set the best params in the doc
         let mut doc = doc;
