@@ -1,6 +1,6 @@
 //! Tabular Data Writing Module
 //!
-//! This module provides functionality for writing tabular data to Excel files,
+//! This module provides functionality for writing tabular data to spreadsheet files,
 //! supporting conversion of `EnzymeMLDocument` and `Measurement` objects to spreadsheets.
 //!
 //! # Key Features
