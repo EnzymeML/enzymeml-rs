@@ -32,7 +32,8 @@ fn main() {
             // Generate compliant Rust code
             let code = model
                 .convert_to(&Templates::Rust, None)
-                .expect("Failed to convert to Rust");
+                .expect("Failed to convert to Rust")
+                + "\n\n";
 
             // Create a new file with the same name as the markdown file
             let out_path: PathBuf = format!("src/versions/{}.rs", fname).into();
