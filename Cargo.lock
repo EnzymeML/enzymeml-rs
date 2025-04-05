@@ -2308,7 +2308,7 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 [[package]]
 name = "mdmodels"
 version = "0.2.2"
-source = "git+https://github.com/FAIRChemistry/md-models.git?branch=fix-rust-vec-gen#2e378366184f128f98a4d6d76f22d30fdf85875d"
+source = "git+https://github.com/FAIRChemistry/md-models.git?branch=fix-rust-vec-gen#70bd84109a1fdd59ad15dec58aab5fd2c3bb13d8"
 dependencies = [
  "clap",
  "colored",
