@@ -48,7 +48,7 @@ tsify-next = { version = "0.5.5", optional = true }
 clap = { version = "4.5.31", features = ["derive"] }
 itertools = "0.14.0"
 mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "fix-rust-vec-gen", optional = true }
-tokio = { version = "1.44.0", features = ["full"] }
+tokio = { version = "1.44.0", features = ["full"], optional = true }
 
 [profile.release]
 opt-level = 2
@@ -61,7 +61,7 @@ default = ["optimization", "simulation", "llm"]
 tabular = ["polars", "calamine", "xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next", "jsonschema"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
-llm = ["mdmodels"]
+llm = ["mdmodels", "tokio"]
 optimization = [
     "argmin-math",
     "argmin",
