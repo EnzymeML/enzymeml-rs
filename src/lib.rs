@@ -9,7 +9,6 @@
 //! - Plotting results
 
 #![warn(unused_imports)]
-#![warn(unused_crate_dependencies)]
 
 pub mod versions {
     pub use crate::versions::v2 as latest;
@@ -164,7 +163,7 @@ pub mod tabular {
 
 /// Plotting and visualization functionality
 #[cfg(not(feature = "wasm"))]
-pub mod plot;
+pub mod plotting;
 
 /// IO functionality
 pub mod io;

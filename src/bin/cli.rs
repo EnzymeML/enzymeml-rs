@@ -82,7 +82,7 @@ enum Commands {
 #[derive(Subcommand)]
 enum FitAlgorithm {
     /// Efficient Global Optimization algorithm
-    EGO {
+    Ego {
         /// Path to the EnzymeML document
         #[arg(short, long)]
         path: PathBuf,
@@ -100,7 +100,7 @@ enum FitAlgorithm {
         dt: f64,
     },
     /// Particle Swarm Optimization algorithm
-    PSO {
+    Pso {
         /// Path to the EnzymeML document
         #[arg(short, long)]
         path: PathBuf,
@@ -175,14 +175,14 @@ pub fn main() {
             }
         }
         Commands::Fit { algorithm } => match algorithm {
-            FitAlgorithm::EGO {
+            FitAlgorithm::Ego {
                 path,
                 max_iters,
                 output_dir,
                 dt,
             } => {
                 let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                let problem = ProblemBuilder::new(&enzmldoc, RK5::default())
+                let problem = ProblemBuilder::new(&enzmldoc, RK5)
                     .dt(*dt)
                     .build()
                     .expect("Failed to build problem");
@@ -201,7 +201,7 @@ pub fn main() {
                 let report_file = File::create(report_path).expect("Failed to create report file");
                 serde_json::to_writer_pretty(report_file, &report).expect("Failed to write report");
             }
-            FitAlgorithm::PSO {
+            FitAlgorithm::Pso {
                 path,
                 max_iters,
                 pop_size,
@@ -209,7 +209,7 @@ pub fn main() {
                 dt,
             } => {
                 let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                let problem = ProblemBuilder::new(&enzmldoc, RK5::default())
+                let problem = ProblemBuilder::new(&enzmldoc, RK5)
                     .dt(*dt)
                     .build()
                     .expect("Failed to build problem");

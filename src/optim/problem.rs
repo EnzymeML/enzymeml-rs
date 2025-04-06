@@ -278,8 +278,8 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     ///
     /// # Errors
     /// Returns `OptimizeError::UnknownParameter` if an unknown parameter is encountered
-    pub fn apply_transformations(&self, param_vec: &Vec<f64>) -> Result<Vec<f64>, OptimizeError> {
-        let mut transformed_params = param_vec.clone();
+    pub fn apply_transformations(&self, param_vec: &[f64]) -> Result<Vec<f64>, OptimizeError> {
+        let mut transformed_params = param_vec.to_vec();
         let param_order = self.ode_system.get_sorted_params();
 
         // Create a map of parameter name to transformation
@@ -345,7 +345,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     /// # Returns
     /// * `S` - Clone of the solver used for numerical integration
     pub fn solver(&self) -> S {
-        self.solver.clone()
+        self.solver
     }
 
     /// Returns a reference to the vector of simulation setups

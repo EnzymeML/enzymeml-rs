@@ -73,7 +73,7 @@ fn check_equation_variables(
     eq_idx: usize,
 ) {
     for (var_idx, var) in equation.variables.iter().enumerate() {
-        if !all_species.contains(&&var.id) {
+        if !all_species.contains(&var.id) {
             let result = ValidationResult::new(
                 format!("/equations/{}/variables/{}", eq_idx, var_idx),
                 format!(

@@ -32,8 +32,7 @@ use polars::frame::DataFrame;
 use polars::prelude::NamedFrom;
 use polars::series::Series;
 
-use crate::enzyme_ml::{Measurement, MeasurementBuilder};
-use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder};
+use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder, Measurement, MeasurementBuilder};
 
 impl EnzymeMLDocument {
     /// Adds measurements from an Excel file to the `EnzymeMLDocument`.

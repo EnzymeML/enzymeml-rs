@@ -22,30 +22,26 @@ use serde::{Deserialize, Serialize};
 #[allow(non_snake_case)]
 pub struct EnzymeMLDocument {
     /// Title of the EnzymeML Document.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Date the EnzymeML Document was created.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub created: Option<String>,
 
     /// Date the EnzymeML Document was modified.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub modified: Option<String>,
 
     /// Contains descriptions of all authors that are part of the experiment.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_creators")))]
     pub creators: Vec<Creator>,
 
     /// Contains descriptions of all vessels that are part of the experiment.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_vessels")))]
     pub vessels: Vec<Vessel>,
@@ -53,7 +49,6 @@ pub struct EnzymeMLDocument {
     /// Contains descriptions of all proteins that are part of the experiment
     /// that may be referenced in reactions, measurements, and
     /// equations.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_proteins")))]
     pub proteins: Vec<Protein>,
@@ -61,7 +56,6 @@ pub struct EnzymeMLDocument {
     /// Contains descriptions of all complexes that are part of the experiment
     /// that may be referenced in reactions, measurements, and
     /// equations.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_complexes")))]
     pub complexes: Vec<Complex>,
@@ -69,42 +63,36 @@ pub struct EnzymeMLDocument {
     /// Contains descriptions of all reactants that are part of the experiment
     /// that may be referenced in reactions, measurements, and
     /// equations.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_small_molecules")))]
     pub small_molecules: Vec<SmallMolecule>,
 
     /// Contains descriptions of all reactions that are part of the
     /// experiment.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_reactions")))]
     pub reactions: Vec<Reaction>,
 
     /// Contains descriptions of all measurements that are part of the
     /// experiment.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_measurements")))]
     pub measurements: Vec<Measurement>,
 
     /// Contains descriptions of all equations that are part of the
     /// experiment.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_equations")))]
     pub equations: Vec<Equation>,
 
     /// Contains descriptions of all parameters that are part of the
     /// experiment and may be used in equations.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_parameters")))]
     pub parameters: Vec<Parameter>,
 
     /// Contains references to publications, databases, and arbitrary links to
     /// the web.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_references")))]
     pub references: Vec<String>,
@@ -119,17 +107,17 @@ pub struct EnzymeMLDocument {
 #[allow(non_snake_case)]
 pub struct Creator {
     /// Given name of the author or contributor.
-
+    ///
     #[builder(setter(into))]
     pub given_name: String,
 
     /// Family name of the author or contributor.
-
+    ///
     #[builder(setter(into))]
     pub family_name: String,
 
     /// Email address of the author or contributor.
-
+    ///
     #[builder(setter(into))]
     pub mail: String,
 }
@@ -142,27 +130,26 @@ pub struct Creator {
 #[allow(non_snake_case)]
 pub struct Vessel {
     /// Unique identifier of the vessel.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the used vessel.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Volumetric value of the vessel.
-
+    ///
     #[builder(setter(into))]
     pub volume: f64,
 
     /// Volumetric unit of the vessel.
-
+    ///
     #[builder(setter(into))]
     pub unit: UnitDefinition,
 
     /// Whether the volume of the vessel is constant or not. Default is True.
-
     #[serde(default)]
     #[builder(default = "true.into()", setter(into))]
     pub constant: bool,
@@ -175,55 +162,48 @@ pub struct Vessel {
 pub struct Protein {
     /// Identifier of the protein, such as a UniProt ID, or a custom
     /// identifier.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the protein.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Whether the concentration of the protein is constant through the
     /// experiment or not. Default is True.
-
     #[serde(default)]
     #[builder(default = "true.into()", setter(into))]
     pub constant: bool,
 
     /// Amino acid sequence of the protein
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub sequence: Option<String>,
 
     /// Identifier of the vessel this protein has been applied to.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub vessel_id: Option<String>,
 
     /// EC number of the protein.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub ecnumber: Option<String>,
 
     /// Expression host organism of the protein.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub organism: Option<String>,
 
     /// Taxonomy identifier of the expression host.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub organism_tax_id: Option<String>,
 
     /// List of references to publications, database entries, etc. that
     /// describe or reference the protein.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_references")))]
     pub references: Vec<String>,
@@ -237,29 +217,27 @@ pub struct Protein {
 #[allow(non_snake_case)]
 pub struct Complex {
     /// Unique identifier of the complex.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the complex.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Whether the concentration of the complex is constant through the
     /// experiment or not. Default is False.
-
+    ///
     #[builder(setter(into))]
     pub constant: bool,
 
     /// Unique identifier of the vessel this complex has been used in.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub vessel_id: Option<String>,
 
     /// Array of IDs the complex contains
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_participants")))]
     pub participants: Vec<String>,
@@ -274,51 +252,46 @@ pub struct Complex {
 pub struct SmallMolecule {
     /// Identifier of the small molecule, such as a Pubchem ID, ChEBI ID, or a
     /// custom identifier.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the small molecule.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Whether the concentration of the small molecule is constant through
     /// the experiment or not. Default is False.
-
+    ///
     #[builder(setter(into))]
     pub constant: bool,
 
     /// Identifier of the vessel this small molecule has been used in.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub vessel_id: Option<String>,
 
     /// Canonical Simplified Molecular-Input Line-Entry System (SMILES)
     /// encoding of the small molecule.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub canonical_smiles: Option<String>,
 
     /// International Chemical Identifier (InChI) encoding of the small
     /// molecule.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub inchi: Option<String>,
 
     /// Hashed International Chemical Identifier (InChIKey) encoding of the
     /// small molecule.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub inchikey: Option<String>,
 
     /// List of references to publications, database entries, etc. that
     /// describe or reference the small molecule.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_references")))]
     pub references: Vec<String>,
@@ -331,35 +304,32 @@ pub struct SmallMolecule {
 #[allow(non_snake_case)]
 pub struct Reaction {
     /// Unique identifier of the reaction.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the reaction.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Whether the reaction is reversible or irreversible. Default is False.
-
+    ///
     #[builder(setter(into))]
     pub reversible: bool,
 
     /// Mathematical expression of the reaction.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub kinetic_law: Option<Equation>,
 
     /// List of reaction elements that are part of the reaction.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_species")))]
     pub species: Vec<ReactionElement>,
 
     /// List of reaction elements that are not part of the reaction but
     /// influence it.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_modifiers")))]
     pub modifiers: Vec<String>,
@@ -376,14 +346,14 @@ pub struct Reaction {
 pub struct ReactionElement {
     /// Internal identifier to either a protein or reactant defined in the
     /// EnzymeML Document.
-
+    ///
     #[builder(setter(into))]
     pub species_id: String,
 
     /// Float number representing the associated stoichiometry. Negative
     /// values indicate that the species is a reactant and positive
     /// values indicate that the species is a product of the reaction.
-
+    ///
     #[builder(setter(into))]
     pub stoichiometry: f64,
 }
@@ -395,23 +365,22 @@ pub struct ReactionElement {
 pub struct Equation {
     /// Identifier of a defined species (SmallMolecule, Protein, Complex).
     /// Represents the left hand side of the equation.
-
+    ///
     #[builder(setter(into))]
     pub species_id: String,
 
     /// Mathematical expression of the equation. Represents the right hand
     /// side of the equation.
-
+    ///
     #[builder(setter(into))]
     pub equation: String,
 
     /// Type of the equation.
-
+    ///
     #[builder(setter(into))]
     pub equation_type: EquationType,
 
     /// List of variables that are part of the equation
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_variables")))]
     pub variables: Vec<Variable>,
@@ -426,17 +395,17 @@ pub struct Equation {
 #[allow(non_snake_case)]
 pub struct Variable {
     /// Identifier of the variable.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the variable.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Equation symbol of the variable.
-
+    ///
     #[builder(setter(into))]
     pub symbol: String,
 }
@@ -450,60 +419,53 @@ pub struct Variable {
 #[allow(non_snake_case)]
 pub struct Parameter {
     /// Identifier of the parameter.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the parameter.
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Equation symbol of the parameter.
-
+    ///
     #[builder(setter(into))]
     pub symbol: String,
 
     /// Numerical value of the estimated parameter.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub value: Option<f64>,
 
     /// Unit of the estimated parameter.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub unit: Option<UnitDefinition>,
 
     /// Initial value that was used for the parameter estimation.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub initial_value: Option<f64>,
 
     /// Upper bound for the parameter value that was used for the parameter
     /// estimation
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub upper_bound: Option<f64>,
 
     /// Lower bound for the parameter value that was used for the parameter
     /// estimation
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub lower_bound: Option<f64>,
 
     /// Standard error of the estimated parameter.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub stderr: Option<f64>,
 
     /// Specifies if this parameter is constant. Default is True.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default = "true.into()", setter(into))]
     pub constant: Option<bool>,
@@ -519,42 +481,37 @@ pub struct Parameter {
 #[allow(non_snake_case)]
 pub struct Measurement {
     /// Unique identifier of the measurement.
-
+    ///
     #[builder(setter(into))]
     pub id: String,
 
     /// Name of the measurement
-
+    ///
     #[builder(setter(into))]
     pub name: String,
 
     /// Measurement data of all species that were part of the measurement. A
     /// species refers to a Protein, Complex, or SmallMolecule.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_species_data")))]
     pub species_data: Vec<MeasurementData>,
 
     /// User-defined group ID to signal relationships between measurements.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub group_id: Option<String>,
 
     /// pH value of the measurement.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub ph: Option<f64>,
 
     /// Temperature of the measurement.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub temperature: Option<f64>,
 
     /// Unit of the temperature of the measurement.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub temperature_unit: Option<UnitDefinition>,
@@ -570,23 +527,23 @@ pub struct Measurement {
 #[allow(non_snake_case)]
 pub struct MeasurementData {
     /// The identifier for the described reactant.
-
+    ///
     #[builder(setter(into))]
     pub species_id: String,
 
     /// Initial amount of the measurement data. This must be the same as the
     /// first data point in the array.
-
+    ///
     #[builder(setter(into))]
     pub initial: f64,
 
     /// SI unit of the data that was measured.
-
+    ///
     #[builder(setter(into))]
     pub data_unit: UnitDefinition,
 
     /// Type of data that was measured (e.g. concentration, absorbance, etc.)
-
+    ///
     #[builder(setter(into))]
     pub data_type: DataTypes,
 
@@ -595,32 +552,28 @@ pub struct MeasurementData {
     /// in the reaction mix. Not to be confused with , specifying
     /// the concentration of a species at the first data point from
     /// the array.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub prepared: Option<f64>,
 
     /// Data that was measured.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_data")))]
     pub data: Vec<f64>,
 
     /// Corresponding time points of the .
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_time")))]
     pub time: Vec<f64>,
 
     /// Unit of the time points of the .
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub time_unit: Option<UnitDefinition>,
 
     /// Whether or not the data has been generated by simulation. Default
     /// is False.
-
+    ///
     #[builder(setter(into))]
     pub is_simulated: bool,
 }
@@ -635,13 +588,11 @@ pub struct UnitDefinition {
     pub id: Option<String>,
 
     /// Common name of the unit definition.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub name: Option<String>,
 
     /// Base units that define the unit.
-
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_base_units")))]
     pub base_units: Vec<BaseUnit>,
@@ -652,23 +603,21 @@ pub struct UnitDefinition {
 #[allow(non_snake_case)]
 pub struct BaseUnit {
     /// Kind of the base unit (e.g., meter, kilogram, second).
-
+    ///
     #[builder(setter(into))]
     pub kind: UnitType,
 
     /// Exponent of the base unit in the unit definition.
-
+    ///
     #[builder(setter(into))]
     pub exponent: i64,
 
     /// Multiplier of the base unit in the unit definition.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub multiplier: Option<f64>,
 
     /// Scale of the base unit in the unit definition.
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub scale: Option<f64>,
@@ -823,3 +772,4 @@ pub enum UnitType {
     #[serde(rename = "weber")]
     WEBER,
 }
+

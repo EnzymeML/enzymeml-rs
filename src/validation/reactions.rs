@@ -39,7 +39,7 @@ fn check_reaction_species(
     reaction_idx: usize,
 ) {
     for (elem_idx, reac_elem) in reaction.species.iter().enumerate() {
-        if !all_species.contains(&&reac_elem.species_id) {
+        if !all_species.contains(&reac_elem.species_id) {
             let result = ValidationResult::new(
                 format!("/reactions/{}/species/{}", reaction_idx, elem_idx),
                 format!(

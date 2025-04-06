@@ -104,7 +104,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         initial_conditions,
         None,                // We could also dynamically set new parameters
         None,                // We could also provide specific time points to extract
-        RK5::default(),      // We could also use a different solver
+        RK5,                 // We could also use a different solver
         Some(Mode::Regular), // We could also use a different mode (e.g. Sensitivity)
     );
 

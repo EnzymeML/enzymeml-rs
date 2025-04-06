@@ -301,9 +301,11 @@ mod tests {
     #[test]
     fn test_get_t0() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData {
+            time: vec![0.0, 1.0, 2.0],
+            ..Default::default()
+        };
 
-        species.time = vec![0.0, 1.0, 2.0];
         measurement.species_data.push(species);
 
         let t0 = get_t0(&measurement).unwrap();
@@ -314,9 +316,8 @@ mod tests {
     #[should_panic]
     fn test_get_t0_none() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData::default();
 
-        species.time = vec![];
         measurement.species_data.push(species);
 
         get_t0(&measurement).expect("No time data found in measurement");
@@ -325,9 +326,11 @@ mod tests {
     #[test]
     fn test_get_t1() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData {
+            time: vec![0.0, 1.0, 2.0],
+            ..Default::default()
+        };
 
-        species.time = vec![0.0, 1.0, 2.0];
         measurement.species_data.push(species);
 
         let t1 = get_t1(&measurement).unwrap();
@@ -338,9 +341,8 @@ mod tests {
     #[should_panic]
     fn test_get_t1_none() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData::default();
 
-        species.time = vec![];
         measurement.species_data.push(species);
 
         get_t1(&measurement).expect("No time data found in measurement");

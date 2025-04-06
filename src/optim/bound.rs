@@ -49,7 +49,7 @@ impl Bound {
 /// * `Err(OptimizeError)` - Error if bounds are invalid or missing parameters
 pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy>(
     problem: &Problem<S>,
-    bounds: &Vec<Bound>,
+    bounds: &[Bound],
 ) -> Result<Array2<f64>, OptimizeError> {
     let bound_params = bounds.iter().map(|b| b.param.clone()).collect::<Vec<_>>();
     let system_params = problem
@@ -68,7 +68,7 @@ pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy>(
 
     // Sort bounds by system parameters
     let sorted_params = problem.ode_system().get_sorted_params();
-    let sorted_bounds = sort_by_system_params(bounds.clone(), &sorted_params);
+    let sorted_bounds = sort_by_system_params(bounds, &sorted_params);
 
     // Create array with bounds
     let mut array = Array2::zeros((bounds.len(), 2));
@@ -105,8 +105,8 @@ fn has_all_params(bound_params: &[String], system_params: &[String]) -> bool {
 /// # Returns
 ///
 /// New vector of bounds sorted to match the parameter order
-fn sort_by_system_params(bounds: Vec<Bound>, sorted_params: &[String]) -> Vec<Bound> {
-    let mut sorted_bounds = bounds.clone();
+fn sort_by_system_params(bounds: &[Bound], sorted_params: &[String]) -> Vec<Bound> {
+    let mut sorted_bounds = bounds.to_vec();
     sorted_bounds.sort_by_key(|b| sorted_params.iter().position(|p| p == &b.param).unwrap());
     sorted_bounds
 }
@@ -157,7 +157,7 @@ mod tests {
             Bound::new("k2".to_string(), 0.0, 1.0),
         ];
         let sorted_params = vec!["k1".to_string(), "k2".to_string()];
-        let sorted_bounds = sort_by_system_params(bounds, &sorted_params);
+        let sorted_bounds = sort_by_system_params(&bounds, &sorted_params);
         assert_eq!(
             sorted_bounds,
             vec![

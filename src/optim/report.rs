@@ -3,13 +3,9 @@ use std::collections::{BTreeMap, HashMap};
 use argmin::core::CostFunction;
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
-use plotly::Plot;
 use serde::Serialize;
 
-use crate::{
-    prelude::{EnzymeMLDocument, SimulationResult},
-    simulation::error::SimulationError,
-};
+use crate::prelude::{EnzymeMLDocument, SimulationResult};
 
 use super::{error::OptimizeError, metrics::akaike_information_criterion, problem::Problem};
 
@@ -64,7 +60,7 @@ impl OptimizationReport {
     pub(crate) fn new<S: ODEIntegrator + Copy>(
         problem: &Problem<S>,
         doc: EnzymeMLDocument,
-        param_vec: &Vec<f64>,
+        param_vec: &[f64],
         _: Option<Vec<f64>>,
     ) -> Result<Self, OptimizeError> {
         // Transform the param_vec into a HashMap
@@ -115,25 +111,6 @@ impl OptimizationReport {
             aic,
             uncertainties: None,
         })
-    }
-
-    /// Creates an interactive plot comparing model predictions to experimental data
-    ///
-    /// Generates a Plotly visualization showing:
-    /// - Experimental data points
-    /// - Model predictions using best-fit parameters
-    /// - Error bars if experimental uncertainties are available
-    ///
-    /// # Arguments
-    /// * `measurement_id` - The ID of the measurement to plot
-    /// * `show` - Whether to display the plot immediately in the default browser
-    ///
-    /// # Returns
-    /// * `Result<Plot, SimulationError>` - A Plotly Plot object containing the visualization if successful,
-    ///   or a SimulationError if plotting fails
-    pub fn plot_fit(&self, measurement_id: String, show: bool) -> Result<Plot, SimulationError> {
-        let plot = self.doc.plot_measurement(measurement_id, show, true)?;
-        Ok(plot)
     }
 }
 
