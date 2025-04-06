@@ -84,6 +84,6 @@ impl From<&EnzymeMLDocument> for Vec<InitialCondition> {
     /// A vector of `InitialCondition`, where each element is a `HashMap` mapping
     /// species IDs to their initial values.
     fn from(doc: &EnzymeMLDocument) -> Self {
-        doc.get_measurements().iter().map(|m| m.into()).collect()
+        doc.measurements.iter().map(|m| m.into()).collect()
     }
 }

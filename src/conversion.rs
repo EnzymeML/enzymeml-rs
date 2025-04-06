@@ -69,7 +69,7 @@ impl TryFrom<&Measurement> for Array2<f64> {
         let species_w_data = measurement
             .species_data
             .iter()
-            .filter(|s| s.data.is_some())
+            .filter(|s| !s.data.is_empty())
             .map(|s| s.species_id.clone())
             .collect::<Vec<_>>();
 
@@ -106,10 +106,11 @@ fn get_measurement_data(
             .find(|s| s.species_id == *species_id)
             .ok_or_else(|| ConversionError::NoMeasurement(species_id.clone()))?;
 
-        let data_vec = meas_data
-            .data
-            .as_ref()
-            .ok_or_else(|| ConversionError::NoMeasurement(species_id.clone()))?;
+        if meas_data.data.is_empty() {
+            return Err(ConversionError::NoMeasurement(species_id.clone()));
+        }
+
+        let data_vec: &[f64] = meas_data.data.as_ref();
 
         data.push(data_vec);
     }

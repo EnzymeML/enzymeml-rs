@@ -22,6 +22,9 @@
 use evalexpr_jit::errors::EquationError;
 use thiserror::Error;
 
+#[cfg(not(feature = "wasm"))]
+use crate::plotting::PlotError;
+
 #[derive(Error, Debug)]
 pub enum SimulationError {
     #[error("Error evaluating expression: {0}")]
@@ -46,4 +49,7 @@ pub enum SimulationError {
     ArgMinMathError(#[from] argmin_math::Error),
     #[error("No data provided for interpolation")]
     NoDataForInterpolation,
+    #[cfg(not(feature = "wasm"))]
+    #[error("Failed to plot")]
+    PlotError(#[from] PlotError),
 }

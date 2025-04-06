@@ -78,7 +78,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
         };
 
         // Convert bounds to Array2
-        let bounds = bounds_to_array2(&problem, &self.bounds)?;
+        let bounds = bounds_to_array2(problem, &self.bounds)?;
 
         // Build and run EGO optimizer
         let result = EgorBuilder::optimize(objective)

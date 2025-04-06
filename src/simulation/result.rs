@@ -22,6 +22,7 @@
 
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use plotly::layout::Axis;
 use plotly::Plot;
 use plotly::{common::Mode, Scatter};
@@ -277,7 +278,7 @@ impl From<&SimulationResult> for Vec<Box<Scatter<f64, f64>>> {
         let mut traces = Vec::new();
 
         // Plot species
-        for (species, values) in result.species.iter() {
+        for (species, values) in result.species.iter().sorted_by_key(|k| k.0) {
             let trace = plotly::Scatter::new(result.time.clone(), values.clone())
                 .name(format!("{} Fit", species))
                 .mode(Mode::LinesText);

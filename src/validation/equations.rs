@@ -1,5 +1,4 @@
-use crate::enzyme_ml::{EnzymeMLDocument, Equation};
-use crate::prelude::EquationType;
+use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
 use crate::validation::validator::{get_species_ids, Report, Severity, ValidationResult};
 
 /// Validates equations in an EnzymeML document by checking that all referenced variables exist
@@ -18,7 +17,7 @@ pub fn check_equations(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
     for (eq_idx, equation) in enzmldoc.equations.iter().enumerate() {
         check_equation_variables(report, equation, &all_species, eq_idx);
 
-        if matches!(equation.equation_type, EquationType::Ode) {
+        if matches!(equation.equation_type, EquationType::ODE) {
             check_ode_species_id(report, equation, &all_species, eq_idx);
         }
     }
@@ -39,26 +38,16 @@ pub fn check_equations(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
 fn check_ode_species_id(
     report: &mut Report,
     equation: &Equation,
-    all_species: &[&String],
+    all_species: &[String],
     eq_idx: usize,
 ) {
-    if let Some(species_id) = &equation.species_id {
-        if !all_species.contains(&&species_id) {
-            let result = ValidationResult::new(
-                format!("/equations/{}/species_id", eq_idx),
-                format!(
-                    "Species ID '{}' is not defined in the document.",
-                    species_id
-                ),
-                Severity::Error,
-            );
-
-            report.add_result(result);
-        }
-    } else {
+    if !all_species.contains(&equation.species_id) {
         let result = ValidationResult::new(
             format!("/equations/{}/species_id", eq_idx),
-            "Species ID is not defined in the document.".to_string(),
+            format!(
+                "Species ID '{}' is not defined in the document.",
+                equation.species_id
+            ),
             Severity::Error,
         );
 
@@ -80,11 +69,11 @@ fn check_ode_species_id(
 fn check_equation_variables(
     report: &mut Report,
     equation: &Equation,
-    all_species: &[&String],
+    all_species: &[String],
     eq_idx: usize,
 ) {
     for (var_idx, var) in equation.variables.iter().enumerate() {
-        if !all_species.contains(&&var.id) {
+        if !all_species.contains(&var.id) {
             let result = ValidationResult::new(
                 format!("/equations/{}/variables/{}", eq_idx, var_idx),
                 format!(
@@ -112,19 +101,25 @@ mod tests {
     fn test_valid_equation() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test".to_string())
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
                     .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_equations(
                 EquationBuilder::default()
-                    .species_id("S1")
-                    .equation_type(EquationType::Ode)
+                    .species_id("S1".to_string())
+                    .equation_type(EquationType::ODE)
+                    .equation("S1 * 2".to_string())
                     .to_variables(
                         VariableBuilder::default()
                             .id("S1".to_string())
+                            .name("S1".to_string())
+                            .symbol("S1".to_string())
                             .build()
                             .expect("Failed to build variable"),
                     )
@@ -146,18 +141,25 @@ mod tests {
     fn test_invalid_equation() {
         let mut report = Report::new();
         let enzmldoc = EnzymeMLDocumentBuilder::default()
+            .name("test")
             .to_small_molecules(
                 SmallMoleculeBuilder::default()
+                    .id("S1".to_string())
+                    .name("S1".to_string())
+                    .constant(false)
                     .build()
                     .expect("Failed to build small molecule"),
             )
             .to_equations(
                 EquationBuilder::default()
-                    .species_id("S1")
-                    .equation_type(EquationType::Ode)
+                    .species_id("S2".to_string())
+                    .equation_type(EquationType::ODE)
+                    .equation("S2 * 2".to_string())
                     .to_variables(
                         VariableBuilder::default()
-                            .id("S1".to_string())
+                            .id("S2".to_string())
+                            .symbol("S2".to_string())
+                            .name("S2".to_string())
                             .build()
                             .expect("Failed to build variable"),
                     )

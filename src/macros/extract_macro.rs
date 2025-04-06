@@ -32,7 +32,7 @@ macro_rules! extract_all {
     // $vec_path: The vector from which to extract all elements
     // $($rest:tt)*: The rest of the path to follow after extracting the elements
     ($struct:expr, $vec_path:ident [*] ) => {
-        $struct.$vec_path.iter()
+        $struct.$vec_path.unwrap_or_default().iter()
     };
 
     // Case where the next part of the path is a vector with wildcard

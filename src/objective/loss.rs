@@ -489,7 +489,7 @@ mod tests {
         // 4. Divide by number of points
         let expected = {
             let tanh_vals = residuals.mapv(|r| r.tanh());
-            let mut grad = vec![0.0; 2];
+            let mut grad = [0.0; 2];
             for i in 0..2 {
                 for j in 0..2 {
                     grad[0] += tanh_vals[[i, j]] * sensitivities[[i, j, 0]];

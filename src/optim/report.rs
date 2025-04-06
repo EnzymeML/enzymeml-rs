@@ -1,15 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use argmin::core::CostFunction;
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
-use plotly::Plot;
 use serde::Serialize;
 
-use crate::{
-    prelude::{EnzymeMLDocument, SimulationResult},
-    simulation::error::SimulationError,
-};
+use crate::prelude::{EnzymeMLDocument, SimulationResult};
 
 use super::{error::OptimizeError, metrics::akaike_information_criterion, problem::Problem};
 
@@ -30,10 +26,12 @@ use super::{error::OptimizeError, metrics::akaike_information_criterion, problem
 #[derive(Debug, Clone, Serialize)]
 pub struct OptimizationReport {
     /// The EnzymeML document containing model and data
+    #[serde(skip_serializing)]
     pub doc: EnzymeMLDocument,
     /// Map of parameter names to their optimized values
-    pub best_params: HashMap<String, f64>,
+    pub best_params: BTreeMap<String, f64>,
     /// Fits to experimental data, mapping measurement IDs to simulation results
+    #[serde(skip_serializing)]
     pub fits: HashMap<String, SimulationResult>,
     /// Akaike Information Criterion
     pub aic: f64,
@@ -62,7 +60,7 @@ impl OptimizationReport {
     pub(crate) fn new<S: ODEIntegrator + Copy>(
         problem: &Problem<S>,
         doc: EnzymeMLDocument,
-        param_vec: &Vec<f64>,
+        param_vec: &[f64],
         _: Option<Vec<f64>>,
     ) -> Result<Self, OptimizeError> {
         // Transform the param_vec into a HashMap
@@ -73,7 +71,7 @@ impl OptimizationReport {
             .iter()
             .enumerate()
             .map(|(i, p)| (p.to_string(), param_vec[i]))
-            .collect::<HashMap<String, f64>>();
+            .collect::<BTreeMap<String, f64>>();
 
         // First we need to set the best params in the doc
         let mut doc = doc;
@@ -113,24 +111,6 @@ impl OptimizationReport {
             aic,
             uncertainties: None,
         })
-    }
-
-    /// Creates an interactive plot comparing model predictions to experimental data
-    ///
-    /// Generates a Plotly visualization showing:
-    /// - Experimental data points
-    /// - Model predictions using best-fit parameters
-    /// - Error bars if experimental uncertainties are available
-    ///
-    /// # Arguments
-    /// * `show` - Whether to display the plot immediately in the default browser
-    ///
-    /// # Returns
-    /// * `Result<Plot, SimulationError>` - A Plotly Plot object containing the visualization if successful,
-    ///   or a SimulationError if plotting fails
-    pub fn plot_fit(&self, show: bool) -> Result<Plot, SimulationError> {
-        let plot = self.doc.plot(Some(2), show, None, true).unwrap();
-        Ok(plot)
     }
 }
 

@@ -43,6 +43,7 @@ pub trait OutputFormat {
 }
 
 /// Type alias for matrix output results
+#[derive(Debug, Clone)]
 pub struct MatrixResult {
     pub times: Array1<f64>,
     pub species: Array2<f64>,

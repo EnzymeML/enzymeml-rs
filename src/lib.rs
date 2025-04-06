@@ -9,17 +9,16 @@
 //! - Plotting results
 
 #![warn(unused_imports)]
-#![warn(unused_crate_dependencies)]
 
-/// Module for generating EnzymeML model code from markdown specifications
-pub mod enzyme_ml {
-    mdmodels_macro::parse_mdmodel!("model.md");
+pub mod versions {
+    pub use crate::versions::v2 as latest;
+    pub mod v2;
 }
 
 /// Commonly used types and functionality re-exported for convenience
 pub mod prelude {
-    pub use crate::enzyme_ml::*;
     pub use crate::io::*;
+    pub use crate::versions::latest::*;
 
     #[cfg(feature = "simulation")]
     pub use crate::simulation::init_cond::*;
@@ -111,6 +110,9 @@ pub mod objective {
     pub mod objfun;
 }
 
+#[cfg(feature = "llm")]
+pub mod llm;
+
 /// Validation of EnzymeML documents and components
 pub mod validation {
     /// Validation of equation specifications
@@ -161,7 +163,7 @@ pub mod tabular {
 
 /// Plotting and visualization functionality
 #[cfg(not(feature = "wasm"))]
-pub mod plot;
+pub mod plotting;
 
 /// IO functionality
 pub mod io;

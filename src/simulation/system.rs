@@ -1044,10 +1044,10 @@ impl TryFrom<EnzymeMLDocument> for ODESystem {
 
     fn try_from(doc: EnzymeMLDocument) -> Result<Self, Self::Error> {
         // Extract equations by type
-        let odes = extract_equation_by_type(&doc.equations, EquationType::Ode)?;
-        let assignments = extract_equation_by_type(&doc.equations, EquationType::Assignment)?;
+        let odes = extract_equation_by_type(&doc.equations, EquationType::ODE);
+        let assignments = extract_equation_by_type(&doc.equations, EquationType::ASSIGNMENT);
         let initial_assignments =
-            extract_equation_by_type(&doc.equations, EquationType::InitialAssignment)?;
+            extract_equation_by_type(&doc.equations, EquationType::INITIAL_ASSIGNMENT);
 
         // Extract parameters
         let params = doc
@@ -1065,10 +1065,10 @@ impl TryFrom<&EnzymeMLDocument> for ODESystem {
 
     fn try_from(doc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
         // Extract equations by type
-        let odes = extract_equation_by_type(&doc.equations, EquationType::Ode)?;
-        let assignments = extract_equation_by_type(&doc.equations, EquationType::Assignment)?;
+        let odes = extract_equation_by_type(&doc.equations, EquationType::ODE);
+        let assignments = extract_equation_by_type(&doc.equations, EquationType::ASSIGNMENT);
         let initial_assignments =
-            extract_equation_by_type(&doc.equations, EquationType::InitialAssignment)?;
+            extract_equation_by_type(&doc.equations, EquationType::INITIAL_ASSIGNMENT);
 
         // Extract parameters
         let params = doc
@@ -1117,21 +1117,12 @@ impl std::fmt::Debug for ODESystem {
 fn extract_equation_by_type(
     equations: &[Equation],
     equation_type: EquationType,
-) -> Result<HashMap<String, String>, SimulationError> {
-    let mut result = HashMap::new();
-
-    for eq in equations
+) -> HashMap<String, String> {
+    equations
         .iter()
         .filter(|eq| eq.equation_type == equation_type)
-    {
-        let species_id = eq
-            .species_id
-            .clone()
-            .ok_or(SimulationError::Other("Species ID is None".to_string()))?;
-        result.insert(species_id, eq.equation.clone());
-    }
-
-    Ok(result)
+        .map(|eq| (eq.species_id.clone(), eq.equation.clone()))
+        .collect()
 }
 
 /// Represents the operating mode of the ODE system.
@@ -1168,24 +1159,26 @@ mod tests {
             .name("test")
             .to_equations(
                 EquationBuilder::default()
-                    .species_id("substrate")
-                    .equation("-v_max * substrate / (K_M + substrate)")
-                    .equation_type(EquationType::Ode)
+                    .species_id("substrate".to_string())
+                    .equation("-v_max * substrate / (K_M + substrate)".to_string())
+                    .equation_type(EquationType::ODE)
                     .build()
                     .unwrap(),
             )
             .to_parameters(
                 ParameterBuilder::default()
-                    .id("v_max")
-                    .symbol("v_max")
-                    .value(10.0)
+                    .id("v_max".to_string())
+                    .symbol("v_max".to_string())
+                    .name("v_max".to_string())
+                    .value(Some(10.0))
                     .build()
                     .unwrap(),
             )
             .to_parameters(
                 ParameterBuilder::default()
-                    .id("K_M")
-                    .symbol("K_M")
+                    .id("K_M".to_string())
+                    .symbol("K_M".to_string())
+                    .name("K_M".to_string())
                     .value(100.0)
                     .build()
                     .unwrap(),

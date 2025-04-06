@@ -11,17 +11,17 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
             EquationBuilder::default()
                 .species_id("substrate")
                 .equation("-v_max * substrate / (K_M + substrate)")
-                .equation_type(EquationType::Ode)
+                .equation_type(EquationType::ODE)
                 .build()
-                .unwrap(),
+                .expect("Failed to build equation"),
         )
         .to_equations(
             EquationBuilder::default()
                 .species_id("product")
                 .equation("v_max * substrate / (K_M + substrate)")
-                .equation_type(EquationType::Ode)
+                .equation_type(EquationType::ODE)
                 .build()
-                .unwrap(),
+                .expect("Failed to build equation"),
         )
         .to_parameters(
             ParameterBuilder::default()
@@ -29,7 +29,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
                 .symbol("v_max")
                 .value(2.0)
                 .build()
-                .unwrap(),
+                .expect("Failed to build parameter"),
         )
         .to_parameters(
             ParameterBuilder::default()
@@ -37,7 +37,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
                 .symbol("K_M")
                 .value(100.0)
                 .build()
-                .unwrap(),
+                .expect("Failed to build parameter"),
         )
         .to_measurements(
             MeasurementBuilder::default()
@@ -47,17 +47,17 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
                         .species_id("substrate")
                         .initial(100.0)
                         .build()
-                        .unwrap(),
+                        .expect("Failed to build measurement data"),
                 )
                 .to_species_data(
                     MeasurementDataBuilder::default()
                         .species_id("product")
                         .initial(0.0)
                         .build()
-                        .unwrap(),
+                        .expect("Failed to build measurement data"),
                 )
                 .build()
-                .unwrap(),
+                .expect("Failed to build measurement"),
         )
         .build()?;
 
@@ -90,7 +90,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         .t0(0.0)
         .t1(200.0)
         .build()
-        .unwrap();
+        .expect("Failed to build simulation setup");
 
     // Finally, we can run the simulation!
     //
@@ -104,7 +104,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         initial_conditions,
         None,                // We could also dynamically set new parameters
         None,                // We could also provide specific time points to extract
-        RK5::default(),      // We could also use a different solver
+        RK5,                 // We could also use a different solver
         Some(Mode::Regular), // We could also use a different mode (e.g. Sensitivity)
     );
 
