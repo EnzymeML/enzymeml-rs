@@ -74,6 +74,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     ) -> Result<Self, OptimizeError> {
         // Cloning the enzymeml document to avoid modifying the original document
         let mut doc = enzmldoc.clone();
+        doc.measurements.retain(measurement_not_empty);
 
         // Extract initial conditions and simulation setups from the document
         let initials: Vec<InitialCondition> = (&doc).into();
@@ -531,4 +532,19 @@ impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
             transformations,
         )
     }
+}
+
+/// Checks if a measurement has data for all species
+///
+/// # Arguments
+/// * `measurement` - The measurement to check
+///
+/// # Returns
+/// * `bool` - True if all species have data, false otherwise
+fn measurement_not_empty(measurement: &Measurement) -> bool {
+    measurement
+        .species_data
+        .iter()
+        .map(|s| !s.data.is_empty())
+        .any(|b| b)
 }
