@@ -115,6 +115,9 @@ pub mod llm;
 
 /// Validation of EnzymeML documents and components
 pub mod validation {
+    pub use crate::validation::schema::*;
+    /// Main consistency interface
+    pub mod consistency;
     /// Validation of equation specifications
     mod equations;
     /// Validation of measurement data
@@ -123,8 +126,8 @@ pub mod validation {
     mod parameters;
     /// Validation of reaction specifications
     mod reactions;
-    /// Main validation interface
-    pub mod validator;
+    /// Main schema validation interface
+    pub mod schema;
 }
 
 /// Procedural and helper macros
