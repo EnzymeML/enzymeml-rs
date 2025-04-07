@@ -1167,6 +1167,7 @@ dependencies = [
  "argmin-observer-slog",
  "calamine",
  "clap",
+ "colored",
  "derive_builder",
  "egobox-ego",
  "evalexpr-jit",
