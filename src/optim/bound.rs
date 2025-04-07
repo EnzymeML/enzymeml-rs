@@ -34,6 +34,65 @@ impl Bound {
             upper,
         }
     }
+
+    /// Returns the parameter name.
+    pub fn param(&self) -> &str {
+        &self.param
+    }
+
+    /// Returns the lower bound of the parameter.
+    pub fn lower(&self) -> f64 {
+        self.lower
+    }
+
+    /// Returns the upper bound of the parameter.
+    pub fn upper(&self) -> f64 {
+        self.upper
+    }
+
+    /// Sets the lower bound of the parameter.
+    ///
+    /// # Arguments
+    ///
+    /// * `lower` - The new lower bound value
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the lower bound is valid
+    /// * `Err(OptimizeError)` - If the lower bound is invalid
+    pub fn set_lower(&mut self, lower: f64) {
+        self.lower = lower;
+    }
+
+    /// Sets the upper bound of the parameter.
+    ///
+    /// # Arguments
+    ///
+    /// * `upper` - The new upper bound value
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the upper bound is valid
+    /// * `Err(OptimizeError)` - If the upper bound is invalid
+    pub fn set_upper(&mut self, upper: f64) {
+        self.upper = upper;
+    }
+
+    /// Validates the bounds of the parameter.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` - If the bounds are valid
+    /// * `Err(OptimizeError)` - If the bounds are invalid
+    pub fn validate(&self) -> Result<(), OptimizeError> {
+        if self.lower > self.upper {
+            return Err(OptimizeError::InvalidBounds {
+                expected: vec![self.param.clone()],
+                found: vec![self.lower.to_string(), self.upper.to_string()],
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Converts a vector of bounds into a 2D array format required by optimization algorithms.
