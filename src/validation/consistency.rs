@@ -1,4 +1,4 @@
-//! Validation module for checking consistency of EnzymeML documents.
+//! Consistency module for checking consistency of EnzymeML documents.
 //!
 //! This module provides functionality to validate EnzymeML documents by checking:
 //! - Measurements data consistency
@@ -9,6 +9,8 @@
 //! The main entry point is the `check_consistency` function which runs all validation
 //! checks and returns a `Report` with the results.
 
+use std::fmt;
+
 use crate::extract_all;
 use crate::prelude::EnzymeMLDocument;
 use crate::validation::equations::check_equations;
@@ -16,6 +18,7 @@ use crate::validation::measurements::check_measurements;
 use crate::validation::parameters::check_parameters;
 use crate::validation::reactions::check_reactions;
 
+use colored::Colorize;
 #[cfg(feature = "wasm")]
 use tsify_next::Tsify;
 
@@ -122,6 +125,30 @@ impl ValidationResult {
     }
 }
 
+impl fmt::Display for ValidationResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self.severity {
+            Severity::Error => self.message.bold().red(),
+            Severity::Warning => self.message.bold().yellow(),
+            Severity::Info => self.message.bold().green(),
+        };
+
+        let severity = match self.severity {
+            Severity::Error => "Error".bold().red(),
+            Severity::Warning => "Warning".bold().yellow(),
+            Severity::Info => "Info".bold().green(),
+        };
+
+        write!(
+            f,
+            "[{}] {}:\n\t└── {}",
+            self.location.bold(),
+            severity,
+            message
+        )
+    }
+}
+
 /// Severity levels for validation issues.
 ///
 /// Used to indicate how serious a validation issue is:
@@ -138,6 +165,16 @@ pub enum Severity {
     Warning,
     /// Informational message about potential improvements
     Info,
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Severity::Error => write!(f, "Error"),
+            Severity::Warning => write!(f, "Warning"),
+            Severity::Info => write!(f, "Info"),
+        }
+    }
 }
 
 /// Retrieves the species IDs from an `EnzymeMLDocument`.

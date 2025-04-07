@@ -1,5 +1,5 @@
 use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
-use crate::validation::validator::{get_species_ids, Report, Severity, ValidationResult};
+use crate::validation::consistency::{get_species_ids, Report, Severity, ValidationResult};
 
 /// Validates equations in an EnzymeML document by checking that all referenced variables exist
 ///
@@ -95,7 +95,7 @@ mod tests {
         EnzymeMLDocumentBuilder, EquationBuilder, EquationType, SmallMoleculeBuilder,
         VariableBuilder,
     };
-    use crate::validation::validator::Report;
+    use crate::validation::consistency::Report;
 
     #[test]
     fn test_valid_equation() {

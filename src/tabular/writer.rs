@@ -32,7 +32,7 @@ use xlsxwriter::worksheet::validation::{
 };
 
 use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementDataBuilder};
-use crate::validation::validator::get_species_ids;
+use crate::validation::consistency::get_species_ids;
 
 static ERROR_MESSAGE: &str = "Only positive numbers are allowed in this cell.";
 

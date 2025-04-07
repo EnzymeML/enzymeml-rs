@@ -1,5 +1,5 @@
 use crate::prelude::{EnzymeMLDocument, Parameter};
-use crate::validation::validator::{Report, Severity, ValidationResult};
+use crate::validation::consistency::{Report, Severity, ValidationResult};
 
 /// Validates parameters in an EnzymeML document by checking units
 ///

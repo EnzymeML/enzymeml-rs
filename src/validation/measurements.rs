@@ -1,6 +1,6 @@
 use crate::prelude::{EnzymeMLDocument, MeasurementData};
 
-use super::validator::{get_species_ids, Report, Severity, ValidationResult};
+use super::consistency::{get_species_ids, Report, Severity, ValidationResult};
 
 /// Validates measurements in an EnzymeML document by checking:
 /// - Initial concentrations match first data point at t=0

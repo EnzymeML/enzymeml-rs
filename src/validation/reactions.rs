@@ -1,5 +1,5 @@
 use crate::prelude::{EnzymeMLDocument, Reaction};
-use crate::validation::validator::{get_species_ids, Report, Severity, ValidationResult};
+use crate::validation::consistency::{get_species_ids, Report, Severity, ValidationResult};
 
 /// Validates reactions in an EnzymeML document by checking that all referenced species exist
 ///
