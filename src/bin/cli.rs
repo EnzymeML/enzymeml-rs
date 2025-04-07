@@ -24,10 +24,12 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use enzymeml::{
     io::load_enzmldoc,
     llm::{query_llm, PromptInput},
     optim::{Bound, EGOBuilder, InitialGuesses, Optimizer, PSOBuilder, ProblemBuilder},
+    validation::{consistency, schema},
 };
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
@@ -42,11 +44,19 @@ struct Cli {
 /// Available CLI commands
 #[derive(Subcommand)]
 enum Commands {
+    /// Validate an EnzymeML document
+    Validate {
+        /// Path to the file containing the EnzymeML document
+        #[arg(help = "Path to the file containing the EnzymeML document")]
+        path: PathBuf,
+    },
+
     /// Fit a model using optimization algorithms
     Fit {
         #[command(subcommand)]
         algorithm: FitAlgorithm,
     },
+
     /// Extract information from an EnzymeML document
     Extract {
         /// Path to the file containing the EnzymeML document
@@ -155,6 +165,40 @@ pub fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
+        Commands::Validate { path } => {
+            // First, check if the file exists
+            if !Path::new(path).exists() {
+                eprintln!("File does not exist: {}", path.display());
+                return;
+            }
+
+            // Check if the file is a valid EnzymeML document
+            let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
+            let report =
+                schema::validate_json(&content).expect("Failed to validate EnzymeML document");
+
+            if !report.valid {
+                println!("{}", "EnzymeML document is invalid".bold().red());
+                for error in report.errors {
+                    println!("   {}", error);
+                }
+                return;
+            }
+
+            // Check if the document is consistent
+            let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+            let report = consistency::check_consistency(&enzmldoc);
+
+            if !report.is_valid {
+                println!("{}", "EnzymeML document is inconsistent".bold().red());
+                for error in report.errors {
+                    println!("   {}", error);
+                }
+                return;
+            }
+
+            println!("{}", "EnzymeML document is valid".bold().green());
+        }
         Commands::Extract {
             prompt,
             system_prompt,
@@ -307,6 +351,7 @@ fn parse_key_bounds(s: &str) -> Result<(String, (f64, f64)), String> {
 ///
 /// * `cli_bounds` - The bounds from the CLI
 /// * `doc_bounds` - The bounds from the EnzymeML document
+#[allow(clippy::ptr_arg)]
 fn add_cli_bounds(cli_bounds: &Vec<(String, (f64, f64))>, doc_bounds: &mut Vec<Bound>) {
     for (key, (lower, upper)) in cli_bounds {
         if let Some(bound) = doc_bounds.iter_mut().find(|b| b.param() == key) {
@@ -334,6 +379,7 @@ enum Solvers {
 impl FromStr for Solvers {
     type Err = String;
 
+    #[allow(clippy::default_constructed_unit_structs)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "rk5" => Ok(Self::RK5(fuga::RK5::default())),
