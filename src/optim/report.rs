@@ -1,13 +1,21 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::{self, Display},
+};
 
 use argmin::core::CostFunction;
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 use serde::Serialize;
+use tabled::{builder::Builder, settings::Style};
 
 use crate::prelude::{EnzymeMLDocument, SimulationResult};
 
-use super::{error::OptimizeError, metrics::akaike_information_criterion, problem::Problem};
+use super::{
+    error::OptimizeError,
+    metrics::{akaike_information_criterion, bayesian_information_criterion},
+    problem::Problem,
+};
 
 /// A report containing optimization results and evaluation metrics
 ///
@@ -35,6 +43,12 @@ pub struct OptimizationReport {
     pub fits: HashMap<String, SimulationResult>,
     /// Akaike Information Criterion
     pub aic: f64,
+    /// Bayesian Information Criterion
+    pub bic: f64,
+    /// Error of the fit
+    pub error: f64,
+    /// Loss function used
+    pub loss_function: String,
     /// Relative uncertainties of the best parameters
     pub uncertainties: Option<HashMap<String, f64>>,
 }
@@ -63,18 +77,57 @@ impl OptimizationReport {
         param_vec: &[f64],
         _: Option<Vec<f64>>,
     ) -> Result<Self, OptimizeError> {
-        // Transform the param_vec into a HashMap
-        let param_vec = problem.apply_transformations(param_vec)?;
-        let best_params = problem
+        let best_params = Self::transform_parameters(problem, param_vec)?;
+        let doc = Self::update_document(doc, &best_params);
+        let fits = Self::simulate_fits(problem, &doc, param_vec)?;
+        let (aic, bic, error) = Self::calculate_metrics(problem, param_vec, &doc)?;
+
+        Ok(Self {
+            doc,
+            best_params,
+            fits,
+            aic,
+            bic,
+            error,
+            loss_function: problem.objective().to_string(),
+            uncertainties: None,
+        })
+    }
+
+    /// Transforms optimization parameters into named parameter map
+    ///
+    /// # Arguments
+    /// * `problem` - The optimization problem containing parameter information
+    /// * `param_vec` - Raw parameter vector from optimization
+    ///
+    /// # Returns
+    /// * `Result<BTreeMap<String, f64>, OptimizeError>` - Map of parameter names to values
+    fn transform_parameters<S: ODEIntegrator + Copy>(
+        problem: &Problem<S>,
+        param_vec: &[f64],
+    ) -> Result<BTreeMap<String, f64>, OptimizeError> {
+        let transformed_params = problem.apply_transformations(param_vec)?;
+        Ok(problem
             .ode_system()
             .get_sorted_params()
             .iter()
             .enumerate()
-            .map(|(i, p)| (p.to_string(), param_vec[i]))
-            .collect::<BTreeMap<String, f64>>();
+            .map(|(i, p)| (p.to_string(), transformed_params[i]))
+            .collect())
+    }
 
-        // First we need to set the best params in the doc
-        let mut doc = doc;
+    /// Updates EnzymeML document with optimized parameter values
+    ///
+    /// # Arguments
+    /// * `doc` - Original EnzymeML document
+    /// * `best_params` - Map of parameter names to optimized values
+    ///
+    /// # Returns
+    /// * Updated EnzymeML document
+    fn update_document(
+        mut doc: EnzymeMLDocument,
+        best_params: &BTreeMap<String, f64>,
+    ) -> EnzymeMLDocument {
         for (name, value) in best_params.iter() {
             let param = doc
                 .parameters
@@ -83,13 +136,29 @@ impl OptimizationReport {
                 .unwrap();
             param.value = Some(*value);
         }
+        doc
+    }
 
+    /// Simulates model fits using optimized parameters
+    ///
+    /// # Arguments
+    /// * `problem` - The optimization problem
+    /// * `doc` - EnzymeML document with experimental data
+    /// * `param_vec` - Optimized parameter vector
+    ///
+    /// # Returns
+    /// * `Result<HashMap<String, SimulationResult>, OptimizeError>` - Map of measurement IDs to simulation results
+    fn simulate_fits<S: ODEIntegrator + Copy>(
+        problem: &Problem<S>,
+        doc: &EnzymeMLDocument,
+        param_vec: &[f64],
+    ) -> Result<HashMap<String, SimulationResult>, OptimizeError> {
         let system = problem.ode_system();
-        let fits = system
+        Ok(system
             .bulk_integrate::<SimulationResult>(
                 problem.simulation_setup(),
                 problem.initials(),
-                Some(&param_vec),
+                Some(param_vec),
                 None,
                 problem.solver(),
                 None,
@@ -97,38 +166,70 @@ impl OptimizationReport {
             .iter()
             .zip(doc.measurements.iter())
             .map(|(fit, measurement)| (measurement.id.clone(), fit.clone()))
-            .collect::<HashMap<String, SimulationResult>>();
+            .collect())
+    }
 
-        let aic = akaike_information_criterion(
-            problem.cost(&Array1::from_vec(param_vec)).unwrap(),
-            system.get_sorted_params().len(),
-        );
+    /// Calculates AIC and BIC metrics for the optimization result
+    ///
+    /// # Arguments
+    /// * `problem` - The optimization problem
+    /// * `param_vec` - Optimized parameter vector
+    /// * `doc` - EnzymeML document with data
+    ///
+    /// # Returns
+    /// * `Result<(f64, f64), OptimizeError>` - Tuple of (AIC, BIC) values
+    fn calculate_metrics<S: ODEIntegrator + Copy>(
+        problem: &Problem<S>,
+        param_vec: &[f64],
+        doc: &EnzymeMLDocument,
+    ) -> Result<(f64, f64, f64), OptimizeError> {
+        let cost = problem
+            .cost(&Array1::from_vec(param_vec.to_vec()))
+            .map_err(OptimizeError::ArgMinError)?;
+        let num_params = problem.ode_system().get_sorted_params().len();
+        let aic = akaike_information_criterion(cost, num_params);
+        let bic = bayesian_information_criterion(cost, num_params, doc.measurements.len());
 
-        Ok(Self {
-            doc,
-            best_params,
-            fits,
-            aic,
-            uncertainties: None,
-        })
+        Ok((aic, bic, cost))
     }
 }
 
-/// Collection of metrics evaluating optimization results
-///
-/// Contains various statistical measures comparing the model predictions
-/// using optimized parameters against experimental data:
-/// - MSE: Mean Squared Error - measures average squared deviation
-/// - RMSE: Root Mean Squared Error - like MSE but in original units
-/// - MAE: Mean Absolute Error - average absolute deviation
-/// - AIC: Akaike Information Criterion - penalizes model complexity
-/// - BIC: Bayesian Information Criterion - more strongly penalizes complexity
-///
-/// Lower values indicate better model fit for all metrics.
-#[derive(Debug, Clone, Serialize)]
-pub struct Metrics {
-    /// Akaike Information Criterion - measures model quality considering complexity
-    pub aic: f64,
-    /// Bayesian Information Criterion - similar to AIC but with stronger complexity penalty
-    pub bic: f64,
+impl Display for OptimizationReport {
+    /// Formats the OptimizationReport as a string
+    ///
+    /// # Arguments
+    /// * `f` - The formatter to write the report to
+    ///
+    /// # Returns
+    /// * `fmt::Result` - The formatted report
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "\nOptimization Report\n")?;
+
+        // Create a table of all metrics
+        let mut builder = Builder::default();
+        builder.push_record(vec!["Metric", "Value"]);
+        builder.push_record(vec![&self.loss_function, &self.error.to_string()]);
+        builder.push_record(vec!["Akaike Information Criterion", &self.aic.to_string()]);
+        builder.push_record(vec![
+            "Bayesian Information Criterion",
+            &self.bic.to_string(),
+        ]);
+
+        let mut table = builder.build();
+        table.with(Style::rounded());
+        write!(f, "\n{}\n", table)?;
+
+        // Create a table of the best parameters
+        let mut builder = Builder::default();
+        builder.push_record(vec!["Parameter", "Value"]);
+        for (name, value) in &self.best_params {
+            builder.push_record(vec![name.to_string(), value.to_string()]);
+        }
+
+        let mut table = builder.build();
+        table.with(Style::rounded());
+        write!(f, "\n{}\n", table)?;
+
+        Ok(())
+    }
 }
