@@ -395,9 +395,7 @@ impl ODESystem {
     /// # Arguments
     ///
     /// * `var_map` - A reference to the master HashMap mapping all variable names to indices.
-    ///               This contains the complete mapping of all variables in the system.
-    /// * `variables` - A HashMap containing the subset of variables to extract mappings for.
-    ///                The values in this HashMap are not used, only the keys are checked.
+    /// * `variables` - A slice of variable names to extract mappings for.
     ///
     /// # Returns
     ///
