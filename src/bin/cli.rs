@@ -3,6 +3,8 @@
 //! This binary provides a CLI interface to interact with EnzymeML documents, including:
 //! - Extracting information from natural language descriptions using LLMs
 //! - Fitting kinetic parameters using various optimization algorithms
+//! - Converting EnzymeML documents to different formats
+//! - Validating EnzymeML documents for schema compliance and consistency
 //!
 //! # Usage
 //!
@@ -15,7 +17,45 @@
 //!
 //! # Fit parameters using PSO algorithm  
 //! enzymeml fit pso --path model.xml --pop-size 50
+//!
+//! # Convert EnzymeML document to Excel format
+//! enzymeml convert --input model.xml --target xlsx --output model.xlsx
+//!
+//! # Validate an EnzymeML document
+//! enzymeml validate model.xml
 //! ```
+//!
+//! # Commands
+//!
+//! - `convert`: Convert EnzymeML documents to different formats (currently supports XLSX)
+//! - `validate`: Check EnzymeML documents for schema compliance and consistency
+//! - `fit`: Fit kinetic parameters using various optimization algorithms
+//!   - `ego`: Efficient Global Optimization algorithm
+//!   - `pso`: Particle Swarm Optimization algorithm
+//!   - `lbfgs`: Limited-memory BFGS algorithm
+//!   - `bfgs`: Broyden–Fletcher–Goldfarb–Shanno algorithm
+//! - `extract`: Extract structured information from natural language using LLMs
+//!
+//! # Parameter Optimization
+//!
+//! The CLI supports multiple optimization algorithms for parameter fitting:
+//!
+//! - **EGO**: Efficient Global Optimization, a surrogate-based algorithm suitable for expensive objective functions
+//! - **PSO**: Particle Swarm Optimization, a population-based stochastic algorithm
+//! - **LBFGS/BFGS**: Gradient-based optimization algorithms for smooth objective functions
+//!
+//! # Solvers
+//!
+//! The following ODE solvers are available for simulation:
+//!
+//! - `rk5`: 5th order Runge-Kutta method
+//! - `rk4`: 4th order Runge-Kutta method
+//! - `rkf45`: Runge-Kutta-Fehlberg method
+//! - `tsit45`: Tsitouras 5/4 method
+//! - `dp45`: Dormand-Prince 5/4 method
+//! - `bs23`: Bogacki-Shampine 3/2 method
+//! - `rals3`: 3rd order Rosenbrock-Armero-Laso-Simo method
+//! - `rals4`: 4th order Rosenbrock-Armero-Laso-Simo method
 
 use std::{
     fs::File,
@@ -23,15 +63,22 @@ use std::{
     str::FromStr,
 };
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use enzymeml::{
-    io::load_enzmldoc,
+    io::{load_enzmldoc, save_enzmldoc},
     llm::{query_llm, PromptInput},
-    optim::{Bound, EGOBuilder, InitialGuesses, Optimizer, PSOBuilder, ProblemBuilder},
+    optim::{
+        BFGSBuilder, Bound, EGOBuilder, InitialGuesses, LBFGSBuilder, Optimizer, PSOBuilder,
+        ProblemBuilder, Transformation,
+    },
+    prelude::{EnzymeMLDocument, LossFunction},
     validation::{consistency, schema},
 };
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
+
+const AVAILABLE_TRANSFORMATIONS: &[&str] =
+    &["log", "multscale", "pow", "abs", "neg-exp", "softplus"];
 
 /// Main CLI configuration struct
 #[derive(Parser)]
@@ -44,6 +91,29 @@ struct Cli {
 /// Available CLI commands
 #[derive(Subcommand)]
 enum Commands {
+    /// Convert an EnzymeML document to a target
+    Convert {
+        /// Path to the file containing the EnzymeML document
+        #[arg(
+            short,
+            long,
+            help = "Path to the file containing the EnzymeML document"
+        )]
+        input: PathBuf,
+
+        /// Target format
+        #[arg(short, long, help = "Target format")]
+        target: ConversionTarget,
+
+        /// Output path for the converted document
+        #[arg(short, long, help = "Output path for the converted document.")]
+        output: PathBuf,
+
+        /// As template or not
+        #[arg(long, help = "As template or not")]
+        template: bool,
+    },
+
     /// Validate an EnzymeML document
     Validate {
         /// Path to the file containing the EnzymeML document
@@ -102,10 +172,6 @@ enum FitAlgorithm {
         #[arg(long, default_value_t = 100)]
         max_iters: usize,
 
-        /// Output directory for the optimization report
-        #[arg(short, long, default_value = ".")]
-        output_dir: PathBuf,
-
         /// Time step for the design points
         #[arg(long, default_value_t = 0.1)]
         dt: f64,
@@ -122,7 +188,16 @@ enum FitAlgorithm {
             help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
         )]
         solver: Solvers,
+
+        /// Loss function to use
+        #[arg(short, long, default_value = "mse", value_enum)]
+        loss_function: LossFunction,
+
+        /// Output directory for the optimization report
+        #[arg(short, long, default_value = ".")]
+        output_dir: Option<PathBuf>,
     },
+
     /// Particle Swarm Optimization algorithm
     Pso {
         /// Path to the EnzymeML document
@@ -150,13 +225,105 @@ enum FitAlgorithm {
         )]
         solver: Solvers,
 
+        /// Loss function to use
+        #[arg(short, long, default_value = "mse", value_enum)]
+        loss_function: LossFunction,
+
         /// Time step for the design points
         #[arg(long, default_value_t = 0.1)]
         dt: f64,
 
         /// Output directory for the optimization report
         #[arg(short, long, default_value = ".")]
-        output_dir: PathBuf,
+        output_dir: Option<PathBuf>,
+    },
+
+    /// LBFGS algorithm
+    Lbfgs {
+        /// Path to the EnzymeML document
+        #[arg(short, long)]
+        path: PathBuf,
+
+        /// Initial guesses for the optimization
+        #[arg(short, long, value_parser = parse_initial_guesses)]
+        initial: Vec<(String, f64)>,
+
+        /// Whether to use the log transformation for the initial guesses
+        #[arg(short, long, conflicts_with = "transform")]
+        log_transform: bool,
+
+        /// Transformations for the initial guesses
+        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
+        transform: Vec<Transformation>,
+
+        /// Solver to use
+        #[arg(
+            short,
+            long,
+            value_parser = Solvers::from_str,
+            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
+        )]
+        solver: Solvers,
+
+        /// Objective function to use
+        #[arg(short = 'O', long, default_value = "mse", value_enum)]
+        objective: LossFunction,
+
+        /// Time step for the design points
+        #[arg(long, default_value_t = 0.1)]
+        dt: f64,
+
+        /// Maximum number of iterations before stopping
+        #[arg(long, default_value_t = 20)]
+        max_iters: u64,
+
+        /// Output directory for the optimization report
+        #[arg(short, long, default_value = ".")]
+        output_dir: Option<PathBuf>,
+    },
+
+    /// BFGS algorithm
+    Bfgs {
+        /// Path to the EnzymeML document
+        #[arg(short, long)]
+        path: PathBuf,
+
+        /// Initial guesses for the optimization
+        #[arg(short, long, value_parser = parse_initial_guesses)]
+        initial: Vec<(String, f64)>,
+
+        /// Whether to use the log transformation for the initial guesses
+        #[arg(short, long, conflicts_with = "transform")]
+        log_transform: bool,
+
+        /// Transformations for the initial guesses
+        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
+        transform: Vec<Transformation>,
+
+        /// Solver to use
+        #[arg(
+            short,
+            long,
+            value_parser = Solvers::from_str,
+            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
+        )]
+        solver: Solvers,
+
+        /// Objective function to use
+        #[arg(short = 'O', long, default_value = "mse", value_enum)]
+        objective: LossFunction,
+
+        /// Time step for the design points
+        #[arg(long, default_value_t = 0.1)]
+        dt: f64,
+
+        /// Maximum number of iterations before stopping
+        #[arg(long, default_value_t = 20)]
+        max_iters: u64,
+
+        /// Output directory for the optimization report
+        #[arg(short, long, default_value = ".")]
+        output_dir: Option<PathBuf>,
     },
 }
 
@@ -165,6 +332,34 @@ pub fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
+        Commands::Convert {
+            input: path,
+            target,
+            output,
+            template,
+        } => {
+            // Check if the file is a valid EnzymeML document
+            let enzmldoc = complete_check(path);
+
+            if let Err(e) = enzmldoc {
+                // If the document is invalid, print the error and return
+                println!("{}", e);
+                return;
+            }
+
+            // We know the document is valid, so we can unwrap it
+            let enzmldoc = enzmldoc.unwrap();
+
+            match target {
+                ConversionTarget::Xlsx => {
+                    // Convert the document to XLSX
+                    enzmldoc
+                        .to_excel(output.to_path_buf(), *template)
+                        .expect("Failed to convert EnzymeML document to XLSX");
+                }
+            }
+        }
+
         Commands::Validate { path } => {
             // First, check if the file exists
             if !Path::new(path).exists() {
@@ -172,32 +367,9 @@ pub fn main() {
                 return;
             }
 
-            // Check if the file is a valid EnzymeML document
-            let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
-            let report =
-                schema::validate_json(&content).expect("Failed to validate EnzymeML document");
-
-            if !report.valid {
-                println!("{}", "EnzymeML document is invalid".bold().red());
-                for error in report.errors {
-                    println!("   {}", error);
-                }
-                return;
+            if let Err(e) = complete_check(path) {
+                println!("{}", e);
             }
-
-            // Check if the document is consistent
-            let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-            let report = consistency::check_consistency(&enzmldoc);
-
-            if !report.is_valid {
-                println!("{}", "EnzymeML document is inconsistent".bold().red());
-                for error in report.errors {
-                    println!("   {}", error);
-                }
-                return;
-            }
-
-            println!("{}", "EnzymeML document is valid".bold().green());
         }
         Commands::Extract {
             prompt,
@@ -245,7 +417,119 @@ pub fn main() {
                 None => println!("{}", json_response),
             }
         }
+
         Commands::Fit { algorithm } => match algorithm {
+            FitAlgorithm::Lbfgs {
+                path,
+                initial,
+                transform,
+                solver,
+                objective: loss_function,
+                dt,
+                max_iters,
+                output_dir,
+                log_transform,
+            } => {
+                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let transformations = if *log_transform {
+                    create_log_transformations(&enzmldoc)
+                } else {
+                    transform.clone()
+                };
+
+                // Build problem
+                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                    .dt(*dt)
+                    .objective(*loss_function)
+                    .transformations(transformations)
+                    .build()
+                    .expect("Failed to build problem");
+
+                // Convert EnzymeML document to initial guesses
+                let param_order = problem.ode_system().get_sorted_params();
+                let mut initial_guesses: InitialGuesses = (&enzmldoc)
+                    .try_into()
+                    .expect("Failed to convert EnzymeML document to initial guesses");
+
+                // Override initial guesses
+                override_initial_guesses(&param_order, &mut initial_guesses, initial);
+
+                // Build optimizer
+                let lbfgs = LBFGSBuilder::default()
+                    .linesearch(1e-4, 0.9)
+                    .max_iters(*max_iters)
+                    .target_cost(1e-6)
+                    .build();
+
+                // Optimize
+                let report = lbfgs
+                    .optimize(&problem, Some(initial_guesses))
+                    .expect("Failed to optimize");
+
+                // Display the results
+                println!("{}", report);
+
+                // Save the fitted EnzymeML document
+                if let Some(output_dir) = output_dir {
+                    save_fitted_enzmldoc(path, &report.doc, output_dir, "lbfgs");
+                }
+            }
+
+            FitAlgorithm::Bfgs {
+                path,
+                initial,
+                transform,
+                solver,
+                objective: loss_function,
+                dt,
+                max_iters,
+                output_dir,
+                log_transform,
+            } => {
+                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let transformations = if *log_transform {
+                    create_log_transformations(&enzmldoc)
+                } else {
+                    transform.clone()
+                };
+
+                // Build problem
+                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                    .dt(*dt)
+                    .objective(*loss_function)
+                    .transformations(transformations)
+                    .build()
+                    .expect("Failed to build problem");
+
+                // Convert EnzymeML document to initial guesses
+                let param_order = problem.ode_system().get_sorted_params();
+                let mut initial_guesses: InitialGuesses = (&enzmldoc)
+                    .try_into()
+                    .expect("Failed to convert EnzymeML document to initial guesses");
+
+                // Override initial guesses
+                override_initial_guesses(&param_order, &mut initial_guesses, initial);
+
+                // Build optimizer
+                let bfgs = BFGSBuilder::default()
+                    .linesearch(1e-4, 0.9)
+                    .max_iters(*max_iters)
+                    .target_cost(1e-6)
+                    .build();
+
+                // Optimize
+                let report = bfgs
+                    .optimize(&problem, Some(initial_guesses))
+                    .expect("Failed to optimize");
+
+                // Display the results
+                println!("{}", report);
+
+                // Save the fitted EnzymeML document
+                if let Some(output_dir) = output_dir {
+                    save_fitted_enzmldoc(path, &report.doc, output_dir, "bfgs");
+                }
+            }
             FitAlgorithm::Ego {
                 path,
                 max_iters,
@@ -253,10 +537,12 @@ pub fn main() {
                 dt,
                 bound,
                 solver,
+                loss_function,
             } => {
                 let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
                 let problem = ProblemBuilder::new(&enzmldoc, *solver)
                     .dt(*dt)
+                    .objective(*loss_function)
                     .build()
                     .expect("Failed to build problem");
 
@@ -279,11 +565,15 @@ pub fn main() {
                     .optimize(&problem, None::<InitialGuesses>)
                     .expect("Failed to optimize");
 
-                // Write report
-                let report_path = output_dir.join("report.json");
-                let report_file = File::create(report_path).expect("Failed to create report file");
-                serde_json::to_writer_pretty(report_file, &report).expect("Failed to write report");
+                // Display the results
+                println!("{}", report);
+
+                // Save the fitted EnzymeML document
+                if let Some(output_dir) = output_dir {
+                    save_fitted_enzmldoc(path, &report.doc, output_dir, "ego");
+                }
             }
+
             FitAlgorithm::Pso {
                 path,
                 max_iters,
@@ -292,6 +582,7 @@ pub fn main() {
                 dt,
                 bound,
                 solver,
+                loss_function,
             } => {
                 // Load EnzymeML document
                 let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
@@ -299,6 +590,7 @@ pub fn main() {
                 // Build problem
                 let problem = ProblemBuilder::new(&enzmldoc, *solver)
                     .dt(*dt)
+                    .objective(*loss_function)
                     .build()
                     .expect("Failed to build problem");
 
@@ -322,13 +614,97 @@ pub fn main() {
                     .optimize(&problem, None::<InitialGuesses>)
                     .expect("Failed to optimize");
 
-                // Write report
-                let report_path = output_dir.join("report.json");
-                let report_file = File::create(report_path).expect("Failed to create report file");
-                serde_json::to_writer_pretty(report_file, &report).expect("Failed to write report");
+                // Display the results
+                println!("{}", report);
+
+                // Save the fitted EnzymeML document
+                if let Some(output_dir) = output_dir {
+                    save_fitted_enzmldoc(path, &report.doc, output_dir, "pso");
+                }
             }
         },
     }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ConversionTarget {
+    Xlsx,
+}
+
+fn complete_check(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
+    // Check if the file is a valid EnzymeML document
+    let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
+    let report = schema::validate_json(&content).expect("Failed to validate EnzymeML document");
+
+    if !report.valid {
+        println!("{}", "EnzymeML document is invalid".bold().red());
+        for error in report.errors {
+            println!("   {}", error);
+        }
+        return Err("EnzymeML document is invalid".to_string());
+    }
+
+    // Check if the document is consistent
+    let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+    let report = consistency::check_consistency(&enzmldoc);
+
+    if !report.is_valid {
+        println!("{}", "EnzymeML document is inconsistent".bold().red());
+        for error in report.errors {
+            println!("   {}", error);
+        }
+        return Err("EnzymeML document is inconsistent".to_string());
+    }
+
+    println!("{}", "EnzymeML document is valid".bold().green());
+
+    Ok(enzmldoc)
+}
+
+/// Override the initial guesses with the ones from the CLI
+///
+/// # Arguments
+///
+/// * `param_order` - The order of the parameters
+/// * `initial_guesses` - The initial guesses
+/// * `initial` - The initial guesses from the CLI
+fn override_initial_guesses(
+    param_order: &[String],
+    initial_guesses: &mut InitialGuesses,
+    initial: &[(String, f64)],
+) {
+    for (key, value) in initial {
+        let index = param_order
+            .iter()
+            .position(|p| p == key)
+            .expect("Parameter not found");
+
+        initial_guesses.set_value_at(index, *value);
+    }
+}
+
+/// Creates log transformations for the parameters in the EnzymeML document
+fn create_log_transformations(enzmldoc: &EnzymeMLDocument) -> Vec<Transformation> {
+    let parameter_names = enzmldoc
+        .parameters
+        .iter()
+        .map(|p| p.symbol.clone())
+        .collect::<Vec<_>>();
+    parameter_names
+        .iter()
+        .map(|p| Transformation::Log(p.to_string()))
+        .collect::<Vec<_>>()
+}
+
+fn parse_initial_guesses(s: &str) -> Result<(String, f64), String> {
+    // Example k_cat=0.1
+    let parts = s.split('=').collect::<Vec<_>>();
+    if parts.len() != 2 {
+        return Err("Invalid format. Expected key=initial".to_string());
+    }
+    let key = parts[0].to_string();
+    let initial = parts[1].to_string().parse::<f64>().unwrap();
+    Ok((key, initial))
 }
 
 fn parse_key_bounds(s: &str) -> Result<(String, (f64, f64)), String> {
@@ -362,6 +738,35 @@ fn add_cli_bounds(cli_bounds: &Vec<(String, (f64, f64))>, doc_bounds: &mut Vec<B
             println!("Parameter {} not found", key);
         }
     }
+}
+
+/// Saves the fitted EnzymeML document to the output directory
+///
+/// # Arguments
+///
+/// * `doc_path` - The path to the EnzymeML document
+/// * `enzmldoc` - The fitted EnzymeML document
+/// * `output_dir` - The output directory
+fn save_fitted_enzmldoc(
+    doc_path: &Path,
+    enzmldoc: &EnzymeMLDocument,
+    output_dir: &Path,
+    optimizer: &str,
+) {
+    let name = format!(
+        "{}_{}.json",
+        doc_path
+            .file_name()
+            .expect("Failed to get file name")
+            .to_str()
+            .expect("Failed to get file name as string")
+            .split('.')
+            .next()
+            .expect("Failed to get file name without extension"),
+        optimizer,
+    );
+    let output_path = output_dir.join(name);
+    save_enzmldoc(&output_path, enzmldoc).expect("Failed to save EnzymeML document");
 }
 
 #[derive(Debug, Clone, Copy)]
