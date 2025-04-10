@@ -50,6 +50,8 @@ itertools = "0.14.0"
 mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "fix-rust-vec-gen", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
 colored = "3.0.0"
+regex = "1.11.1"
+tabled = "0.18.0"
 
 [profile.release]
 opt-level = 2
@@ -58,7 +60,7 @@ codegen-units = 1
 debug = false
 
 [features]
-default = ["optimization", "simulation", "llm"]
+default = ["optimization", "simulation", "llm", "tabular"]
 tabular = ["polars", "calamine", "xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
