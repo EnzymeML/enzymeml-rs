@@ -70,7 +70,7 @@ use enzymeml::{
     llm::{query_llm, PromptInput},
     optim::{
         BFGSBuilder, Bound, EGOBuilder, InitialGuesses, LBFGSBuilder, Optimizer, PSOBuilder,
-        ProblemBuilder, Transformation,
+        ProblemBuilder, SR1TrustRegionBuilder, SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction},
     validation::{consistency, schema},
@@ -325,6 +325,54 @@ enum FitAlgorithm {
         #[arg(short, long, default_value = ".")]
         output_dir: Option<PathBuf>,
     },
+
+    /// SR1TrustRegion algorithm
+    SR1 {
+        /// Path to the EnzymeML document
+        #[arg(short, long)]
+        path: PathBuf,
+
+        /// Initial guesses for the optimization
+        #[arg(short, long, value_parser = parse_initial_guesses)]
+        initial: Vec<(String, f64)>,
+
+        /// Whether to use the log transformation for the initial guesses
+        #[arg(short, long, conflicts_with = "transform")]
+        log_transform: bool,
+
+        /// Transformations for the initial guesses
+        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
+        transform: Vec<Transformation>,
+
+        /// Solver to use
+        #[arg(
+            short,
+            long,
+            value_parser = Solvers::from_str,
+            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
+        )]
+        solver: Solvers,
+
+        /// Subproblem solver to use
+        #[arg(short = 'S', long, default_value = "steihaug", value_enum)]
+        subproblem: SubProblem,
+
+        /// Objective function to use
+        #[arg(short = 'O', long, default_value = "mse", value_enum)]
+        objective: LossFunction,
+
+        /// Time step for the design points
+        #[arg(long, default_value_t = 0.1)]
+        dt: f64,
+
+        /// Maximum number of iterations before stopping
+        #[arg(long, default_value_t = 40)]
+        max_iters: u64,
+
+        /// Output directory for the optimization report
+        #[arg(short, long, default_value = ".")]
+        output_dir: Option<PathBuf>,
+    },
 }
 
 /// Main entry point for the CLI application
@@ -528,6 +576,62 @@ pub fn main() {
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = output_dir {
                     save_fitted_enzmldoc(path, &report.doc, output_dir, "bfgs");
+                }
+            }
+
+            FitAlgorithm::SR1 {
+                path,
+                initial,
+                transform,
+                solver,
+                objective: loss_function,
+                dt,
+                max_iters,
+                output_dir,
+                log_transform,
+                subproblem,
+            } => {
+                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let transformations = if *log_transform {
+                    create_log_transformations(&enzmldoc)
+                } else {
+                    transform.clone()
+                };
+
+                // Build problem
+                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                    .dt(*dt)
+                    .objective(*loss_function)
+                    .transformations(transformations)
+                    .build()
+                    .expect("Failed to build problem");
+
+                // Convert EnzymeML document to initial guesses
+                let param_order = problem.ode_system().get_sorted_params();
+                let mut initial_guesses: InitialGuesses = (&enzmldoc)
+                    .try_into()
+                    .expect("Failed to convert EnzymeML document to initial guesses");
+
+                // Override initial guesses
+                override_initial_guesses(&param_order, &mut initial_guesses, initial);
+
+                // Build optimizer
+                let sr1trustregion = SR1TrustRegionBuilder::default()
+                    .max_iters(*max_iters)
+                    .subproblem(*subproblem)
+                    .build();
+
+                // Optimize
+                let report = sr1trustregion
+                    .optimize(&problem, Some(initial_guesses))
+                    .expect("Failed to optimize");
+
+                // Display the results
+                println!("{}", report);
+
+                // Save the fitted EnzymeML document
+                if let Some(output_dir) = output_dir {
+                    save_fitted_enzmldoc(path, &report.doc, output_dir, "sr1trustregion");
                 }
             }
             FitAlgorithm::Ego {

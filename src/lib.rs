@@ -92,11 +92,13 @@ pub mod optim {
         pub use crate::optim::optimizers::lbfgs::*;
         pub use crate::optim::optimizers::optimizer::*;
         pub use crate::optim::optimizers::pso::*;
+        pub use crate::optim::optimizers::srtrust::*;
         pub mod bfgs;
         pub mod ego;
         pub mod lbfgs;
         pub mod optimizer;
         pub mod pso;
+        pub mod srtrust;
         pub(crate) mod utils;
     }
 }
