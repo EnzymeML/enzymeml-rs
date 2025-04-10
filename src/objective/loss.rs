@@ -1,3 +1,9 @@
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
+
+use clap::ValueEnum;
 /// # Loss Functions Module
 ///
 /// This module provides a comprehensive implementation of various loss functions
@@ -33,7 +39,7 @@ use super::{error::ObjectiveError, objfun::ObjectiveFunction};
 /// Loss functions are used to measure the discrepancy between predicted and actual values
 /// in machine learning and optimization problems. Each variant represents a different
 /// approach to calculating the error or cost of a model's predictions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, ValueEnum)]
 pub enum LossFunction {
     /// Sum of Squared Errors (SSE): Measures sum of squared differences between predictions and actual values
     SSE,
@@ -88,6 +94,21 @@ impl ObjectiveFunction for LossFunction {
             LossFunction::RMSE => RootMeanSquaredError.gradient(residuals, sensitivities, n_points),
             LossFunction::LogCosh => LogCosh.gradient(residuals, sensitivities, n_points),
             LossFunction::MAE => MeanAbsoluteError.gradient(residuals, sensitivities, n_points),
+        }
+    }
+}
+
+impl FromStr for LossFunction {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "sse" => Ok(LossFunction::SSE),
+            "mse" => Ok(LossFunction::MSE),
+            "rmse" => Ok(LossFunction::RMSE),
+            "logcosh" => Ok(LossFunction::LogCosh),
+            "mae" => Ok(LossFunction::MAE),
+            _ => Err(format!("Invalid loss function: {}", s)),
         }
     }
 }
@@ -393,6 +414,18 @@ impl ObjectiveFunction for MeanAbsoluteError {
         let product = &sign_residuals_expanded * sensitivities;
         let sum = product.sum_axis(Axis(1)).sum_axis(Axis(0));
         Ok(sum / n_points as f64)
+    }
+}
+
+impl Display for LossFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LossFunction::SSE => write!(f, "Sum of Squared Errors"),
+            LossFunction::MSE => write!(f, "Mean Squared Error"),
+            LossFunction::RMSE => write!(f, "Root Mean Squared Error"),
+            LossFunction::LogCosh => write!(f, "Log-Cosh Loss"),
+            LossFunction::MAE => write!(f, "Mean Absolute Error"),
+        }
     }
 }
 
