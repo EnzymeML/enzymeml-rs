@@ -24,6 +24,8 @@ pub enum OptimizeError {
         transformation: String,
         message: String,
     },
+    #[error("Parameter {param} not found: {message}")]
+    ParameterNotFound { param: String, message: String },
     #[error("Species data not found for {0}")]
     SpeciesDataNotFound(String),
     #[error("No solution found")]
@@ -59,4 +61,10 @@ pub enum OptimizeError {
     MissingLowerBound { param: String },
     #[error("Missing upper bound for parameter {param}")]
     MissingUpperBound { param: String },
+    #[error("Cost is NaN")]
+    CostNaN,
+    #[error("Hessian is not invertible")]
+    HessianNotInvertible,
+    #[error("Hessian can not be converted to ndarray")]
+    HessianNotConvertibleToNdarray,
 }
