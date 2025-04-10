@@ -4,10 +4,10 @@
 //! which is a quasi-Newton method for solving unconstrained optimization problems. The implementation
 //! includes:
 //!
-//! - The main `SRTrust` optimizer struct and implementation
-//! - A builder pattern via `SRTrustBuilder` for convenient configuration
-//! - Support for trust region parameters and convergence criteria
-//! - Observer pattern for monitoring optimization progress
+//! - The main `SR1TrustRegion` optimizer struct and implementation
+//! - A builder pattern via `SR1TrustRegionBuilder` for convenient configuration
+//! - Support for different subproblem solvers (Steihaug and Cauchy point)
+//! - Integration with the argmin optimization framework
 //!
 //! The SR1 Trust Region algorithm uses a symmetric rank-one update to approximate the Hessian matrix
 //! and employs a trust region strategy to determine step sizes. This approach is particularly effective
@@ -30,16 +30,12 @@ use peroxide::fuga::ODEIntegrator;
 
 use super::utils::transform_initial_guesses;
 
-/// Implementation of the L-BFGS optimization algorithm.
+/// Implementation of the SR1 Trust Region optimization algorithm.
 ///
-/// L-BFGS (Limited-memory BFGS) is a quasi-Newton method for solving unconstrained
-/// optimization problems that approximates the Broyden–Fletcher–Goldfarb–Shanno (BFGS)
-/// algorithm using a limited amount of memory.
-///
-/// # Type Parameters
-///
-/// * `I` - The state type that implements the `State` trait
-/// * `O` - The observer type that implements the `Observe` trait
+/// The SR1 Trust Region method is a quasi-Newton optimization technique that uses
+/// symmetric rank-one updates to approximate the Hessian matrix while constraining
+/// steps to remain within a trust region. This approach provides robust convergence
+/// properties for nonlinear optimization problems.
 pub struct SR1TrustRegion {
     /// Maximum number of iterations before stopping
     pub max_iters: u64,
@@ -70,12 +66,8 @@ impl SR1TrustRegion {
     ///
     /// # Arguments
     ///
-    /// * `c1` - Line search parameter for sufficient decrease condition
-    /// * `c2` - Line search parameter for curvature condition
-    /// * `m` - History size for storing previous iterations
     /// * `max_iters` - Maximum number of iterations
-    /// * `target_cost` - Target cost function value for convergence
-    /// * `observers` - List of observers for monitoring progress
+    /// * `subproblem` - The subproblem solver to use (Steihaug or Cauchy point)
     pub fn new(max_iters: u64, subproblem: SubProblem) -> Self {
         Self {
             max_iters,
@@ -85,7 +77,7 @@ impl SR1TrustRegion {
 }
 
 impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
-    /// Optimizes the given problem using the SR1TrustRegion algorithm.
+    /// Optimizes the given problem using the SR1 Trust Region algorithm.
     ///
     /// # Arguments
     ///
@@ -94,7 +86,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
     ///
     /// # Returns
     ///
-    /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
+    /// * `Ok(OptimizationReport)` - Report containing the optimal parameters and other information
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
     fn optimize<T>(
         &self,
@@ -138,6 +130,9 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
 }
 
 /// Solves the subproblem using the Steihaug method.
+///
+/// This function configures and runs the Steihaug-Toint conjugate gradient method
+/// to solve the trust-region subproblem within the SR1 Trust Region algorithm.
 ///
 /// # Arguments
 ///
@@ -183,6 +178,11 @@ fn solve_steihaug<S: ODEIntegrator + Copy>(
 
 /// Solves the subproblem using the Cauchy Point method.
 ///
+/// This function configures and runs the Cauchy Point method to solve the
+/// trust-region subproblem within the SR1 Trust Region algorithm. The Cauchy Point
+/// is the minimizer of the quadratic model along the steepest descent direction
+/// within the trust region.
+///
 /// # Arguments
 ///
 /// * `problem` - The optimization problem to solve
@@ -225,15 +225,10 @@ fn solve_cauchy_point<S: ODEIntegrator + Copy>(
         .ok_or(OptimizeError::ConvergenceError)
 }
 
-/// Builder for configuring and constructing LBFGS instances.
+/// Builder for configuring and constructing SR1TrustRegion instances.
 ///
-/// This builder provides a fluent interface for setting up LBFGS optimizer instances
+/// This builder provides a fluent interface for setting up SR1TrustRegion optimizer instances
 /// with custom parameters and configuration options.
-///
-/// # Type Parameters
-///
-/// * `I` - The state type that implements the `State` trait
-/// * `O` - The observer type that implements the `Observe` trait
 pub struct SR1TrustRegionBuilder {
     /// Maximum number of iterations before stopping
     max_iters: u64,
@@ -256,17 +251,17 @@ impl SR1TrustRegionBuilder {
     ///
     /// # Arguments
     ///
-    /// * `subproblem` - The subproblem solver to use
+    /// * `subproblem` - The subproblem solver to use (Steihaug or Cauchy point)
     pub fn subproblem(mut self, subproblem: SubProblem) -> Self {
         self.subproblem = subproblem;
         self
     }
 
-    /// Builds and returns an LBFGS instance with the configured settings.
+    /// Builds and returns an SR1TrustRegion instance with the configured settings.
     ///
     /// # Returns
     ///
-    /// A new LBFGS optimizer instance with all configured parameters
+    /// A new SR1TrustRegion optimizer instance with all configured parameters
     pub fn build(self) -> SR1TrustRegion {
         SR1TrustRegion {
             max_iters: self.max_iters,
