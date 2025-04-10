@@ -25,9 +25,31 @@ use crate::prelude::EnzymeMLDocument;
 /// * The file cannot be found or opened (`IOError::FileNotFound`)
 /// * The file contents cannot be parsed as valid JSON (`IOError::JsonParseError`)
 /// * The JSON structure does not match the expected EnzymeML document format
-pub fn load_enzmldoc(path: &PathBuf) -> Result<EnzymeMLDocument, IOError> {
+pub fn load_enzmldoc(path: impl Into<PathBuf>) -> Result<EnzymeMLDocument, IOError> {
+    let path = path.into();
     let file = std::fs::File::open(path).map_err(IOError::FileNotFound)?;
     serde_json::from_reader(file).map_err(IOError::JsonParseError)
+}
+
+/// Saves an EnzymeML document to a JSON file.
+///
+/// This function attempts to save an EnzymeML document to a JSON file at the specified path.
+/// It handles both file system operations and JSON serialization, returning either the saved document or an error.
+///
+/// # Arguments
+///
+/// * `path` - A string slice containing the path to the JSON file to save the EnzymeML document to
+/// * `doc` - A reference to the EnzymeML document to save
+///
+/// # Returns
+///
+/// Returns a `Result` containing either:
+/// * `Ok(())` - The successfully saved EnzymeML document
+/// * `Err(IOError)` - An error that occurred during file writing or JSON serialization
+pub fn save_enzmldoc(path: impl Into<PathBuf>, doc: &EnzymeMLDocument) -> Result<(), IOError> {
+    let path = path.into();
+    let file = std::fs::File::create(path).map_err(IOError::FileNotFound)?;
+    serde_json::to_writer_pretty(file, doc).map_err(IOError::JsonParseError)
 }
 
 /// Represents errors that can occur during EnzymeML document I/O operations.
