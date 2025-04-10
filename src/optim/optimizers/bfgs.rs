@@ -25,6 +25,8 @@ use serde::Serialize;
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 
+use super::utils::transform_initial_guesses;
+
 /// Implementation of the BFGS optimization algorithm.
 ///
 /// BFGS is a quasi-Newton method for solving unconstrained
@@ -92,7 +94,16 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for BFGS {
             missing: vec!["all".to_string()],
         })?;
 
-        let initial_guess = initial_guess.into().get_values();
+        // Extract the initial guesses
+        let mut initial_guess: InitialGuesses = initial_guess.into();
+
+        // Transform the initial guesses
+        transform_initial_guesses(
+            &problem.ode_system().get_sorted_params(),
+            &mut initial_guess,
+            problem.transformations(),
+        );
+
         let init_hessian = Array2::eye(initial_guess.len());
         let linesearch = MoreThuenteLineSearch::new()
             .with_c(self.c1, self.c2)
@@ -102,7 +113,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for BFGS {
         let res = Executor::new(problem.clone(), solver)
             .configure(|state| {
                 state
-                    .param(initial_guess.to_owned())
+                    .param(initial_guess.get_values())
                     .inv_hessian(init_hessian)
                     .max_iters(self.max_iters)
                     .target_cost(self.target_cost)

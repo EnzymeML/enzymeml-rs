@@ -15,6 +15,7 @@
 use argmin::core::observers::ObserverMode;
 use argmin::core::Executor;
 use argmin::core::State;
+use argmin::core::TerminationStatus;
 use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::LBFGS as ArgminLBFGS;
 use argmin_observer_slog::SlogLogger;
@@ -22,6 +23,8 @@ use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
+
+use super::utils::transform_initial_guesses;
 
 /// Implementation of the L-BFGS optimization algorithm.
 ///
@@ -92,7 +95,16 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
             missing: vec!["all".to_string()],
         })?;
 
-        let initial_guess = initial_guess.into().get_values();
+        // Extract the initial guesses
+        let mut initial_guess: InitialGuesses = initial_guess.into();
+
+        // Transform the initial guesses
+        transform_initial_guesses(
+            &problem.ode_system().get_sorted_params(),
+            &mut initial_guess,
+            problem.transformations(),
+        );
+
         let linesearch = MoreThuenteLineSearch::new()
             .with_c(self.c1, self.c2)
             .unwrap();
@@ -100,13 +112,19 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
         let res = Executor::new(problem.clone(), solver)
             .configure(|state| {
                 state
-                    .param(initial_guess)
+                    .param(initial_guess.get_values())
                     .max_iters(self.max_iters)
                     .target_cost(self.target_cost)
             })
             .add_observer(SlogLogger::term(), ObserverMode::Always)
             .run()
-            .unwrap();
+            .map_err(OptimizeError::ArgMinError)?;
+
+        if let TerminationStatus::Terminated(argmin::core::TerminationReason::SolverExit(_)) =
+            res.state.termination_status
+        {
+            return Err(OptimizeError::CostNaN);
+        }
 
         let best_params = res
             .state
