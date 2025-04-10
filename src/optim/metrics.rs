@@ -91,24 +91,19 @@ pub fn akaike_information_criterion(cost: f64, num_parameters: usize) -> f64 {
 /// as its penalty for complexity increases with the sample size.
 /// When comparing models, prefer the one with the lowest BIC value.
 ///
-/// BIC = n * ln(SSE/n) + k * ln(n)
+/// BIC = k * ln(n) - 2 * ln(L)
 /// where:
 /// - n is the number of data points
 /// - SSE is the sum of squared errors
 /// - k is the number of model parameters
 ///
 /// # Arguments
-/// * `residuals` - 2D array of residuals (differences between predicted and actual values)
+/// * `cost` - Cost of the model
 /// * `num_samples` - Total number of data points across all measurements
 /// * `num_parameters` - Number of parameters in the model (model complexity)
 ///
 /// # Returns
 /// * `f64` - BIC value
-pub fn bayesian_information_criterion(
-    residuals: &Array2<f64>,
-    num_samples: f64,
-    num_parameters: f64,
-) -> f64 {
-    let sse = sum_of_squared_errors(residuals);
-    num_samples * (sse / num_samples).ln() + num_parameters * num_samples.ln()
+pub fn bayesian_information_criterion(cost: f64, num_parameters: usize, num_samples: usize) -> f64 {
+    num_parameters as f64 * (num_samples as f64).ln() - 2.0 * cost.ln()
 }
