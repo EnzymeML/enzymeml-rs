@@ -97,6 +97,7 @@ pub mod optim {
         pub mod lbfgs;
         pub mod optimizer;
         pub mod pso;
+        pub(crate) mod utils;
     }
 }
 
