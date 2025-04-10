@@ -11,7 +11,7 @@ use crate::{
     prelude::{MatrixResult, Mode},
 };
 
-use super::problem::Problem;
+use super::{problem::Problem, OptimizeError};
 
 /// Implementation of the CostFunction trait for Problem to enable parameter optimization.
 /// This allows using the Problem with optimization algorithms that minimize a cost function.
@@ -54,6 +54,10 @@ impl<S: ODEIntegrator + Copy> CostFunction for Problem<S> {
         let residuals = species - self.measurement_buffer();
         let cost = self.objective().cost(&residuals, self.n_points()).unwrap();
 
+        if cost.is_nan() {
+            return Err(argmin::core::Error::msg(OptimizeError::CostNaN.to_string()));
+        }
+
         Ok(cost)
     }
 }
@@ -72,7 +76,7 @@ impl<S: ODEIntegrator + Copy> Gradient for Problem<S> {
     /// # Returns
     /// * `Result<Array1<f64>, argmin::core::Error>` - The computed gradient vector or an error
     fn gradient(&self, params: &Self::Param) -> Result<Self::Gradient, argmin::core::Error> {
-        let gradient = params.central_diff(&|x| self.cost(x).unwrap());
+        let gradient = params.central_diff(&|x| self.cost(x).expect("Failed to compute cost"));
         Ok(gradient)
     }
 }
@@ -90,7 +94,8 @@ impl<S: ODEIntegrator + Copy> Hessian for Problem<S> {
     type Hessian = Array2<f64>;
 
     fn hessian(&self, params: &Self::Param) -> Result<Self::Hessian, argmin::core::Error> {
-        let hessian = params.central_hessian(&|x| self.gradient(x).unwrap());
+        let hessian =
+            params.central_hessian(&|x| self.gradient(x).expect("Failed to compute gradient"));
         Ok(hessian)
     }
 }
