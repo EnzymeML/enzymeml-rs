@@ -36,8 +36,8 @@ mod test_optim {
         let problem = ProblemBuilder::new(&doc, RK5::default())
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
-            .transform(Transformation::NegExp("k_ie".into()))
-            .transform(Transformation::MultScale("K_M".into(), 10.0))
+            .transform(Transformation::Log("k_ie".into()))
+            .transform(Transformation::Log("K_M".into()))
             .build()
             .expect("Failed to build problem");
 
@@ -48,7 +48,7 @@ mod test_optim {
             .target_cost(1e-6)
             .build();
 
-        let inits = Array1::from_vec(vec![18.0, 2.0, 7.0]);
+        let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = bfgs
             .optimize(&problem, Some(inits))
             .expect("Failed to optimize");
@@ -70,8 +70,8 @@ mod test_optim {
         let problem = ProblemBuilder::new(&doc, RK5::default())
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
-            .transform(Transformation::NegExp("k_ie".into()))
-            .transform(Transformation::MultScale("K_M".into(), 10.0))
+            .transform(Transformation::Log("k_ie".into()))
+            .transform(Transformation::Log("K_M".into()))
             .build()
             .expect("Failed to build problem");
 
@@ -82,7 +82,7 @@ mod test_optim {
             .target_cost(1e-6)
             .build();
 
-        let inits = Array1::from_vec(vec![18.0, 2.0, 7.0]);
+        let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = lbfgs
             .optimize(&problem, Some(inits))
             .expect("Failed to optimize");
