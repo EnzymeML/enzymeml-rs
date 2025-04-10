@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use regex::Regex;
+
 use crate::prelude::{EnzymeMLDocument, Equation, EquationBuilder, EquationType};
 
 use super::error::OptimizeError;
@@ -20,7 +24,7 @@ use super::error::OptimizeError;
 /// * `Pow(String, f64)` - Raise named parameter to the specified power
 /// * `Logit(String)` - Logit transformation of the named parameter
 /// * `Abs(String)` - Absolute value of the named parameter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Transformation {
     SoftPlus(String),
     MultScale(String, f64),
@@ -28,6 +32,7 @@ pub enum Transformation {
     Abs(String),
     Log(String),
     NegExp(String),
+    Log1P(String),
 }
 
 impl Transformation {
@@ -50,11 +55,12 @@ impl Transformation {
             Transformation::Log(s) => s,
             Transformation::Abs(s) => s,
             Transformation::NegExp(s) => s,
+            Transformation::Log1P(s) => s,
         };
 
         let equation_string = self.equation_string();
 
-        EquationBuilder::default()
+        let equation = EquationBuilder::default()
             .species_id(format!("{variable}_transformed"))
             .equation(equation_string.clone())
             .equation_type(EquationType::INITIAL_ASSIGNMENT)
@@ -63,17 +69,21 @@ impl Transformation {
                 variable: variable.to_string(),
                 transformation: equation_string,
                 message: e.to_string(),
-            })
+            })?;
+
+        Ok(equation)
     }
 
+    // Inverse transformations
     pub fn equation_string(&self) -> String {
         match self {
-            Transformation::SoftPlus(s) => format!("ln(1 + exp({s}))", s = s),
-            Transformation::MultScale(s, scale) => format!("{s} * {scale}", s = s, scale = scale),
-            Transformation::Pow(s, power) => format!("{s}^{power}", s = s, power = power),
-            Transformation::Log(s) => format!("log({s})", s = s),
-            Transformation::Abs(s) => format!("abs({s})", s = s),
-            Transformation::NegExp(s) => format!("exp(-{s})", s = s),
+            Transformation::SoftPlus(s) => format!("exp({s}) - 1", s = s),
+            Transformation::MultScale(s, scale) => format!("{s} / {scale}", s = s, scale = scale),
+            Transformation::Pow(s, power) => format!("{s}^(1/{power})", s = s, power = power),
+            Transformation::Log(s) => format!("exp({s})", s = s),
+            Transformation::Abs(s) => format!("abs({s})", s = s), // Abs is its own inverse
+            Transformation::NegExp(s) => format!("-log({s})", s = s),
+            Transformation::Log1P(s) => format!("exp({s}) - 1", s = s),
         }
     }
 
@@ -88,14 +98,38 @@ impl Transformation {
     ///
     /// # Returns
     /// * `f64` - The transformed parameter value
-    pub fn apply(&self, value: f64) -> f64 {
+    pub fn apply_forward(&self, value: f64) -> f64 {
         match self {
             Transformation::SoftPlus(_) => (1_f64 + value.exp()).ln(),
             Transformation::MultScale(_, scale) => value * scale,
-            Transformation::Pow(_, power) => value.powi(*power as i32),
-            Transformation::Log(_) => value.ln(),
+            Transformation::Pow(_, power) => value.powf(*power),
+            Transformation::Log(_) => (1e-12 + value).ln(),
             Transformation::Abs(_) => value.abs(),
             Transformation::NegExp(_) => (-value).exp(),
+            Transformation::Log1P(_) => (1_f64 + value).ln(),
+        }
+    }
+
+    /// Applies the inverse transformation to a single parameter value
+    ///
+    /// Computes the original value for a transformed parameter according to the
+    /// transformation type. This is used to convert optimizer results
+    /// back to their original scale/meaning.
+    ///
+    /// # Arguments
+    /// * `value` - Transformed parameter value to transform back
+    ///
+    /// # Returns
+    /// * `f64` - The original parameter value
+    pub fn apply_back(&self, value: f64) -> f64 {
+        match self {
+            Transformation::SoftPlus(_) => (value.exp() - 1.0).ln(),
+            Transformation::MultScale(_, scale) => value / scale,
+            Transformation::Pow(_, power) => value.powf(1.0 / power),
+            Transformation::Log(_) => value.exp() - 1e-12,
+            Transformation::Abs(_) => value.abs(),
+            Transformation::NegExp(_) => -(value.ln()),
+            Transformation::Log1P(_) => value.exp() - 1.0,
         }
     }
 
@@ -115,6 +149,7 @@ impl Transformation {
             Transformation::Log(s) => s.clone(),
             Transformation::Abs(s) => s.clone(),
             Transformation::NegExp(s) => s.clone(),
+            Transformation::Log1P(s) => s.clone(),
         }
     }
 
@@ -134,6 +169,7 @@ impl Transformation {
             Transformation::Log(s) => format!("{s}_transformed"),
             Transformation::Abs(s) => format!("{s}_transformed"),
             Transformation::NegExp(s) => format!("{s}_transformed"),
+            Transformation::Log1P(s) => format!("{s}_transformed"),
         }
     }
 
@@ -161,5 +197,108 @@ impl Transformation {
         }
 
         Ok(())
+    }
+}
+
+impl FromStr for Transformation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pattern = r"^(\w+)=([a-zA-Z1\-]+)(?:\((.*)\))?$";
+        let re = Regex::new(pattern).unwrap();
+        let captures = re.captures(s);
+
+        if let Some(captures) = captures {
+            let key = captures
+                .get(1)
+                .ok_or("Missing parameter key")?
+                .as_str()
+                .to_string();
+            let transformation = captures
+                .get(2)
+                .ok_or("Missing transformation type")?
+                .as_str()
+                .to_string();
+            let args = captures
+                .get(3)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
+
+            match transformation.as_str() {
+                "log" => Ok(Transformation::Log(key)),
+                "multscale" => {
+                    if args.is_empty() {
+                        Err("multscale transformation requires a scale value".to_string())
+                    } else {
+                        args.parse::<f64>()
+                            .map(|scale| Transformation::MultScale(key, scale))
+                            .map_err(|_| {
+                                "Invalid scale value for multscale transformation".to_string()
+                            })
+                    }
+                }
+                "pow" => {
+                    if args.is_empty() {
+                        Err("pow transformation requires a power value".to_string())
+                    } else {
+                        args.parse::<f64>()
+                            .map(|power| Transformation::Pow(key, power))
+                            .map_err(|_| "Invalid power value for pow transformation".to_string())
+                    }
+                }
+                "abs" => Ok(Transformation::Abs(key)),
+                "neg-exp" => Ok(Transformation::NegExp(key)),
+                "softplus" => Ok(Transformation::SoftPlus(key)),
+                "log1p" => Ok(Transformation::Log1P(key)),
+                _ => Err("Invalid transformation".to_string()),
+            }
+        } else {
+            Err("Invalid format. Expected key=transformation".to_string())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transformation_from_str() {
+        let transformation = Transformation::from_str("k_cat=log")
+            .expect("Failed to parse transformation for k_cat=log");
+        assert_eq!(transformation, Transformation::Log("k_cat".to_string()));
+
+        let transformation = Transformation::from_str("k_cat=multscale(10.0)")
+            .expect("Failed to parse transformation for k_cat=multscale(10.0)");
+        assert_eq!(
+            transformation,
+            Transformation::MultScale("k_cat".to_string(), 10.0)
+        );
+
+        let transformation = Transformation::from_str("k_cat=pow(2.0)")
+            .expect("Failed to parse transformation for k_cat=pow(2.0)");
+        assert_eq!(
+            transformation,
+            Transformation::Pow("k_cat".to_string(), 2.0)
+        );
+
+        let transformation = Transformation::from_str("k_cat=abs")
+            .expect("Failed to parse transformation for k_cat=abs");
+        assert_eq!(transformation, Transformation::Abs("k_cat".to_string()));
+
+        let transformation = Transformation::from_str("k_cat=neg-exp")
+            .expect("Failed to parse transformation for k_cat=neg-exp");
+        assert_eq!(transformation, Transformation::NegExp("k_cat".to_string()));
+
+        let transformation = Transformation::from_str("k_cat=softplus")
+            .expect("Failed to parse transformation for k_cat=softplus");
+        assert_eq!(
+            transformation,
+            Transformation::SoftPlus("k_cat".to_string())
+        );
+
+        let transformation = Transformation::from_str("k_cat=log1p")
+            .expect("Failed to parse transformation for k_cat=log1p");
+        assert_eq!(transformation, Transformation::Log1P("k_cat".to_string()));
     }
 }
