@@ -73,6 +73,8 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
         transformations: Option<Vec<Transformation>>,
     ) -> Result<Self, OptimizeError> {
         // Cloning the enzymeml document to avoid modifying the original document
+        // We might need to add transformations, which will be used for initial assignments
+        // and will be applied to the parameter vector before optimization
         let mut doc = enzmldoc.clone();
         doc.measurements.retain(measurement_not_empty);
 
@@ -109,7 +111,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
             .collect();
 
         Ok(Self {
-            doc,
+            doc: enzmldoc.clone(),
             initials,
             solver,
             simulation_setup,
@@ -293,7 +295,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
         // Apply transformations in one pass
         for (i, param) in param_order.iter().enumerate() {
             if let Some(transformation) = transform_map.get(param) {
-                transformed_params[i] = transformation.apply(transformed_params[i]);
+                transformed_params[i] = transformation.apply_back(transformed_params[i]);
             }
         }
 
@@ -542,9 +544,5 @@ impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
 /// # Returns
 /// * `bool` - True if all species have data, false otherwise
 fn measurement_not_empty(measurement: &Measurement) -> bool {
-    measurement
-        .species_data
-        .iter()
-        .map(|s| !s.data.is_empty())
-        .any(|b| b)
+    measurement.species_data.iter().any(|s| !s.data.is_empty())
 }
