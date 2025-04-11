@@ -1,4 +1,4 @@
-use crate::optim::Transformation;
+use crate::optim::{Bound, Transformation};
 
 use super::InitialGuesses;
 
@@ -28,5 +28,27 @@ pub(crate) fn transform_initial_guesses(
             index,
             transformation.apply_forward(initial_guesses.get_value_at(index)),
         );
+    }
+}
+
+/// Transform bounds based on the transformations
+///
+/// Given there are trasnformations, we need to transform the bounds
+/// based on the transformations. This way, users can specify bounds
+/// in the original scale of the parameters.
+///
+/// # Arguments
+///
+/// * `bounds` - The bounds to transform
+/// * `transformations` - The transformations to apply
+pub(crate) fn transform_bounds(bounds: &mut Vec<Bound>, transformations: &[Transformation]) {
+    for transformation in transformations {
+        if let Some(bound) = bounds
+            .iter_mut()
+            .find(|b| b.param() == transformation.symbol())
+        {
+            bound.set_lower(transformation.apply_forward(bound.lower()));
+            bound.set_upper(transformation.apply_forward(bound.upper()));
+        }
     }
 }
