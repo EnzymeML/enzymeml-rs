@@ -81,7 +81,7 @@ pub fn mean_absolute_error(residuals: &Array2<f64>, num_samples: f64) -> f64 {
 /// # Returns
 /// * `f64` - AIC value
 pub fn akaike_information_criterion(cost: f64, num_parameters: usize) -> f64 {
-    2.0 * num_parameters as f64 - 2.0 * (cost).ln()
+    2.0 * num_parameters as f64 + 2.0 * (cost).ln()
 }
 
 /// Calculates Bayesian Information Criterion (BIC), similar to AIC but with a stronger penalty
@@ -105,5 +105,5 @@ pub fn akaike_information_criterion(cost: f64, num_parameters: usize) -> f64 {
 /// # Returns
 /// * `f64` - BIC value
 pub fn bayesian_information_criterion(cost: f64, num_parameters: usize, num_samples: usize) -> f64 {
-    num_parameters as f64 * (num_samples as f64).ln() - 2.0 * cost.ln()
+    num_parameters as f64 * (num_samples as f64).ln() + 2.0 * cost.ln()
 }
