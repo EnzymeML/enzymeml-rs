@@ -41,7 +41,7 @@ pub(crate) fn transform_initial_guesses(
 ///
 /// * `bounds` - The bounds to transform
 /// * `transformations` - The transformations to apply
-pub(crate) fn transform_bounds(bounds: &mut Vec<Bound>, transformations: &[Transformation]) {
+pub(crate) fn transform_bounds(bounds: &mut [Bound], transformations: &[Transformation]) {
     for transformation in transformations {
         if let Some(bound) = bounds
             .iter_mut()

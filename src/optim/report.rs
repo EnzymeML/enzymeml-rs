@@ -6,7 +6,6 @@ use std::{
 use argmin::core::CostFunction;
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
-use serde::Serialize;
 use tabled::{builder::Builder, settings::Style};
 
 use crate::prelude::{EnzymeMLDocument, SimulationResult};
