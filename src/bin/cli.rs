@@ -180,6 +180,14 @@ enum FitAlgorithm {
         #[arg(short, long, value_parser = parse_key_bounds)]
         bound: Vec<(String, (f64, f64))>,
 
+        /// Whether to use the log transformation for the initial guesses
+        #[arg(short, long, conflicts_with = "transform")]
+        log_transform: bool,
+
+        /// Transformations for the initial guesses
+        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
+        transform: Vec<Transformation>,
+
         /// Solver to use
         #[arg(
             short,
@@ -189,9 +197,9 @@ enum FitAlgorithm {
         )]
         solver: Solvers,
 
-        /// Loss function to use
-        #[arg(short, long, default_value = "mse", value_enum)]
-        loss_function: LossFunction,
+        /// Objective function to use
+        #[arg(short = 'O', long, default_value = "mse", value_enum)]
+        objective: LossFunction,
 
         /// Output directory for the optimization report
         #[arg(short, long, default_value = ".")]
@@ -216,6 +224,14 @@ enum FitAlgorithm {
         #[arg(short, long, value_parser = parse_key_bounds)]
         bound: Vec<(String, (f64, f64))>,
 
+        /// Whether to use the log transformation for the initial guesses
+        #[arg(short, long, conflicts_with = "transform")]
+        log_transform: bool,
+
+        /// Transformations for the initial guesses
+        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
+        transform: Vec<Transformation>,
+
         /// Solver to use
         #[arg(
             short,
@@ -225,9 +241,9 @@ enum FitAlgorithm {
         )]
         solver: Solvers,
 
-        /// Loss function to use
-        #[arg(short, long, default_value = "mse", value_enum)]
-        loss_function: LossFunction,
+        /// Objective function to use
+        #[arg(short = 'O', long, default_value = "mse", value_enum)]
+        objective: LossFunction,
 
         /// Time step for the design points
         #[arg(long, default_value_t = 0.1)]
@@ -641,12 +657,21 @@ pub fn main() {
                 dt,
                 bound,
                 solver,
-                loss_function,
+                objective,
+                log_transform,
+                transform,
             } => {
                 let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let transformations = if *log_transform {
+                    create_log_transformations(&enzmldoc)
+                } else {
+                    transform.clone()
+                };
+
                 let problem = ProblemBuilder::new(&enzmldoc, *solver)
                     .dt(*dt)
-                    .objective(*loss_function)
+                    .objective(*objective)
+                    .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");
 
@@ -686,15 +711,23 @@ pub fn main() {
                 dt,
                 bound,
                 solver,
-                loss_function,
+                objective,
+                log_transform,
+                transform,
             } => {
                 // Load EnzymeML document
                 let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let transformations = if *log_transform {
+                    create_log_transformations(&enzmldoc)
+                } else {
+                    transform.clone()
+                };
 
                 // Build problem
                 let problem = ProblemBuilder::new(&enzmldoc, *solver)
                     .dt(*dt)
-                    .objective(*loss_function)
+                    .objective(*objective)
+                    .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");
 

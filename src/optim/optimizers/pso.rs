@@ -23,6 +23,8 @@ use crate::optim::{
     Problem,
 };
 
+use super::utils::transform_bounds;
+
 /// Implementation of the BFGS optimization algorithm.
 ///
 /// BFGS is a quasi-Newton method for solving unconstrained
@@ -79,8 +81,12 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for ParticleSwarmOpt {
     where
         T: Into<InitialGuesses>,
     {
-        // Get bounds and split into (Array1<f64>, Array1<f64>)
-        let bounds = bounds_to_array2(problem, &self.bounds)?;
+        // Get bounds and transform them based on the transformations
+        let mut bounds = self.bounds.clone();
+        transform_bounds(&mut bounds, problem.transformations());
+
+        // Split bounds into (Array1<f64>, Array1<f64>)
+        let bounds = bounds_to_array2(problem, &bounds)?;
         let lower_bound = bounds.slice(s![.., 0]);
         let upper_bound = bounds.slice(s![.., 1]);
         let bounds = (lower_bound.to_owned(), upper_bound.to_owned());
@@ -106,6 +112,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for ParticleSwarmOpt {
             problem.enzmldoc().clone(),
             &best_individual.position.to_vec(),
             None,
+            Some(self.bounds.clone()),
         )
     }
 }

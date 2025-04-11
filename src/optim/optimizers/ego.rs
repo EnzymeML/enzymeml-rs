@@ -22,6 +22,8 @@ use crate::optim::{
     Problem,
 };
 
+use super::utils::transform_bounds;
+
 /// Implementation of the Efficient Global Optimization algorithm.
 ///
 /// EGO is a surrogate-based optimization algorithm that is particularly well-suited
@@ -77,8 +79,12 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
             Array2::from_shape_vec((results.len(), 1), results).unwrap()
         };
 
+        // Get bounds and transform them based on the transformations
+        let mut bounds = self.bounds.clone();
+        transform_bounds(&mut bounds, problem.transformations());
+
         // Convert bounds to Array2
-        let bounds = bounds_to_array2(problem, &self.bounds)?;
+        let bounds = bounds_to_array2(problem, &bounds)?;
 
         // Build and run EGO optimizer
         let result = EgorBuilder::optimize(objective)
@@ -89,7 +95,13 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
 
         // Return best parameters
         if let Some(params) = result.state.best_param {
-            OptimizationReport::new(problem, problem.enzmldoc().clone(), &params.to_vec(), None)
+            OptimizationReport::new(
+                problem,
+                problem.enzmldoc().clone(),
+                &params.to_vec(),
+                None,
+                Some(self.bounds.clone()),
+            )
         } else {
             Err(OptimizeError::ConvergenceError)
         }
