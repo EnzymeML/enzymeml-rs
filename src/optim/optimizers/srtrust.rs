@@ -96,12 +96,16 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
     where
         T: Into<InitialGuesses>,
     {
+        // Get the initial guesses
         let initial_guess = initial_guess.ok_or(OptimizeError::MissingInitialGuesses {
             missing: vec!["all".to_string()],
         })?;
+        let mut initial_guess: InitialGuesses = initial_guess.into();
+
+        // We need this for the report before transforming the initial guesses
+        let init_guess_copy = initial_guess.clone();
 
         // Extract the initial guesses
-        let mut initial_guess: InitialGuesses = initial_guess.into();
         let init_hessian = Array2::eye(initial_guess.len());
 
         // Transform the initial guesses
@@ -113,10 +117,10 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
 
         let best_params = match self.subproblem {
             SubProblem::Steihaug => {
-                solve_steihaug(problem, initial_guess, self.max_iters, init_hessian)
+                solve_steihaug(problem, initial_guess.clone(), self.max_iters, init_hessian)
             }
             SubProblem::Cauchy => {
-                solve_cauchy_point(problem, initial_guess, self.max_iters, init_hessian)
+                solve_cauchy_point(problem, initial_guess.clone(), self.max_iters, init_hessian)
             }
         }?;
 
@@ -124,6 +128,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
             problem,
             problem.enzmldoc().clone(),
             &best_params.to_vec(),
+            Some(init_guess_copy),
             None,
         )
     }

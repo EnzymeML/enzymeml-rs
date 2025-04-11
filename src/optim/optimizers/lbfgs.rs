@@ -91,12 +91,14 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
     where
         T: Into<InitialGuesses>,
     {
+        // Extract the initial guesses
         let initial_guess = initial_guess.ok_or(OptimizeError::MissingInitialGuesses {
             missing: vec!["all".to_string()],
         })?;
-
-        // Extract the initial guesses
         let mut initial_guess: InitialGuesses = initial_guess.into();
+
+        // We need this for the report before transforming the initial guesses
+        let init_guess_copy = initial_guess.clone();
 
         // Transform the initial guesses
         transform_initial_guesses(
@@ -112,7 +114,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
         let res = Executor::new(problem.clone(), solver)
             .configure(|state| {
                 state
-                    .param(initial_guess.get_values())
+                    .param(initial_guess.clone().get_values())
                     .max_iters(self.max_iters)
                     .target_cost(self.target_cost)
             })
@@ -136,6 +138,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for LBFGS {
             problem,
             problem.enzmldoc().clone(),
             &best_params.to_vec(),
+            Some(init_guess_copy),
             None,
         )
     }

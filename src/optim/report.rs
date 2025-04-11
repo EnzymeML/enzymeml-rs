@@ -15,6 +15,7 @@ use super::{
     error::OptimizeError,
     metrics::{akaike_information_criterion, bayesian_information_criterion},
     problem::Problem,
+    Bound, InitialGuesses,
 };
 
 /// A report containing optimization results and evaluation metrics
@@ -31,15 +32,13 @@ use super::{
 /// - Statistical metrics evaluating the fit quality
 /// - Simulated model fits to experimental data
 /// - Parameter uncertainties and correlations from the inverse Hessian matrix
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct OptimizationReport {
     /// The EnzymeML document containing model and data
-    #[serde(skip_serializing)]
     pub doc: EnzymeMLDocument,
     /// Map of parameter names to their optimized values
     pub best_params: BTreeMap<String, f64>,
     /// Fits to experimental data, mapping measurement IDs to simulation results
-    #[serde(skip_serializing)]
     pub fits: HashMap<String, SimulationResult>,
     /// Akaike Information Criterion
     pub aic: f64,
@@ -51,6 +50,10 @@ pub struct OptimizationReport {
     pub loss_function: String,
     /// Relative uncertainties of the best parameters
     pub uncertainties: Option<HashMap<String, f64>>,
+    /// Bounds of the parameters
+    pub bounds: Option<Vec<Bound>>,
+    /// Initial guesses
+    pub initial_guesses: Option<InitialGuesses>,
 }
 
 impl OptimizationReport {
@@ -75,7 +78,8 @@ impl OptimizationReport {
         problem: &Problem<S>,
         doc: EnzymeMLDocument,
         param_vec: &[f64],
-        _: Option<Vec<f64>>,
+        initial_guesses: Option<InitialGuesses>,
+        bounds: Option<Vec<Bound>>,
     ) -> Result<Self, OptimizeError> {
         let best_params = Self::transform_parameters(problem, param_vec)?;
         let doc = Self::update_document(doc, &best_params);
@@ -91,6 +95,8 @@ impl OptimizationReport {
             error,
             loss_function: problem.objective().to_string(),
             uncertainties: None,
+            bounds,
+            initial_guesses,
         })
     }
 
@@ -221,9 +227,39 @@ impl Display for OptimizationReport {
 
         // Create a table of the best parameters
         let mut builder = Builder::default();
-        builder.push_record(vec!["Parameter", "Value"]);
-        for (name, value) in &self.best_params {
-            builder.push_record(vec![name.to_string(), value.to_string()]);
+        builder.push_record(vec![
+            "Parameter",
+            "Value",
+            "Initial Guess",
+            "Lower Bound",
+            "Upper Bound",
+        ]);
+
+        for (i, (name, value)) in self.best_params.iter().enumerate() {
+            // Get initial guess and bounds as strings, defaulting to "-" if not present
+            let initial_guess = self
+                .initial_guesses
+                .as_ref()
+                .map_or("-".to_string(), |g| g.get_value_at(i).to_string());
+
+            let (lower_bound, upper_bound) =
+                self.bounds
+                    .as_ref()
+                    .map_or(("-".to_string(), "-".to_string()), |bounds| {
+                        let bound = bounds.iter().find(|b| b.param() == name);
+                        (
+                            bound.map_or("-".to_string(), |b| b.lower().to_string()),
+                            bound.map_or("-".to_string(), |b| b.upper().to_string()),
+                        )
+                    });
+
+            builder.push_record(vec![
+                name.to_string(),
+                value.to_string(),
+                initial_guess,
+                lower_bound,
+                upper_bound,
+            ]);
         }
 
         let mut table = builder.build();
