@@ -5,6 +5,7 @@
 //! - Fitting kinetic parameters using various optimization algorithms
 //! - Converting EnzymeML documents to different formats
 //! - Validating EnzymeML documents for schema compliance and consistency
+//! - Visualizing measurement data and simulation results
 //!
 //! # Usage
 //!
@@ -13,27 +14,32 @@
 //! enzymeml extract --prompt input.txt --output result.json
 //!
 //! # Fit parameters using EGO algorithm
-//! enzymeml fit ego --path model.xml --max-iters 100
+//! enzymeml fit ego --path model.json --max-iters 100
 //!
 //! # Fit parameters using PSO algorithm  
-//! enzymeml fit pso --path model.xml --pop-size 50
+//! enzymeml fit pso --path model.json --pop-size 50
 //!
 //! # Convert EnzymeML document to Excel format
-//! enzymeml convert --input model.xml --target xlsx --output model.xlsx
+//! enzymeml convert --input model.json --target xlsx --output model.xlsx
 //!
 //! # Validate an EnzymeML document
-//! enzymeml validate model.xml
+//! enzymeml validate model.json
+//!
+//! # Visualize measurement data
+//! enzymeml visualize model.json --measurement-ids meas1 meas2 --show-fit
 //! ```
 //!
 //! # Commands
 //!
 //! - `convert`: Convert EnzymeML documents to different formats (currently supports XLSX)
 //! - `validate`: Check EnzymeML documents for schema compliance and consistency
+//! - `visualize`: Generate plots of measurement data and simulation results
 //! - `fit`: Fit kinetic parameters using various optimization algorithms
 //!   - `ego`: Efficient Global Optimization algorithm
 //!   - `pso`: Particle Swarm Optimization algorithm
 //!   - `lbfgs`: Limited-memory BFGS algorithm
 //!   - `bfgs`: Broyden–Fletcher–Goldfarb–Shanno algorithm
+//!   - `sr1`: Symmetric Rank 1 Trust Region algorithm
 //! - `extract`: Extract structured information from natural language using LLMs
 //!
 //! # Parameter Optimization
@@ -43,6 +49,7 @@
 //! - **EGO**: Efficient Global Optimization, a surrogate-based algorithm suitable for expensive objective functions
 //! - **PSO**: Particle Swarm Optimization, a population-based stochastic algorithm
 //! - **LBFGS/BFGS**: Gradient-based optimization algorithms for smooth objective functions
+//! - **SR1**: Symmetric Rank 1 Trust Region method for constrained optimization problems
 //!
 //! # Solvers
 //!
@@ -78,6 +85,7 @@ use enzymeml::{
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
+// TODO: This is very ugly, we should extract the WASM feature into a separate crate
 #[cfg(not(feature = "wasm"))]
 use case::CaseExt;
 #[cfg(not(feature = "wasm"))]
@@ -873,6 +881,20 @@ enum ConversionTarget {
     Xlsx,
 }
 
+/// Performs comprehensive validation of an EnzymeML document
+///
+/// Checks both schema compliance and data consistency:
+/// 1. Validates against the EnzymeML JSON schema
+/// 2. Verifies internal data consistency
+///
+/// # Arguments
+///
+/// * `path` - Path to the EnzymeML document
+///
+/// # Returns
+///
+/// * `Ok(EnzymeMLDocument)` - Valid document
+/// * `Err(String)` - Error message if validation fails
 fn complete_check(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
     // Check if the file is a valid EnzymeML document
     let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
@@ -938,6 +960,19 @@ fn create_log_transformations(enzmldoc: &EnzymeMLDocument) -> Vec<Transformation
         .collect::<Vec<_>>()
 }
 
+/// Parses initial parameter guesses from command-line string
+///
+/// Format: "parameter_name=value"
+/// Example: "k_cat=0.1"
+///
+/// # Arguments
+///
+/// * `s` - Input string in the format "parameter=value"
+///
+/// # Returns
+///
+/// * `Ok((String, f64))` - Parameter name and value
+/// * `Err(String)` - Error message if parsing fails
 fn parse_initial_guesses(s: &str) -> Result<(String, f64), String> {
     // Example k_cat=0.1
     let parts = s.split('=').collect::<Vec<_>>();
