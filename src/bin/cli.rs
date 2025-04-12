@@ -63,6 +63,7 @@ use std::{
     str::FromStr,
 };
 
+use case::CaseExt;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use enzymeml::{
@@ -75,8 +76,11 @@ use enzymeml::{
     prelude::{EnzymeMLDocument, LossFunction},
     validation::{consistency, schema},
 };
+use log::{error, info};
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
+use plotly::ImageFormat;
 
+// List all available transformations
 const AVAILABLE_TRANSFORMATIONS: &[&str] =
     &["log", "multscale", "pow", "abs", "neg-exp", "softplus"];
 
@@ -91,6 +95,41 @@ struct Cli {
 /// Available CLI commands
 #[derive(Subcommand)]
 enum Commands {
+    /// Visualize an EnzymeML document
+    Visualize {
+        /// Path to the file containing the EnzymeML document
+        #[arg(help = "Path to the file containing the EnzymeML document")]
+        path: PathBuf,
+
+        /// Measurement IDs to visualize
+        #[arg(short, long, help = "Measurement IDs to visualize")]
+        measurement_ids: Vec<String>,
+
+        /// Output directory for the visualization
+        #[arg(
+            short,
+            long,
+            help = "Output directory for the visualization",
+            conflicts_with = "show",
+            default_value = "."
+        )]
+        output_dir: Option<PathBuf>,
+
+        /// Show fit or not
+        #[arg(short = 'F', long, help = "Show fit or not", default_value_t = true)]
+        show_fit: bool,
+
+        /// Show in browser or not
+        #[arg(
+            short,
+            long,
+            help = "Show in browser or not",
+            default_value_t = false,
+            conflicts_with = "output_dir"
+        )]
+        show: bool,
+    },
+
     /// Convert an EnzymeML document to a target
     Convert {
         /// Path to the file containing the EnzymeML document
@@ -393,9 +432,63 @@ enum FitAlgorithm {
 
 /// Main entry point for the CLI application
 pub fn main() {
+    // Initialize logger
+    env_logger::init();
+
     let cli = Cli::parse();
 
     match &cli.command {
+        Commands::Visualize {
+            path,
+            measurement_ids,
+            output_dir,
+            show_fit,
+            show,
+        } => {
+            // Load the enzymeml document
+            let enzmldoc = complete_check(path).expect("Failed to validate EnzymeML document");
+
+            // Get the measurement ids
+            let measurement_ids = if !measurement_ids.is_empty() {
+                measurement_ids.clone()
+            } else {
+                enzmldoc.measurements.iter().map(|m| m.id.clone()).collect()
+            };
+
+            if let Some(output_dir) = output_dir {
+                let output_dir = output_dir.to_owned();
+                if output_dir.exists() && !output_dir.is_dir() {
+                    panic!(
+                        "Output directory is not a directory: {}",
+                        output_dir.display()
+                    );
+                }
+                std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
+            }
+
+            for meas_id in &measurement_ids {
+                let plot = enzmldoc.plot_measurement(meas_id, *show, *show_fit, None, None);
+
+                match plot {
+                    Ok(plot) => {
+                        if let Some(output_dir) = output_dir {
+                            let fname = format!("{}.png", meas_id.to_snake());
+                            let output_path = output_dir.join(fname);
+                            plot.write_image(&output_path, ImageFormat::PNG, 800, 600, 1.0);
+
+                            println!(
+                                "Saved measurement {} plot to {}",
+                                meas_id.cyan().bold(),
+                                output_path.to_str().unwrap().to_string().cyan().bold()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to plot measurement {}: {}", meas_id, e);
+                    }
+                }
+            }
+        }
         Commands::Convert {
             input: path,
             target,
