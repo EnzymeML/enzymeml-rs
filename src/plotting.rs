@@ -6,7 +6,10 @@ use plotly::{
 };
 use thiserror::Error;
 
-use crate::prelude::{EnzymeMLDocument, Measurement};
+use crate::{
+    optim::measurement_not_empty,
+    prelude::{EnzymeMLDocument, Measurement},
+};
 
 #[cfg(feature = "simulation")]
 use crate::{
@@ -35,16 +38,22 @@ impl EnzymeMLDocument {
     /// A Plot object containing the measurement data visualization in a grid layout.
     pub fn plot_measurement(
         &self,
-        measurement_id: String,
+        measurement_id: &str,
         show: bool,
         show_fit: bool,
+        width: Option<usize>,
+        height: Option<usize>,
     ) -> Result<Plot, PlotError> {
         // Filter measurements if measurement_ids are provided
         let measurement: &Measurement = self
             .measurements
             .iter()
             .find(|meas| meas.id == measurement_id)
-            .ok_or(PlotError::MeasurementNotFound(measurement_id))?;
+            .ok_or(PlotError::MeasurementNotFound(measurement_id.to_string()))?;
+
+        if !measurement_not_empty(measurement) {
+            return Err(PlotError::MeasurementEmpty(measurement_id.to_string()));
+        }
 
         // Create a plot
         let mut plot = Plot::new();
@@ -75,8 +84,8 @@ impl EnzymeMLDocument {
         let layout = Layout::new()
             .title(self.name.clone())
             .show_legend(true) // Always show the legend
-            .width(800)
-            .height(600)
+            .width(width.unwrap_or(800))
+            .height(height.unwrap_or(600))
             .x_axis(Axis::new().range(vec![0.0]).auto_range(true).title("Time"))
             .y_axis(
                 Axis::new()
@@ -155,6 +164,9 @@ fn get_simulation_traces(
     doc: &EnzymeMLDocument,
     meas: &Measurement,
 ) -> Result<PlotTraces, SimulationError> {
+    // Check if model has valid equations and parameters
+    has_valid_model(doc)?;
+
     let setup: SimulationSetup = meas.try_into().unwrap();
     let initial_conditions: InitialCondition = meas.into();
     let solver = RK5::default();
@@ -173,12 +185,46 @@ fn get_simulation_traces(
     Ok(traces)
 }
 
+/// Checks if a model has valid equations and parameters
+///
+/// # Arguments
+///
+/// * `doc` - The EnzymeML document to check
+///
+/// # Returns
+///
+/// * `bool` - True if the model has valid equations and parameters, false otherwise   
+fn has_valid_model(doc: &EnzymeMLDocument) -> Result<(), PlotError> {
+    // Check if model has equations, parameters, and all parameters have values
+    if doc.equations.is_empty() || doc.parameters.is_empty() {
+        return Err(PlotError::MissingModel);
+    }
+
+    let mut missing_values = vec![];
+    for param in doc.parameters.iter() {
+        if param.value.is_none() {
+            missing_values.push(param.id.clone());
+        }
+    }
+    if !missing_values.is_empty() {
+        return Err(PlotError::MissingParameterValues(missing_values));
+    }
+
+    Ok(())
+}
+
 #[derive(Error, Debug)]
 pub enum PlotError {
     #[error("Measurement with id {0} not found")]
     MeasurementNotFound(String),
     #[error("Simulation failed")]
     SimulationError,
+    #[error("Cannot plot fit: Not all parameters have values: {0:?}")]
+    MissingParameterValues(Vec<String>),
+    #[error("Cannot plot fit: Model has no equations or parameters")]
+    MissingModel,
+    #[error("Measurement with id {0} has no data")]
+    MeasurementEmpty(String),
 }
 
 #[cfg(test)]
@@ -193,7 +239,7 @@ mod tests {
     fn test_plot() {
         let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
         enzmldoc
-            .plot_measurement("measurement0".to_string(), true, true)
+            .plot_measurement("measurement0", true, true, Some(800), Some(600))
             .unwrap();
     }
 
@@ -204,5 +250,41 @@ mod tests {
 
         let traces = get_simulation_traces(&enzmldoc, measurement).unwrap();
         assert_eq!(traces.len(), 2);
+    }
+
+    #[test]
+    fn test_plot_measurement_missing_model() {
+        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc_no_model.json")).unwrap();
+
+        let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_plot_measurement_missing_parameter_values() {
+        let enzmldoc = load_enzmldoc(&PathBuf::from(
+            "tests/data/enzmldoc_missing_param_value.json",
+        ))
+        .unwrap();
+
+        let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_plot_measurement_empty() {
+        let mut enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+
+        // Clear the data from the measurement
+        for meas in enzmldoc.measurements.iter_mut() {
+            for species_data in meas.species_data.iter_mut() {
+                species_data.data = vec![];
+                species_data.time = vec![];
+            }
+        }
+
+        let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
+
+        assert!(result.is_err());
     }
 }
