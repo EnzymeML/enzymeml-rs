@@ -3714,7 +3714,6 @@
       "id": "k_cat",
       "name": "k_cat",
       "symbol": "k_cat",
-      "value": 0.85,
       "unit": null,
       "initial_value": 0.01,
       "upper_bound": 2.0,
