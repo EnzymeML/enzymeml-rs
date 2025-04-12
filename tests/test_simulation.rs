@@ -55,7 +55,7 @@ mod test_simulation {
             initial_conditions.clone(),
             None,
             None,
-            RK5::default(),
+            RK5,
             Some(Mode::Regular),
         );
 
@@ -143,7 +143,7 @@ mod test_simulation {
                 &initial_conditions,
                 None,
                 None,
-                RK5::default(),
+                RK5,
                 Some(Mode::Regular),
             )
             .expect("Simulation failed");
@@ -210,7 +210,7 @@ mod test_simulation {
             initial_conditions.clone(),
             None,
             None,
-            RK5::default(),
+            RK5,
             Some(Mode::Sensitivity),
         );
 
@@ -218,26 +218,24 @@ mod test_simulation {
         // Compare sensitivity analysis results between both implementations
         if let Ok(MatrixResult {
             species: _,
-            parameter_sensitivities,
+            parameter_sensitivities: Some(parameter_sensitivities),
             times: _,
             assignments: _,
         }) = result
         {
-            if let Some(parameter_sensitivities) = parameter_sensitivities {
-                // Iterate over each timepoint and compare sensitivities
-                for (subview, menten_value) in parameter_sensitivities
-                    .axis_iter(Axis(0))
-                    .zip(menten_result)
-                {
-                    let enzmldoc_km = subview.get((0, 0)).unwrap(); // Sensitivity w.r.t. KM
-                    let enzmldoc_vmax = subview.get((0, 1)).unwrap(); // Sensitivity w.r.t. Vmax
-                    let menten_km = menten_value[1];
-                    let menten_vmax = menten_value[2];
+            // Iterate over each timepoint and compare sensitivities
+            for (subview, menten_value) in parameter_sensitivities
+                .axis_iter(Axis(0))
+                .zip(menten_result)
+            {
+                let enzmldoc_km = subview.get((0, 0)).unwrap(); // Sensitivity w.r.t. KM
+                let enzmldoc_vmax = subview.get((0, 1)).unwrap(); // Sensitivity w.r.t. Vmax
+                let menten_km = menten_value[1];
+                let menten_vmax = menten_value[2];
 
-                    // Verify that sensitivities match within tolerance
-                    assert_relative_eq!(*enzmldoc_km, menten_km, epsilon = 1e-10);
-                    assert_relative_eq!(*enzmldoc_vmax, menten_vmax, epsilon = 1e-10);
-                }
+                // Verify that sensitivities match within tolerance
+                assert_relative_eq!(*enzmldoc_km, menten_km, epsilon = 1e-10);
+                assert_relative_eq!(*enzmldoc_vmax, menten_vmax, epsilon = 1e-10);
             }
         }
     }
@@ -288,7 +286,7 @@ mod test_simulation {
             initial_conditions.clone(),
             None,
             None,
-            RK5::default(),
+            RK5,
             Some(Mode::Regular),
         );
 
@@ -338,7 +336,7 @@ mod test_simulation {
                 initial_conditions.clone(),
                 None,
                 None,
-                RK5::default(),
+                RK5,
                 Some(Mode::Regular),
             )
             .expect("Simulation failed");
@@ -440,7 +438,7 @@ mod test_simulation {
 
         fn integrate(self, s0: f64, t0: f64, t1: f64, dt: f64) -> StepperOutput {
             let initial_state = vec![s0, 0.0, 0.0];
-            let solver = BasicODESolver::new(RK5::default());
+            let solver = BasicODESolver::new(RK5);
             let (_, y_out) = solver
                 .solve(&self, (t0, t1), dt, &initial_state)
                 .expect("Integration failed");

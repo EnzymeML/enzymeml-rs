@@ -76,7 +76,7 @@ use enzymeml::{
     prelude::{EnzymeMLDocument, LossFunction},
     validation::{consistency, schema},
 };
-use log::{error, info};
+use log::error;
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 use plotly::ImageFormat;
 

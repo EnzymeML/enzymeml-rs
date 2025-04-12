@@ -169,7 +169,7 @@ fn get_simulation_traces(
 
     let setup: SimulationSetup = meas.try_into().unwrap();
     let initial_conditions: InitialCondition = meas.into();
-    let solver = RK5::default();
+    let solver = RK5;
     let system: ODESystem = doc.try_into().unwrap();
 
     let result = system.integrate::<SimulationResult>(
@@ -229,15 +229,13 @@ pub enum PlotError {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use crate::io::load_enzmldoc;
 
     use super::*;
 
     #[test]
     fn test_plot() {
-        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+        let enzmldoc = load_enzmldoc("tests/data/enzmldoc.json").unwrap();
         enzmldoc
             .plot_measurement("measurement0", true, true, Some(800), Some(600))
             .unwrap();
@@ -245,8 +243,8 @@ mod tests {
 
     #[test]
     fn test_get_simulation_traces() {
-        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
-        let measurement = enzmldoc.measurements.iter().next().unwrap();
+        let enzmldoc = load_enzmldoc("tests/data/enzmldoc.json").unwrap();
+        let measurement = enzmldoc.measurements.first().unwrap();
 
         let traces = get_simulation_traces(&enzmldoc, measurement).unwrap();
         assert_eq!(traces.len(), 2);
@@ -254,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_plot_measurement_missing_model() {
-        let enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc_no_model.json")).unwrap();
+        let enzmldoc = load_enzmldoc("tests/data/enzmldoc_no_model.json").unwrap();
 
         let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
         assert!(result.is_err());
@@ -262,10 +260,7 @@ mod tests {
 
     #[test]
     fn test_plot_measurement_missing_parameter_values() {
-        let enzmldoc = load_enzmldoc(&PathBuf::from(
-            "tests/data/enzmldoc_missing_param_value.json",
-        ))
-        .unwrap();
+        let enzmldoc = load_enzmldoc("tests/data/enzmldoc_missing_param_value.json").unwrap();
 
         let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
         assert!(result.is_err());
@@ -273,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_plot_measurement_empty() {
-        let mut enzmldoc = load_enzmldoc(&PathBuf::from("tests/data/enzmldoc.json")).unwrap();
+        let mut enzmldoc = load_enzmldoc("tests/data/enzmldoc.json").unwrap();
 
         // Clear the data from the measurement
         for meas in enzmldoc.measurements.iter_mut() {

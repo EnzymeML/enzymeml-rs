@@ -21,19 +21,16 @@ mod test_optim {
         prelude::*,
     };
     use ndarray::Array1;
-    use std::path::PathBuf;
 
     fn get_doc() -> EnzymeMLDocument {
-        let path = PathBuf::from("tests/data/enzmldoc.json");
-        let doc = load_enzmldoc(&path).unwrap();
-        doc
+        load_enzmldoc("tests/data/enzmldoc.json").unwrap()
     }
 
     #[test]
     fn test_bfgs() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5::default())
+        let problem = ProblemBuilder::new(&doc, RK5)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -67,7 +64,7 @@ mod test_optim {
     fn test_lbfgs() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5::default())
+        let problem = ProblemBuilder::new(&doc, RK5)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -101,7 +98,7 @@ mod test_optim {
     fn test_sr1trustregion_cauchy() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5::default())
+        let problem = ProblemBuilder::new(&doc, RK5)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -134,7 +131,7 @@ mod test_optim {
     fn test_sr1trustregion_steihaug() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5::default())
+        let problem = ProblemBuilder::new(&doc, RK5)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -167,7 +164,7 @@ mod test_optim {
     fn test_pso() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5::default())
+        let problem = ProblemBuilder::new(&doc, RK5)
             .dt(10.0)
             .build()
             .expect("Failed to build problem");
@@ -199,10 +196,7 @@ mod test_optim {
     fn test_ego() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5::default())
-            .dt(10.0)
-            .build()
-            .unwrap();
+        let problem = ProblemBuilder::new(&doc, RK5).dt(10.0).build().unwrap();
 
         // ACT
         let res = EGOBuilder::default()
