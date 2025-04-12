@@ -63,7 +63,6 @@ use std::{
     str::FromStr,
 };
 
-use case::CaseExt;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use enzymeml::{
@@ -76,8 +75,14 @@ use enzymeml::{
     prelude::{EnzymeMLDocument, LossFunction},
     validation::{consistency, schema},
 };
-use log::error;
+
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
+
+#[cfg(not(feature = "wasm"))]
+use case::CaseExt;
+#[cfg(not(feature = "wasm"))]
+use log::error;
+#[cfg(not(feature = "wasm"))]
 use plotly::ImageFormat;
 
 // List all available transformations
@@ -438,6 +443,13 @@ pub fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
+        // TODO: This is very ugly, we should extract the WASM feature into a separate crate
+        #[cfg(feature = "wasm")]
+        Commands::Visualize { .. } => {
+            eprintln!("Visualization is not supported in WASM mode");
+        }
+
+        #[cfg(not(feature = "wasm"))]
         Commands::Visualize {
             path,
             measurement_ids,

@@ -19,7 +19,7 @@ meval = { version = "0.2.0", features = ["serde"] }
 schemars = "0.8.22"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.119"
-plotly = { version = "0.12.1", features = ["kaleido", "kaleido_download"] }
+plotly = "0.12.1"
 ordered-float = "5.0"
 ndarray = "^0.15.6"
 thiserror = "2.0.9"
@@ -64,7 +64,7 @@ codegen-units = 1
 debug = false
 
 [features]
-default = ["optimization", "simulation", "llm", "tabular"]
+default = ["optimization", "simulation", "llm", "tabular", "plotly-kaleido"]
 tabular = ["polars", "calamine", "xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
@@ -79,6 +79,7 @@ optimization = [
 serde-wasm-bindgen = ["dep:serde-wasm-bindgen"]
 tsify-next = ["dep:tsify-next"]
 mdmodels = ["dep:mdmodels"]
+plotly-kaleido = ["plotly/kaleido", "plotly/kaleido_download"]
 
 [dev-dependencies]
 approx = "0.5.1"
@@ -89,4 +90,4 @@ glob = "0.3.2"
 md5 = "0.7.0"
 prettyplease = "0.2.31"
 syn = { version = "2.0.100", features = ["full", "parsing"] }
-mdmodels = { version = "0.2.3", optional = true }
+mdmodels = "0.2.3"
