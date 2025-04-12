@@ -543,6 +543,6 @@ impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
 ///
 /// # Returns
 /// * `bool` - True if all species have data, false otherwise
-fn measurement_not_empty(measurement: &Measurement) -> bool {
+pub fn measurement_not_empty(measurement: &Measurement) -> bool {
     measurement.species_data.iter().any(|s| !s.data.is_empty())
 }
