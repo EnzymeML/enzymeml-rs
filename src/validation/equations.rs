@@ -1,3 +1,4 @@
+use crate::ode::SystemType;
 use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
 use crate::validation::consistency::{get_species_ids, Report, Severity, ValidationResult};
 
@@ -14,6 +15,12 @@ use crate::validation::consistency::{get_species_ids, Report, Severity, Validati
 pub fn check_equations(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
     let all_species = get_species_ids(enzmldoc);
 
+    if has_both_system_types(enzmldoc, report) {
+        // We can early return here, because there can only be one type of system
+        // and we will have already added an error to the report
+        return;
+    }
+
     for (eq_idx, equation) in enzmldoc.equations.iter().enumerate() {
         check_equation_variables(report, equation, &all_species, eq_idx);
 
@@ -21,6 +28,28 @@ pub fn check_equations(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
             check_ode_species_id(report, equation, &all_species, eq_idx);
         }
     }
+}
+
+/// Validates that the document contains only one type of system
+///
+/// # Arguments
+/// * `enzmldoc` - The EnzymeML document to validate
+/// * `report` - Validation report to add any errors to
+///
+/// # Returns
+/// * `bool` - True if the document contains both ODEs and kinetic laws, false otherwise
+pub fn has_both_system_types(enzmldoc: &EnzymeMLDocument, report: &mut Report) -> bool {
+    if let SystemType::Both = enzmldoc.determine_system_type() {
+        let result = ValidationResult::new(
+            "/enzmldoc".to_string(),
+            "Document contains both ODEs and kinetic laws. Only one is allowed.".to_string(),
+            Severity::Error,
+        );
+        report.add_result(result);
+        return true;
+    }
+
+    false
 }
 
 /// Validates the species ID for ODE equations
