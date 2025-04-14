@@ -11,8 +11,8 @@
 //! The PSO algorithm is a population-based optimization algorithm that uses a swarm of particles to search for the optimal solution.
 //! Each particle has a position and a velocity, and the particles move in the search space according to the following equations:
 
-use argmin::core::observers::ObserverMode;
-use argmin::core::Executor;
+use argmin::core::{observers::ObserverMode, TerminationStatus};
+use argmin::core::{Executor, TerminationReason};
 use argmin::solver::particleswarm::ParticleSwarm;
 use argmin_observer_slog::SlogLogger;
 use ndarray::s;
@@ -104,6 +104,12 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for Particle
                 .add_observer(SlogLogger::term(), ObserverMode::Always)
                 .run()
                 .unwrap();
+
+        if let TerminationStatus::Terminated(TerminationReason::SolverExit(_)) =
+            res.state.termination_status
+        {
+            return Err(OptimizeError::CostNaN);
+        }
 
         let best_individual = res
             .state

@@ -15,6 +15,7 @@
 use argmin::core::observers::ObserverMode;
 use argmin::core::Executor;
 use argmin::core::State;
+use argmin::core::TerminationReason;
 use argmin::core::TerminationStatus;
 use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::LBFGS as ArgminLBFGS;
@@ -123,7 +124,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for LBFGS {
             .run()
             .map_err(OptimizeError::ArgMinError)?;
 
-        if let TerminationStatus::Terminated(argmin::core::TerminationReason::SolverExit(_)) =
+        if let TerminationStatus::Terminated(TerminationReason::SolverExit(_)) =
             res.state.termination_status
         {
             return Err(OptimizeError::CostNaN);
