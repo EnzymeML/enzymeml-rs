@@ -607,7 +607,9 @@ pub fn main() {
                 output_dir,
                 log_transform,
             } => {
-                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                enzmldoc.derive_system().expect("Failed to derive system");
+
                 let transformations = if *log_transform {
                     create_log_transformations(&enzmldoc)
                 } else {
@@ -662,7 +664,9 @@ pub fn main() {
                 output_dir,
                 log_transform,
             } => {
-                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                enzmldoc.derive_system().expect("Failed to derive system");
+
                 let transformations = if *log_transform {
                     create_log_transformations(&enzmldoc)
                 } else {
@@ -718,7 +722,9 @@ pub fn main() {
                 log_transform,
                 subproblem,
             } => {
-                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                enzmldoc.derive_system().expect("Failed to derive system");
+
                 let transformations = if *log_transform {
                     create_log_transformations(&enzmldoc)
                 } else {
@@ -771,7 +777,9 @@ pub fn main() {
                 log_transform,
                 transform,
             } => {
-                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                enzmldoc.derive_system().expect("Failed to derive system");
+
                 let transformations = if *log_transform {
                     create_log_transformations(&enzmldoc)
                 } else {
@@ -825,7 +833,9 @@ pub fn main() {
                 transform,
             } => {
                 // Load EnzymeML document
-                let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
+                enzmldoc.derive_system().expect("Failed to derive system");
+
                 let transformations = if *log_transform {
                     create_log_transformations(&enzmldoc)
                 } else {
