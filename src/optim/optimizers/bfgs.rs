@@ -15,6 +15,8 @@
 use argmin::core::observers::ObserverMode;
 use argmin::core::Executor;
 use argmin::core::State;
+use argmin::core::TerminationReason;
+use argmin::core::TerminationStatus;
 use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::BFGS as ArgminBFGS;
 use argmin_observer_slog::SlogLogger;
@@ -123,6 +125,12 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for BFGS {
             .add_observer(SlogLogger::term(), ObserverMode::Always)
             .run()
             .unwrap();
+
+        if let TerminationStatus::Terminated(TerminationReason::SolverExit(_)) =
+            res.state.termination_status
+        {
+            return Err(OptimizeError::CostNaN);
+        }
 
         let best_params = res
             .state

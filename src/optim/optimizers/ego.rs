@@ -12,7 +12,7 @@
 //! of the objective function and using it to intelligently select new points for evaluation
 //! based on an acquisition function that balances exploration and exploitation.
 
-use argmin::core::CostFunction;
+use argmin::core::{CostFunction, TerminationReason, TerminationStatus};
 use egobox_ego::EgorBuilder;
 use ndarray::{Array2, ArrayView2};
 use peroxide::fuga::ODEIntegrator;
@@ -97,6 +97,12 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L>
             .min_within(&bounds)
             .run()
             .map_err(|_| OptimizeError::ConvergenceError)?;
+
+        if let TerminationStatus::Terminated(TerminationReason::SolverExit(_)) =
+            result.state.termination_status
+        {
+            return Err(OptimizeError::CostNaN);
+        }
 
         // Return best parameters
         if let Some(params) = result.state.best_param {

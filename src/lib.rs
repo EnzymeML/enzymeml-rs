@@ -174,5 +174,8 @@ pub mod plotting;
 /// IO functionality
 pub mod io;
 
+/// ODE functionality used to derive the system of ODEs from the EnzymeML reactions
+pub mod system;
+
 /// Conversion functionality
 pub mod conversion;
