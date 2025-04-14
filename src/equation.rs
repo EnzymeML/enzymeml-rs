@@ -1,7 +1,6 @@
+use meval::Expr;
 use std::collections::HashSet;
 use std::error::Error;
-
-use meval::Expr;
 
 use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder, EquationBuilder, EquationType};
 use crate::prelude::{Parameter, ParameterBuilder, Variable, VariableBuilder};
@@ -40,7 +39,7 @@ impl<'a> From<&'a mut EnzymeMLDocument> for EnzymeMLDocState<'a> {
 /// Returns a `Result` containing the `EquationBuilder` or an error if the creation fails.
 pub fn create_equation(
     eq: &str,
-    variables: Vec<String>,
+    variables: &[String],
     eq_type: EquationType,
     enzmldoc: EnzymeMLDocState,
 ) -> Result<EquationBuilder, Box<dyn Error>> {
@@ -50,7 +49,7 @@ pub fn create_equation(
         Err(_) => panic!("Could not parse equation."),
     };
 
-    let (params, variables) = extract_params_and_vars(variables, &equation);
+    let (params, variables) = extract_params_and_vars(&variables, &equation);
     let mut eq_builder = EquationBuilder::default();
 
     eq_builder
@@ -66,7 +65,9 @@ pub fn create_equation(
         }
         EnzymeMLDocState::Document(doc) => {
             params.iter().for_each(|p| {
-                doc.parameters.push(p.clone());
+                if !doc.parameters.iter().any(|p| p.symbol == p.symbol) {
+                    doc.parameters.push(p.clone());
+                }
             });
         }
     }
@@ -84,13 +85,12 @@ pub fn create_equation(
 /// # Returns
 ///
 /// Returns a tuple containing a vector of `Parameter` and a vector of `Variable`.
-fn extract_params_and_vars(
-    variables: Vec<String>,
+pub(crate) fn extract_params_and_vars(
+    variables: &[String],
     equation: &Expr,
 ) -> (Vec<Parameter>, Vec<Variable>) {
     // Extract variables from equation and ids from the enzml doc
     let symbols = extract_symbols(equation);
-    check_variable_consistency(&variables, &symbols);
 
     // Sort variables and parameters
     let params = filter_params(&variables, &symbols);
@@ -109,9 +109,9 @@ fn extract_params_and_vars(
 ///
 /// Returns a vector of `Variable`.
 fn filter_variables(variables: &[String], symbols: &[String]) -> Vec<Variable> {
-    variables
+    symbols
         .iter()
-        .filter(|v| symbols.contains(v))
+        .filter(|v| variables.contains(v))
         .map(|v| {
             VariableBuilder::default()
                 .id(v.clone())
@@ -169,24 +169,6 @@ pub fn extract_symbols(eq: &Expr) -> Vec<String> {
     vars.into_iter().collect()
 }
 
-/// Checks the consistency of the given variables with the symbols extracted from the equation.
-///
-/// # Arguments
-///
-/// * `variables` - A reference to a vector of variable names.
-/// * `symbols` - A reference to a vector of symbols extracted from the equation.
-///
-/// # Panics
-///
-/// Panics if a variable is not found in the symbols.
-fn check_variable_consistency(variables: &Vec<String>, symbols: &[String]) {
-    for var in variables {
-        if !symbols.contains(var) {
-            panic!("Variable '{}' not found in equation.", var);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,14 +207,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Variable 'w' not found in equation.")]
-    fn test_check_variable_consistency_panic() {
-        let variables = vec!["x".to_string(), "w".to_string()];
-        let symbols = vec!["x".to_string(), "y".to_string()];
-        check_variable_consistency(&variables, &symbols);
-    }
-
-    #[test]
     fn test_create_equation() {
         let mut doc_builder = EnzymeMLDocumentBuilder::default();
         let eq = "2*x + y";
@@ -241,7 +215,7 @@ mod tests {
 
         let result = create_equation(
             eq,
-            variables,
+            &variables,
             eq_type,
             EnzymeMLDocState::from(&mut doc_builder),
         );
