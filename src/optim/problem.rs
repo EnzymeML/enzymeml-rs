@@ -5,9 +5,8 @@ use ndarray::{Array2, Array3};
 use peroxide::fuga::ODEIntegrator;
 use sha2::{Digest, Sha256};
 
-use crate::prelude::{Measurement, ODESystem};
+use crate::prelude::{Measurement, ODESystem, ObjectiveFunction};
 use crate::{
-    objective::loss::LossFunction,
     prelude::{EnzymeMLDocument, SimulationSetup},
     simulation::init_cond::InitialCondition,
 };
@@ -28,7 +27,7 @@ use super::transformation::Transformation;
 /// * `transformations` - Optional parameter transformations to enforce constraints
 /// * `objective` - Objective function to optimize
 #[derive(Debug, Clone)]
-pub struct Problem<S: ODEIntegrator + Copy> {
+pub struct Problem<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
     /// EnzymeML document containing the model definition, parameters and experimental data
     doc: EnzymeMLDocument,
     /// Optional user-provided initial conditions, otherwise derived from the document
@@ -38,7 +37,7 @@ pub struct Problem<S: ODEIntegrator + Copy> {
     /// Optional parameter transformations to enforce constraints
     transformations: Vec<Transformation>,
     /// Objective function to optimize
-    objective: LossFunction,
+    objective: L,
     /// Jitted ODE system
     ode_system: ODESystem,
     /// Observable species indices
@@ -58,7 +57,7 @@ pub struct Problem<S: ODEIntegrator + Copy> {
     evaluation_times: Vec<Vec<f64>>,
 }
 
-impl<S: ODEIntegrator + Copy> Problem<S> {
+impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
     /// Creates a new optimization problem from an EnzymeML document
     ///
     /// # Arguments
@@ -67,7 +66,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     /// * `dt` - Time step for numerical integration
     pub fn new(
         enzmldoc: &EnzymeMLDocument,
-        objective: LossFunction,
+        objective: L,
         solver: S,
         dt: Option<f64>,
         transformations: Option<Vec<Transformation>>,
@@ -379,7 +378,7 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     ///
     /// # Returns
     /// * `&LossFunction` - Reference to the loss function for computing optimization cost
-    pub fn objective(&self) -> &LossFunction {
+    pub fn objective(&self) -> &L {
         &self.objective
     }
 
@@ -451,15 +450,15 @@ impl<S: ODEIntegrator + Copy> Problem<S> {
     }
 }
 
-pub struct ProblemBuilder<S: ODEIntegrator + Copy> {
+pub struct ProblemBuilder<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
     doc: EnzymeMLDocument,
-    objective: LossFunction,
+    objective: L,
     dt: f64,
     transformations: Vec<Transformation>,
     solver: S,
 }
 
-impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
+impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> ProblemBuilder<S, L> {
     /// Creates a new ProblemBuilder with default settings
     ///
     /// # Arguments
@@ -467,26 +466,16 @@ impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
     ///
     /// # Returns
     /// A new ProblemBuilder instance with default settings:
-    /// - MSE objective function
     /// - dt = 0.1
     /// - no transformations
-    pub fn new(enzmldoc: &EnzymeMLDocument, solver: S) -> Self {
+    pub fn new(enzmldoc: &EnzymeMLDocument, solver: S, objective: L) -> Self {
         Self {
             doc: enzmldoc.clone(),
-            objective: LossFunction::MSE,
+            objective,
             dt: 0.1,
             transformations: vec![],
             solver,
         }
-    }
-
-    /// Sets the objective function to use for optimization
-    ///
-    /// # Arguments
-    /// * `objective` - The loss function to use
-    pub fn objective(mut self, objective: LossFunction) -> Self {
-        self.objective = objective;
-        self
     }
 
     /// Sets the time step for numerical integration
@@ -520,7 +509,7 @@ impl<S: ODEIntegrator + Copy> ProblemBuilder<S> {
     ///
     /// # Returns
     /// Result containing either the constructed Problem or an OptimizeError
-    pub fn build(self) -> Result<Problem<S>, OptimizeError> {
+    pub fn build(self) -> Result<Problem<S, L>, OptimizeError> {
         let transformations = if self.transformations.is_empty() {
             None
         } else {

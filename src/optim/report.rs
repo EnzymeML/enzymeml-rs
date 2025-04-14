@@ -8,7 +8,7 @@ use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 use tabled::{builder::Builder, settings::Style};
 
-use crate::prelude::{EnzymeMLDocument, SimulationResult};
+use crate::prelude::{EnzymeMLDocument, ObjectiveFunction, SimulationResult};
 
 use super::{
     error::OptimizeError,
@@ -73,8 +73,8 @@ impl OptimizationReport {
     /// # Returns
     /// * `Result<OptimizationReport, OptimizeError>` - A report containing all optimization
     ///   results and analysis if successful, or an error if analysis fails
-    pub(crate) fn new<S: ODEIntegrator + Copy>(
-        problem: &Problem<S>,
+    pub(crate) fn new<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+        problem: &Problem<S, L>,
         doc: EnzymeMLDocument,
         param_vec: &[f64],
         initial_guesses: Option<InitialGuesses>,
@@ -107,8 +107,8 @@ impl OptimizationReport {
     ///
     /// # Returns
     /// * `Result<BTreeMap<String, f64>, OptimizeError>` - Map of parameter names to values
-    fn transform_parameters<S: ODEIntegrator + Copy>(
-        problem: &Problem<S>,
+    fn transform_parameters<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+        problem: &Problem<S, L>,
         param_vec: &[f64],
     ) -> Result<BTreeMap<String, f64>, OptimizeError> {
         let transformed_params = problem.apply_transformations(param_vec)?;
@@ -153,8 +153,8 @@ impl OptimizationReport {
     ///
     /// # Returns
     /// * `Result<HashMap<String, SimulationResult>, OptimizeError>` - Map of measurement IDs to simulation results
-    fn simulate_fits<S: ODEIntegrator + Copy>(
-        problem: &Problem<S>,
+    fn simulate_fits<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+        problem: &Problem<S, L>,
         doc: &EnzymeMLDocument,
         param_vec: &[f64],
     ) -> Result<HashMap<String, SimulationResult>, OptimizeError> {
@@ -183,8 +183,8 @@ impl OptimizationReport {
     ///
     /// # Returns
     /// * `Result<(f64, f64), OptimizeError>` - Tuple of (AIC, BIC) values
-    fn calculate_metrics<S: ODEIntegrator + Copy>(
-        problem: &Problem<S>,
+    fn calculate_metrics<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+        problem: &Problem<S, L>,
         param_vec: &[f64],
         doc: &EnzymeMLDocument,
     ) -> Result<(f64, f64, f64), OptimizeError> {

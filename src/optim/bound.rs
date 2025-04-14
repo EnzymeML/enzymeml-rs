@@ -1,7 +1,7 @@
 use ndarray::Array2;
 use peroxide::fuga::ODEIntegrator;
 
-use crate::prelude::{EnzymeMLDocument, Parameter};
+use crate::prelude::{EnzymeMLDocument, ObjectiveFunction, Parameter};
 
 use super::{OptimizeError, Problem};
 
@@ -106,8 +106,8 @@ impl Bound {
 ///
 /// * `Ok(Array2<f64>)` - 2D array where each row contains [lower_bound, upper_bound] for a parameter
 /// * `Err(OptimizeError)` - Error if bounds are invalid or missing parameters
-pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy>(
-    problem: &Problem<S>,
+pub(crate) fn bounds_to_array2<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+    problem: &Problem<S, L>,
     bounds: &[Bound],
 ) -> Result<Array2<f64>, OptimizeError> {
     let bound_params = bounds.iter().map(|b| b.param.clone()).collect::<Vec<_>>();

@@ -601,7 +601,7 @@ pub fn main() {
                 initial,
                 transform,
                 solver,
-                objective: loss_function,
+                objective,
                 dt,
                 max_iters,
                 output_dir,
@@ -615,9 +615,8 @@ pub fn main() {
                 };
 
                 // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
                     .dt(*dt)
-                    .objective(*loss_function)
                     .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");
@@ -657,7 +656,7 @@ pub fn main() {
                 initial,
                 transform,
                 solver,
-                objective: loss_function,
+                objective,
                 dt,
                 max_iters,
                 output_dir,
@@ -671,9 +670,8 @@ pub fn main() {
                 };
 
                 // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
                     .dt(*dt)
-                    .objective(*loss_function)
                     .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");
@@ -713,7 +711,7 @@ pub fn main() {
                 initial,
                 transform,
                 solver,
-                objective: loss_function,
+                objective,
                 dt,
                 max_iters,
                 output_dir,
@@ -728,9 +726,8 @@ pub fn main() {
                 };
 
                 // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
                     .dt(*dt)
-                    .objective(*loss_function)
                     .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");
@@ -781,9 +778,8 @@ pub fn main() {
                     transform.clone()
                 };
 
-                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
                     .dt(*dt)
-                    .objective(*objective)
                     .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");
@@ -837,9 +833,8 @@ pub fn main() {
                 };
 
                 // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver)
+                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
                     .dt(*dt)
-                    .objective(*objective)
                     .transformations(transformations)
                     .build()
                     .expect("Failed to build problem");

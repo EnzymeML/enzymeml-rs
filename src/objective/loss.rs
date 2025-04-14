@@ -72,28 +72,16 @@ impl ObjectiveFunction for LossFunction {
             LossFunction::MAE => MeanAbsoluteError.cost(residuals, n_points),
         }
     }
+}
 
-    /// Delegates gradient calculation to the specific loss function implementation
-    ///
-    /// # Arguments
-    /// * `residuals` - 2D array of differences between predicted and actual values
-    /// * `sensitivities` - 3D array containing sensitivity information for gradient calculation
-    /// * `n_points` - Total number of data points for normalization
-    ///
-    /// # Returns
-    /// Calculated gradient for the selected loss function
-    fn gradient(
-        &self,
-        residuals: Array2<f64>,
-        sensitivities: &Array3<f64>,
-        n_points: usize,
-    ) -> Result<Array1<f64>, ObjectiveError> {
+impl Display for LossFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LossFunction::SSE => SumOfSquaredErrors.gradient(residuals, sensitivities, n_points),
-            LossFunction::MSE => MeanSquaredError.gradient(residuals, sensitivities, n_points),
-            LossFunction::RMSE => RootMeanSquaredError.gradient(residuals, sensitivities, n_points),
-            LossFunction::LogCosh => LogCosh.gradient(residuals, sensitivities, n_points),
-            LossFunction::MAE => MeanAbsoluteError.gradient(residuals, sensitivities, n_points),
+            LossFunction::SSE => write!(f, "Sum of Squared Errors"),
+            LossFunction::MSE => write!(f, "Mean Squared Error"),
+            LossFunction::RMSE => write!(f, "Root Mean Squared Error"),
+            LossFunction::LogCosh => write!(f, "Log-Cosh Loss"),
+            LossFunction::MAE => write!(f, "Mean Absolute Error"),
         }
     }
 }
@@ -113,6 +101,7 @@ impl FromStr for LossFunction {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct SumOfSquaredErrors;
 
 impl ObjectiveFunction for SumOfSquaredErrors {
@@ -120,26 +109,11 @@ impl ObjectiveFunction for SumOfSquaredErrors {
         let squared_residuals = residuals.mapv(|r| r * r);
         Ok(squared_residuals.sum())
     }
+}
 
-    fn gradient(
-        &self,
-        residuals: Array2<f64>,
-        sensitivities: &Array3<f64>,
-        _: usize,
-    ) -> Result<Array1<f64>, ObjectiveError> {
-        let (n_timepoints, n_species, n_params) = sensitivities.dim();
-
-        // Expand residuals to match sensitivities dimensions
-        let expanded = residuals.insert_axis(Axis(2));
-        let residuals_expanded = expanded
-            .broadcast((n_timepoints, n_species, n_params))
-            .ok_or(ObjectiveError::ShapeError)?;
-
-        // Multiply residuals with sensitivities and sum
-        let product = &residuals_expanded * sensitivities;
-        let sum = product.sum_axis(Axis(1)).sum_axis(Axis(0));
-
-        Ok(2.0 * sum)
+impl Display for SumOfSquaredErrors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Sum of Squared Errors")
     }
 }
 
@@ -153,6 +127,8 @@ impl ObjectiveFunction for SumOfSquaredErrors {
 /// - Differentiable and convex
 /// - Heavily penalizes large prediction errors
 /// - Commonly used in regression problems
+
+#[derive(Debug, Clone, Copy)]
 pub struct MeanSquaredError;
 
 impl ObjectiveFunction for MeanSquaredError {
@@ -178,42 +154,11 @@ impl ObjectiveFunction for MeanSquaredError {
         let cost = sum_squared_residuals / n_points as f64;
         Ok(cost)
     }
+}
 
-    /// Calculates the gradient of Mean Squared Error
-    ///
-    /// # Algorithm
-    /// 1. Expand residuals to match sensitivities dimensions
-    /// 2. Multiply expanded residuals with sensitivities
-    /// 3. Sum across species and timepoints
-    /// 4. Scale by 2 and normalize by number of points
-    ///
-    /// # Arguments
-    /// * `residuals` - 2D array of prediction errors
-    /// * `sensitivities` - 3D array of parameter sensitivities
-    /// * `n_points` - Total number of data points for normalization
-    ///
-    /// # Returns
-    /// Gradient of MSE with respect to parameters
-    fn gradient(
-        &self,
-        residuals: Array2<f64>,
-        sensitivities: &Array3<f64>,
-        n_points: usize,
-    ) -> Result<Array1<f64>, ObjectiveError> {
-        let (n_timepoints, n_species, n_params) = sensitivities.dim();
-
-        // Expand residuals to match sensitivities dimensions
-        let expanded = residuals.insert_axis(Axis(2));
-        let residuals_expanded = expanded
-            .broadcast((n_timepoints, n_species, n_params))
-            .ok_or(ObjectiveError::ShapeError)?;
-
-        // Multiply residuals with sensitivities and sum
-        let product = &residuals_expanded * sensitivities;
-        let sum = product.sum_axis(Axis(1)).sum_axis(Axis(0));
-
-        // Scale by 2 and normalize by number of points
-        Ok((2.0 * sum) / n_points as f64)
+impl Display for MeanSquaredError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Mean Squared Error")
     }
 }
 
@@ -227,6 +172,7 @@ impl ObjectiveFunction for MeanSquaredError {
 /// - More interpretable than MSE
 /// - Still sensitive to outliers
 /// - Commonly used in regression evaluation
+#[derive(Debug, Clone, Copy)]
 pub struct RootMeanSquaredError;
 
 impl ObjectiveFunction for RootMeanSquaredError {
@@ -247,31 +193,11 @@ impl ObjectiveFunction for RootMeanSquaredError {
         let cost = mse.cost(residuals, n_points)?;
         Ok(cost.sqrt())
     }
+}
 
-    /// Calculates the gradient of Root Mean Squared Error
-    ///
-    /// # Algorithm
-    /// 1. Calculate MSE cost
-    /// 2. Calculate MSE gradient
-    /// 3. Divide gradient by MSE cost
-    ///
-    /// # Arguments
-    /// * `residuals` - 2D array of prediction errors
-    /// * `sensitivities` - 3D array of parameter sensitivities
-    /// * `n_points` - Total number of data points for normalization
-    ///
-    /// # Returns
-    /// Gradient of RMSE with respect to parameters
-    fn gradient(
-        &self,
-        residuals: Array2<f64>,
-        sensitivities: &Array3<f64>,
-        n_points: usize,
-    ) -> Result<Array1<f64>, ObjectiveError> {
-        let mse = MeanSquaredError;
-        let cost = mse.cost(&residuals, n_points)?;
-        let gradient = mse.gradient(residuals, sensitivities, n_points)?;
-        Ok(gradient / cost)
+impl Display for RootMeanSquaredError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Root Mean Squared Error")
     }
 }
 
@@ -285,6 +211,7 @@ impl ObjectiveFunction for RootMeanSquaredError {
 /// - Less sensitive to outliers compared to MSE
 /// - Computationally stable
 /// - Provides a balance between quadratic and absolute error
+#[derive(Debug, Clone, Copy)]
 pub struct LogCosh;
 
 impl ObjectiveFunction for LogCosh {
@@ -305,44 +232,11 @@ impl ObjectiveFunction for LogCosh {
         let log_cosh = residuals.mapv(|r| r.cosh().ln());
         Ok(log_cosh.sum() / n_points as f64)
     }
+}
 
-    /// Calculates the gradient of Log-Cosh loss
-    ///
-    /// # Algorithm
-    /// 1. Calculate hyperbolic tangent of residuals
-    /// 2. Expand tanh values to match sensitivities
-    /// 3. Multiply expanded tanh with sensitivities
-    /// 4. Sum and normalize by number of points
-    ///
-    /// # Arguments
-    /// * `residuals` - 2D array of prediction errors
-    /// * `sensitivities` - 3D array of parameter sensitivities
-    /// * `n_points` - Total number of data points for normalization
-    ///
-    /// # Returns
-    /// Gradient of log-cosh loss with respect to parameters
-    fn gradient(
-        &self,
-        residuals: Array2<f64>,
-        sensitivities: &Array3<f64>,
-        n_points: usize,
-    ) -> Result<Array1<f64>, ObjectiveError> {
-        // Extract the dimensions of the sensitivities array
-        let (n_timepoints, n_species, n_params) = sensitivities.dim();
-
-        // Get the hyperbolic tangent of the residuals
-        let tanh = residuals.mapv(|r| r.tanh());
-
-        // Expand the tanh array to match the dimensions of the sensitivities
-        let expanded = tanh.insert_axis(Axis(2));
-        let tanh_expanded = expanded
-            .broadcast((n_timepoints, n_species, n_params))
-            .ok_or(ObjectiveError::ShapeError)?;
-
-        // Multiply the expanded tanh array with the sensitivities
-        let product = &tanh_expanded * sensitivities;
-        let sum = product.sum_axis(Axis(1)).sum_axis(Axis(0));
-        Ok(sum / n_points as f64)
+impl Display for LogCosh {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Log-Cosh Loss")
     }
 }
 
@@ -356,6 +250,7 @@ impl ObjectiveFunction for LogCosh {
 /// - More robust to outliers
 /// - Less aggressive penalty for large errors
 /// - Suitable for scenarios with significant outliers
+#[derive(Debug, Clone, Copy)]
 pub struct MeanAbsoluteError;
 
 impl ObjectiveFunction for MeanAbsoluteError {
@@ -377,55 +272,11 @@ impl ObjectiveFunction for MeanAbsoluteError {
         let sum = abs_residuals.sum();
         Ok(sum / n_points as f64)
     }
-
-    /// Calculates the gradient of Mean Absolute Error
-    ///
-    /// # Algorithm
-    /// 1. Calculate sign of each residual
-    /// 2. Expand sign array to match sensitivities
-    /// 3. Multiply expanded signs with sensitivities
-    /// 4. Sum and normalize by number of points
-    ///
-    /// # Arguments
-    /// * `residuals` - 2D array of prediction errors
-    /// * `sensitivities` - 3D array of parameter sensitivities
-    /// * `n_points` - Total number of data points for normalization
-    ///
-    /// # Returns
-    /// Gradient of MAE with respect to parameters
-    fn gradient(
-        &self,
-        residuals: Array2<f64>,
-        sensitivities: &Array3<f64>,
-        n_points: usize,
-    ) -> Result<Array1<f64>, ObjectiveError> {
-        let (n_timepoints, n_species, n_params) = sensitivities.dim();
-
-        // Calculate sign of each residual
-        let sign_residuals = residuals.mapv(|r| r.signum());
-
-        // Expand sign array to match sensitivities dimensions
-        let expanded = sign_residuals.insert_axis(Axis(2));
-        let sign_residuals_expanded = expanded
-            .broadcast((n_timepoints, n_species, n_params))
-            .ok_or(ObjectiveError::ShapeError)?;
-
-        // Multiply signs with sensitivities and sum
-        let product = &sign_residuals_expanded * sensitivities;
-        let sum = product.sum_axis(Axis(1)).sum_axis(Axis(0));
-        Ok(sum / n_points as f64)
-    }
 }
 
-impl Display for LossFunction {
+impl Display for MeanAbsoluteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LossFunction::SSE => write!(f, "Sum of Squared Errors"),
-            LossFunction::MSE => write!(f, "Mean Squared Error"),
-            LossFunction::RMSE => write!(f, "Root Mean Squared Error"),
-            LossFunction::LogCosh => write!(f, "Log-Cosh Loss"),
-            LossFunction::MAE => write!(f, "Mean Absolute Error"),
-        }
+        write!(f, "Mean Absolute Error")
     }
 }
 
@@ -453,35 +304,6 @@ mod tests {
     }
 
     #[test]
-    fn test_mean_squared_error_gradient() {
-        // Create test data
-        let residuals = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let n_points = 4;
-        let mse = MeanSquaredError;
-
-        let sensitivities =
-            Array3::from_shape_vec((2, 2, 2), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
-                .unwrap();
-
-        let gradient = mse
-            .gradient(residuals.clone(), &sensitivities, n_points)
-            .unwrap();
-
-        // Gradient calculation breakdown:
-        // For param 1:
-        //   2 * (1.0 * 0.1 + 2.0 * 0.3 + 3.0 * 0.5 + 4.0 * 0.7) / 4
-        // For param 2:
-        //   2 * (1.0 * 0.2 + 2.0 * 0.4 + 3.0 * 0.6 + 4.0 * 0.8) / 4
-        let expected = Array1::from_vec(vec![
-            2.0 * (1.0 * 0.1 + 2.0 * 0.3 + 3.0 * 0.5 + 4.0 * 0.7) / 4.0,
-            2.0 * (1.0 * 0.2 + 2.0 * 0.4 + 3.0 * 0.6 + 4.0 * 0.8) / 4.0,
-        ]);
-
-        assert_relative_eq!(gradient[0], expected[0], epsilon = 1e-10);
-        assert_relative_eq!(gradient[1], expected[1], epsilon = 1e-10);
-    }
-
-    #[test]
     fn test_log_cosh_cost() {
         // Create test data
         let residuals = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
@@ -503,40 +325,6 @@ mod tests {
     }
 
     #[test]
-    fn test_log_cosh_gradient() {
-        let residuals = Array2::from_shape_vec((2, 2), vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-        let n_points = 4;
-        let sensitivities =
-            Array3::from_shape_vec((2, 2, 2), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
-                .unwrap();
-
-        let log_cosh = LogCosh;
-        let gradient = log_cosh
-            .gradient(residuals.clone(), &sensitivities, n_points)
-            .unwrap();
-
-        // Gradient calculation breakdown:
-        // 1. Calculate tanh for each residual
-        // 2. Multiply tanh values with corresponding sensitivities
-        // 3. Sum the products for each parameter
-        // 4. Divide by number of points
-        let expected = {
-            let tanh_vals = residuals.mapv(|r| r.tanh());
-            let mut grad = [0.0; 2];
-            for i in 0..2 {
-                for j in 0..2 {
-                    grad[0] += tanh_vals[[i, j]] * sensitivities[[i, j, 0]];
-                    grad[1] += tanh_vals[[i, j]] * sensitivities[[i, j, 1]];
-                }
-            }
-            Array1::from_vec(grad.iter().map(|&x| x / n_points as f64).collect())
-        };
-
-        assert_relative_eq!(gradient[0], expected[0], epsilon = 1e-10);
-        assert_relative_eq!(gradient[1], expected[1], epsilon = 1e-10);
-    }
-
-    #[test]
     fn test_mean_absolute_error_cost() {
         let residuals = Array2::from_shape_vec((2, 2), vec![1.0, -2.0, 3.0, -4.0]).unwrap();
         let n_points = 4;
@@ -550,32 +338,5 @@ mod tests {
         // 2. Sum the absolute values: 1 + 2 + 3 + 4 = 10
         // 3. Divide by number of points: 10 / 4 = 2.5
         assert_relative_eq!(cost, 2.5, epsilon = 1e-10);
-    }
-
-    #[test]
-    fn test_mean_absolute_error_gradient() {
-        let residuals = Array2::from_shape_vec((2, 2), vec![1.0, -2.0, 3.0, -4.0]).unwrap();
-        let n_points = 4;
-        let sensitivities =
-            Array3::from_shape_vec((2, 2, 2), vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
-                .unwrap();
-
-        let mae = MeanAbsoluteError;
-        let gradient = mae
-            .gradient(residuals.clone(), &sensitivities, n_points)
-            .unwrap();
-
-        // Gradient calculation breakdown:
-        // For param 1:
-        //   (sign(1.0) * 0.1 + sign(-2.0) * 0.3 + sign(3.0) * 0.5 + sign(-4.0) * 0.7) / 4
-        // For param 2:
-        //   (sign(1.0) * 0.2 + sign(-2.0) * 0.4 + sign(3.0) * 0.6 + sign(-4.0) * 0.8) / 4
-        let expected = Array1::from_vec(vec![
-            (0.1 - 0.3 + 0.5 - 0.7) / 4.0,
-            (0.2 - 0.4 + 0.6 - 0.8) / 4.0,
-        ]);
-
-        assert_relative_eq!(gradient[0], expected[0], epsilon = 1e-10);
-        assert_relative_eq!(gradient[1], expected[1], epsilon = 1e-10);
     }
 }

@@ -30,7 +30,7 @@ mod test_optim {
     fn test_bfgs() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5)
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -64,7 +64,7 @@ mod test_optim {
     fn test_lbfgs() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5)
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -98,7 +98,7 @@ mod test_optim {
     fn test_sr1trustregion_cauchy() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5)
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -131,7 +131,7 @@ mod test_optim {
     fn test_sr1trustregion_steihaug() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5)
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
             .dt(10.0)
             .transform(Transformation::Log("k_cat".into()))
             .transform(Transformation::Log("k_ie".into()))
@@ -164,7 +164,7 @@ mod test_optim {
     fn test_pso() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5)
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
             .dt(10.0)
             .build()
             .expect("Failed to build problem");
@@ -196,7 +196,10 @@ mod test_optim {
     fn test_ego() {
         // ARRANGE
         let doc = get_doc();
-        let problem = ProblemBuilder::new(&doc, RK5).dt(10.0).build().unwrap();
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
+            .dt(10.0)
+            .build()
+            .unwrap();
 
         // ACT
         let res = EGOBuilder::default()

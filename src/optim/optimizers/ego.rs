@@ -17,9 +17,12 @@ use egobox_ego::EgorBuilder;
 use ndarray::{Array2, ArrayView2};
 use peroxide::fuga::ODEIntegrator;
 
-use crate::optim::{
-    bounds_to_array2, report::OptimizationReport, Bound, InitialGuesses, OptimizeError, Optimizer,
-    Problem,
+use crate::{
+    optim::{
+        bounds_to_array2, report::OptimizationReport, Bound, InitialGuesses, OptimizeError,
+        Optimizer, Problem,
+    },
+    prelude::ObjectiveFunction,
 };
 
 use super::utils::transform_bounds;
@@ -49,7 +52,9 @@ impl EfficientGlobalOptimization {
     }
 }
 
-impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
+impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L>
+    for EfficientGlobalOptimization
+{
     /// Optimizes the given problem using the EGO algorithm.
     ///
     /// # Arguments
@@ -63,7 +68,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for EfficientGlobalOptimization {
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
     fn optimize<T>(
         &self,
-        problem: &Problem<S>,
+        problem: &Problem<S, L>,
         _: Option<T>,
     ) -> Result<OptimizationReport, OptimizeError>
     where

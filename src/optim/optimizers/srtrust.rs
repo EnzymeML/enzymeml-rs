@@ -15,6 +15,7 @@
 
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
+use crate::prelude::ObjectiveFunction;
 use argmin::core::observers::ObserverMode;
 use argmin::core::Executor;
 use argmin::core::State;
@@ -76,7 +77,7 @@ impl SR1TrustRegion {
     }
 }
 
-impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
+impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for SR1TrustRegion {
     /// Optimizes the given problem using the SR1 Trust Region algorithm.
     ///
     /// # Arguments
@@ -90,7 +91,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
     fn optimize<T>(
         &self,
-        problem: &Problem<S>,
+        problem: &Problem<S, L>,
         initial_guess: Option<T>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
@@ -150,8 +151,8 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for SR1TrustRegion {
 ///
 /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
 /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-fn solve_steihaug<S: ODEIntegrator + Copy>(
-    problem: &Problem<S>,
+fn solve_steihaug<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+    problem: &Problem<S, L>,
     initial_guess: InitialGuesses,
     max_iters: u64,
     init_hessian: Array2<f64>,
@@ -199,8 +200,8 @@ fn solve_steihaug<S: ODEIntegrator + Copy>(
 ///
 /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
 /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-fn solve_cauchy_point<S: ODEIntegrator + Copy>(
-    problem: &Problem<S>,
+fn solve_cauchy_point<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+    problem: &Problem<S, L>,
     initial_guess: InitialGuesses,
     max_iters: u64,
     init_hessian: Array2<f64>,

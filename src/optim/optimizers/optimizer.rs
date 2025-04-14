@@ -10,12 +10,13 @@ use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::report::OptimizationReport;
+use crate::prelude::ObjectiveFunction;
 use crate::{optim::problem::Problem, prelude::EnzymeMLDocument};
 
 use crate::optim::error::OptimizeError;
 
 /// Trait defining the interface for optimization algorithms.
-pub trait Optimizer<S: ODEIntegrator + Copy> {
+pub trait Optimizer<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
     /// Optimizes the given problem to find optimal parameters.
     ///
     /// # Arguments
@@ -26,7 +27,7 @@ pub trait Optimizer<S: ODEIntegrator + Copy> {
     /// * `Result<Array1<f64>, OptimizeError>` - The optimal parameters or an error
     fn optimize<T>(
         &self,
-        problem: &Problem<S>,
+        problem: &Problem<S, L>,
         initial_guess: Option<T>,
     ) -> Result<OptimizationReport, OptimizeError>
     where

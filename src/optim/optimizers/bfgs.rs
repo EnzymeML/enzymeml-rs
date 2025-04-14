@@ -24,6 +24,7 @@ use serde::Serialize;
 
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
+use crate::prelude::ObjectiveFunction;
 
 use super::utils::transform_initial_guesses;
 
@@ -69,7 +70,7 @@ impl BFGS {
     }
 }
 
-impl<S: ODEIntegrator + Copy> Optimizer<S> for BFGS {
+impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for BFGS {
     /// Optimizes the given problem using the BFGS algorithm.
     ///
     /// # Arguments
@@ -83,7 +84,7 @@ impl<S: ODEIntegrator + Copy> Optimizer<S> for BFGS {
     /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
     fn optimize<T>(
         &self,
-        problem: &Problem<S>,
+        problem: &Problem<S, L>,
         initial_guess: Option<T>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
