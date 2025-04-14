@@ -49,7 +49,7 @@ pub fn create_equation(
         Err(_) => panic!("Could not parse equation."),
     };
 
-    let (params, variables) = extract_params_and_vars(&variables, &equation);
+    let (params, variables) = extract_params_and_vars(variables, &equation);
     let mut eq_builder = EquationBuilder::default();
 
     eq_builder
@@ -65,7 +65,7 @@ pub fn create_equation(
         }
         EnzymeMLDocState::Document(doc) => {
             params.iter().for_each(|p| {
-                if !doc.parameters.iter().any(|p| p.symbol == p.symbol) {
+                if !doc.parameters.iter().any(|param| param.symbol == p.symbol) {
                     doc.parameters.push(p.clone());
                 }
             });
@@ -93,8 +93,8 @@ pub(crate) fn extract_params_and_vars(
     let symbols = extract_symbols(equation);
 
     // Sort variables and parameters
-    let params = filter_params(&variables, &symbols);
-    let variables = filter_variables(&variables, &symbols);
+    let params = filter_params(variables, &symbols);
+    let variables = filter_variables(variables, &symbols);
     (params, variables)
 }
 
