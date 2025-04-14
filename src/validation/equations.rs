@@ -1,5 +1,5 @@
-use crate::ode::SystemType;
 use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
+use crate::system::SystemType;
 use crate::validation::consistency::{get_species_ids, Report, Severity, ValidationResult};
 
 /// Validates equations in an EnzymeML document by checking that all referenced variables exist
