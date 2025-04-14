@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use ndarray::{Array1, Array2, Array3};
+use ndarray::Array2;
 
 use super::error::ObjectiveError;
 

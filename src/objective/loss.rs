@@ -30,7 +30,7 @@ use clap::ValueEnum;
 /// ## Design
 /// The module uses an enum-based approach with trait implementations,
 /// allowing easy extension and runtime selection of loss functions.
-use ndarray::{Array1, Array2, Array3, Axis};
+use ndarray::Array2;
 
 use super::{error::ObjectiveError, objfun::ObjectiveFunction};
 
