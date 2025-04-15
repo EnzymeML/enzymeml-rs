@@ -108,6 +108,13 @@ struct Cli {
 /// Available CLI commands
 #[derive(Subcommand)]
 enum Commands {
+    /// Print information about an EnzymeML document
+    Info {
+        /// Path to the file containing the EnzymeML document
+        #[arg(help = "Path to the file containing the EnzymeML document")]
+        path: PathBuf,
+    },
+
     /// Visualize an EnzymeML document
     Visualize {
         /// Path to the file containing the EnzymeML document
@@ -451,6 +458,11 @@ pub fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
+        Commands::Info { path } => {
+            let enzmldoc = complete_check(path).expect("Failed to validate EnzymeML document");
+            println!("{}", enzmldoc);
+        }
+
         // TODO: This is very ugly, we should extract the WASM feature into a separate crate
         #[cfg(feature = "wasm")]
         Commands::Visualize { .. } => {
