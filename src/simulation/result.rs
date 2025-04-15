@@ -1,12 +1,42 @@
+//! Simulation Result Module
+//!
+//! This module provides data structures and types for representing and visualizing
+//! the results of ODE simulations.
+//!
+//! # Key Components
+//!
+//! - [`SimulationResult`]: Stores time series data for species, assignments, and parameter sensitivities
+//! - [`TimeSeriesMapping`]: A HashMap type for storing time-dependent values
+//! - [`ParameterSensitivities`]: A nested HashMap for storing parameter sensitivity data
+//! - [`PlotConfig`]: Configuration options for plotting simulation results
+//! - [`PlotTraces`]: A type alias for creating plotly scatter plots
+//!
+//! # Usage
+//!
+//! The module allows storing and manipulating simulation output, including:
+//! - Species concentrations over time
+//! - Optional assignment rule values
+//! - Optional parameter sensitivity calculations
+//!
+//! It also provides utilities for configuring plot visualizations of simulation results.
+
 use std::collections::HashMap;
 
-use ndarray::Array2;
+use itertools::Itertools;
 use plotly::layout::Axis;
 use plotly::Plot;
 use plotly::{common::Mode, Scatter};
 use serde::{Deserialize, Serialize};
 
+/// Plot traces are stored in a vector of Box<Scatter<f64, f64>>.
 pub type PlotTraces = Vec<Box<Scatter<f64, f64>>>;
+
+/// Parameter sensitivities are stored in a nested HashMap where the outer key is the parameter name,
+/// and the inner key is the species name. The value is a vector of sensitivity values.
+pub type ParameterSensitivities = HashMap<String, HashMap<String, Vec<f64>>>;
+
+/// Represents the result of a simulation.
+pub type TimeSeriesMapping = HashMap<String, Vec<f64>>;
 
 /// Represents the result of a simulation.
 ///
@@ -20,8 +50,9 @@ pub type PlotTraces = Vec<Box<Scatter<f64, f64>>>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationResult {
     pub time: Vec<f64>,
-    pub species: HashMap<String, Vec<f64>>,
-    pub assignments: HashMap<String, Vec<f64>>,
+    pub species: TimeSeriesMapping,
+    pub assignments: Option<TimeSeriesMapping>,
+    pub parameter_sensitivities: Option<ParameterSensitivities>,
 }
 
 /// Configuration options for plotting simulation results.
@@ -77,7 +108,8 @@ impl SimulationResult {
         Self {
             time,
             species: HashMap::new(),
-            assignments: HashMap::new(),
+            assignments: None,
+            parameter_sensitivities: None,
         }
     }
 
@@ -98,7 +130,41 @@ impl SimulationResult {
     /// * `assignment` - The name of the assignment
     /// * `values` - Vector of calculated values for the assignment over time
     pub fn add_assignment(&mut self, assignment: String, values: Vec<f64>) {
-        self.assignments.insert(assignment, values);
+        if self.assignments.is_none() {
+            self.assignments = Some(HashMap::new());
+        }
+        self.assignments
+            .as_mut()
+            .unwrap()
+            .insert(assignment, values);
+    }
+
+    /// Adds parameter sensitivity data to the SimulationResult.
+    ///
+    /// This method stores sensitivity values showing how changes in a parameter affect a species' concentration over time.
+    /// The data is organized in a nested HashMap structure where the outer key is the parameter name and the inner key
+    /// is the species name.
+    ///
+    /// # Arguments
+    ///
+    /// * `parameter` - The name of the parameter
+    /// * `species` - The name of the species affected by the parameter
+    /// * `values` - Vector of sensitivity values over time
+    pub fn add_parameter_sensitivity(
+        &mut self,
+        parameter: String,
+        species: String,
+        values: Vec<f64>,
+    ) {
+        if self.parameter_sensitivities.is_none() {
+            self.parameter_sensitivities = Some(HashMap::new());
+        }
+        self.parameter_sensitivities
+            .as_mut()
+            .unwrap()
+            .entry(parameter)
+            .or_default()
+            .insert(species, values);
     }
 
     /// Creates a plot of the simulation results.
@@ -174,6 +240,29 @@ impl From<&SimulationResult> for Plot {
     }
 }
 
+/// Implements conversion from SimulationResult to Plot.
+impl From<SimulationResult> for Plot {
+    /// Converts a SimulationResult into a Plot visualization.
+    ///
+    /// # Arguments
+    ///
+    /// * `result` - The SimulationResult to convert
+    ///
+    /// # Returns
+    ///
+    /// A Plot object containing line traces for each species and assignment.
+    fn from(result: SimulationResult) -> Self {
+        let mut plot = Plot::new();
+        let traces: Vec<Box<Scatter<f64, f64>>> = (&result).into();
+
+        for trace in traces {
+            plot.add_trace(trace);
+        }
+
+        plot
+    }
+}
+
 /// Implements conversion from SimulationResult to a vector of Scatter plot traces.
 ///
 /// Creates line plots for both species concentrations and assignment values over time.
@@ -189,7 +278,7 @@ impl From<&SimulationResult> for Vec<Box<Scatter<f64, f64>>> {
         let mut traces = Vec::new();
 
         // Plot species
-        for (species, values) in result.species.iter() {
+        for (species, values) in result.species.iter().sorted_by_key(|k| k.0) {
             let trace = plotly::Scatter::new(result.time.clone(), values.clone())
                 .name(format!("{} Fit", species))
                 .mode(Mode::LinesText);
@@ -198,43 +287,15 @@ impl From<&SimulationResult> for Vec<Box<Scatter<f64, f64>>> {
         }
 
         // Plot assignments
-        for (assignment, values) in result.assignments.iter() {
-            let trace = plotly::Scatter::new(result.time.clone(), values.clone())
-                .name(format!("{} Fit", assignment))
-                .mode(Mode::LinesText);
-            traces.push(trace);
-        }
-
-        traces
-    }
-}
-
-/// Implements conversion from SimulationResult to a 2D array.
-impl From<SimulationResult> for ndarray::Array2<f64> {
-    /// Converts a SimulationResult into a 2D array.
-    ///
-    /// The resulting array has dimensions [time_points × num_species].
-    /// Each row represents a time point and each column represents a species.
-    /// Species are sorted alphabetically by name.
-    ///
-    /// # Arguments
-    ///
-    /// * `result` - The SimulationResult to convert
-    ///
-    /// # Returns
-    ///
-    /// A 2D array containing the species concentration data. Shape is [time_points × num_species].
-    fn from(result: SimulationResult) -> Self {
-        let mut array = Array2::zeros((result.time.len(), result.species.len()));
-        let mut species_names = result.species.keys().collect::<Vec<&String>>();
-        species_names.sort();
-
-        for i in 0..result.time.len() {
-            for (j, species) in species_names.iter().enumerate() {
-                array[[i, j]] = result.species[*species][i];
+        if let Some(assignments) = &result.assignments {
+            for (assignment, values) in assignments.iter() {
+                let trace = plotly::Scatter::new(result.time.clone(), values.clone())
+                    .name(format!("{} Fit", assignment))
+                    .mode(Mode::LinesText);
+                traces.push(trace);
             }
         }
 
-        array
+        traces
     }
 }

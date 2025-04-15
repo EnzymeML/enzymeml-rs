@@ -1,3 +1,19 @@
+//! Deserialization Macro Module
+//!
+//! This module provides powerful macros for flexible deserialization of complex data structures.
+//!
+//! # Key Features
+//!
+//! - Unwrap lists during deserialization
+//! - Unwrap enum variants during deserialization
+//! - Flexible handling of optional and default fields
+//!
+//! # Macro Behavior
+//!
+//! - Handles default and optional fields
+//! - Provides type-safe deserialization
+//! - Supports complex nested structures
+
 #[macro_export]
 macro_rules! unwrap_list {
     ($struct_name:ident, $field_name:ident, $field_type:ty, $fn_name:ident) => {

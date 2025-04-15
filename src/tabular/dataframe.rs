@@ -1,9 +1,32 @@
+//! Tabular Data Conversion Module
+//!
+//! This module provides functionality for converting between `Measurement` and `DataFrame`
+//! representations, enabling seamless data manipulation and analysis.
+//!
+//! # Key Features
+//!
+//! - Convert `Measurement` objects to Polars DataFrames
+//! - Convert DataFrames back to `MeasurementBuilder`
+//! - Handle time series and species data transformations
+//!
+//! # Conversion Methods
+//!
+//! - `From<Measurement>` and `From<&Measurement>` trait implementations for DataFrame conversion
+//! - `to_dataframe()` method on `Measurement`
+//! - `from_dataframe()` static method on `Measurement` and `MeasurementBuilder`
+//!
+//! # Data Handling
+//!
+//! The module supports:
+//! - Extracting time series data
+//! - Managing initial conditions
+//! - Handling missing or placeholder data
+
 use std::error::Error;
 
 use polars::prelude::*;
 
-use crate::enzyme_ml::MeasurementData;
-use crate::prelude::{Measurement, MeasurementBuilder, MeasurementDataBuilder};
+use crate::prelude::{Measurement, MeasurementBuilder, MeasurementData, MeasurementDataBuilder};
 
 /// Implements the conversion from a Measurement to a DataFrame.
 impl From<Measurement> for DataFrame {
@@ -212,13 +235,9 @@ fn collect_data<'a>(
     times: &mut Vec<Vec<f64>>,
     data: &'a MeasurementData, // Lifetimes tied to 'a
 ) {
-    if data.data.is_some() && data.time.is_some() {
-        if !data.data.clone().unwrap().is_empty() {
-            times.push(data.time.clone().unwrap());
-            series.push(Series::new(&data.species_id, data.data.clone().unwrap()))
-        } else {
-            non_measured.push((&data.species_id, &data.initial))
-        }
+    if !data.data.is_empty() && !data.time.is_empty() {
+        times.push(data.time.clone());
+        series.push(Series::new(&data.species_id, data.data.clone()))
     } else {
         non_measured.push((&data.species_id, &data.initial))
     }

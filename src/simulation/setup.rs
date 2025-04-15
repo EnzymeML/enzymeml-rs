@@ -1,3 +1,15 @@
+//! Setup module for configuring ODE simulations.
+//!
+//! This module provides the [`SimulationSetup`] struct and its builder for configuring
+//! numerical integration parameters used in ODE simulations. It handles:
+//!
+//! - Time range specification (start and end times)
+//! - Integration step size
+//! - Error tolerance settings (relative and absolute)
+//!
+//! The configuration can be created programmatically or derived from measurement data
+//! in EnzymeML documents.
+
 use std::{collections::HashMap, error::Error};
 
 use derive_builder::Builder;
@@ -7,6 +19,35 @@ use std::collections::BTreeSet;
 
 use crate::prelude::{EnzymeMLDocument, Measurement};
 
+use super::error::SimulationError;
+
+/// Configuration for numerical integration of ODE systems
+///
+/// This struct contains all the parameters needed to control the numerical integration
+/// of an ODE system, including time range, step size, and error tolerances.
+///
+/// # Fields
+///
+/// * `t0` - Start time of the simulation (default: 0.0)
+/// * `t1` - End time of the simulation (default: 10.0)
+/// * `dt` - Time step size for output points (default: 1.0)
+/// * `rtol` - Relative tolerance for error control (default: 1e-4)
+/// * `atol` - Absolute tolerance for error control (default: 1e-8)
+///
+/// # Examples
+///
+/// ```
+/// use enzymeml::prelude::SimulationSetupBuilder;
+///
+/// let setup = SimulationSetupBuilder::default()
+///     .t0(0.0)
+///     .t1(100.0)
+///     .dt(0.1)
+///     .rtol(1e-6)
+///     .atol(1e-8)
+///     .build()
+///     .unwrap();
+/// ```
 #[derive(Debug, Clone, Builder, Serialize, Deserialize)]
 pub struct SimulationSetup {
     #[builder(default = "0.0")]
@@ -15,9 +56,9 @@ pub struct SimulationSetup {
     pub t1: f64,
     #[builder(default = "1.0")]
     pub dt: f64,
-    #[builder(default = "1e-3")]
+    #[builder(default = "1e-4")]
     pub rtol: f64,
-    #[builder(default = "1e-6")]
+    #[builder(default = "1e-8")]
     pub atol: f64,
 }
 
@@ -29,6 +70,26 @@ impl SimulationSetup {
     ///
     /// # Arguments
     /// * `other` - The SimulationSetup to merge settings from
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use enzymeml::prelude::SimulationSetupBuilder;
+    ///
+    /// let mut setup1 = SimulationSetupBuilder::default()
+    ///     .t0(0.0)
+    ///     .t1(10.0)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// let setup2 = SimulationSetupBuilder::default()
+    ///     .dt(0.1)
+    ///     .rtol(1e-6)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// setup1.merge(&setup2);
+    /// ```
     pub fn merge(&mut self, other: &SimulationSetup) {
         self.dt = other.dt;
         self.rtol = other.rtol;
@@ -75,6 +136,36 @@ impl TryFrom<EnzymeMLDocument> for HashMap<String, SimulationSetup> {
     }
 }
 
+/// Converts an EnzymeML document into a vector of simulation setups
+///
+/// This implementation creates simulation setups for each measurement in the model,
+/// using the earliest and latest time points from the measurement data to set the
+/// simulation time range.
+///
+/// # Arguments
+///
+/// * `enzmldoc` - The EnzymeML document containing measurements to create setups for
+///
+/// # Returns
+///
+/// Returns a Result containing either:
+/// * A Vec of SimulationSetups, one for each measurement in the document
+/// * An error if time data could not be extracted from any measurement
+impl TryFrom<&EnzymeMLDocument> for Vec<SimulationSetup> {
+    type Error = SimulationError;
+
+    fn try_from(enzmldoc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
+        enzmldoc
+            .measurements
+            .iter()
+            .map(|m| {
+                m.try_into()
+                    .map_err(|_| SimulationError::ConversionError(m.id.clone()))
+            })
+            .collect()
+    }
+}
+
 /// Converts a measurement into a simulation setup
 ///
 /// This implementation creates a simulation setup using the earliest and latest time points
@@ -106,6 +197,9 @@ impl TryFrom<&Measurement> for SimulationSetup {
 
 /// Gets the earliest time point across all species in a measurement
 ///
+/// Examines all time series data in the measurement and finds the globally earliest
+/// time point across all species.
+///
 /// # Arguments
 ///
 /// * `measurement` - The measurement containing time series data for multiple species
@@ -115,13 +209,19 @@ impl TryFrom<&Measurement> for SimulationSetup {
 /// Returns a Result containing either:
 /// * The earliest time point as an f64
 /// * An error if no time data is found in the measurement
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * No species in the measurement have time data
+/// * All time series in the measurement are empty
 fn get_t0(measurement: &Measurement) -> Result<f64, Box<dyn Error>> {
     let mut min_times: BTreeSet<OrderedFloat<f64>> = BTreeSet::new();
     for species in measurement.species_data.iter() {
-        if let Some(time) = &species.time {
+        if !species.time.is_empty() {
             let mut min_time = BTreeSet::new();
 
-            for t in time.iter() {
+            for t in species.time.iter() {
                 min_time.insert(OrderedFloat(*t));
             }
 
@@ -145,6 +245,9 @@ fn get_t0(measurement: &Measurement) -> Result<f64, Box<dyn Error>> {
 
 /// Gets the latest time point across all species in a measurement
 ///
+/// Examines all time series data in the measurement and finds the globally latest
+/// time point across all species.
+///
 /// # Arguments
 ///
 /// * `measurement` - The measurement containing time series data for multiple species
@@ -154,14 +257,20 @@ fn get_t0(measurement: &Measurement) -> Result<f64, Box<dyn Error>> {
 /// Returns a Result containing either:
 /// * The latest time point as an f64
 /// * An error if no time data is found in the measurement
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * No species in the measurement have time data
+/// * All time series in the measurement are empty
 fn get_t1(measurement: &Measurement) -> Result<f64, Box<dyn Error>> {
     let mut max_times: BTreeSet<OrderedFloat<f64>> = BTreeSet::new();
 
     for species in measurement.species_data.iter() {
-        if let Some(time) = &species.time {
+        if !species.time.is_empty() {
             let mut max_time = BTreeSet::new();
 
-            for t in time.iter() {
+            for t in species.time.iter() {
                 max_time.insert(OrderedFloat(*t));
             }
 
@@ -192,9 +301,11 @@ mod tests {
     #[test]
     fn test_get_t0() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData {
+            time: vec![0.0, 1.0, 2.0],
+            ..Default::default()
+        };
 
-        species.time = Some(vec![0.0, 1.0, 2.0]);
         measurement.species_data.push(species);
 
         let t0 = get_t0(&measurement).unwrap();
@@ -205,9 +316,8 @@ mod tests {
     #[should_panic]
     fn test_get_t0_none() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData::default();
 
-        species.time = None;
         measurement.species_data.push(species);
 
         get_t0(&measurement).expect("No time data found in measurement");
@@ -216,9 +326,11 @@ mod tests {
     #[test]
     fn test_get_t1() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData {
+            time: vec![0.0, 1.0, 2.0],
+            ..Default::default()
+        };
 
-        species.time = Some(vec![0.0, 1.0, 2.0]);
         measurement.species_data.push(species);
 
         let t1 = get_t1(&measurement).unwrap();
@@ -229,9 +341,8 @@ mod tests {
     #[should_panic]
     fn test_get_t1_none() {
         let mut measurement = Measurement::default();
-        let mut species = MeasurementData::default();
+        let species = MeasurementData::default();
 
-        species.time = None;
         measurement.species_data.push(species);
 
         get_t1(&measurement).expect("No time data found in measurement");

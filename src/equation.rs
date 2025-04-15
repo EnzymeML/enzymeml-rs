@@ -1,11 +1,9 @@
+use meval::Expr;
 use std::collections::HashSet;
 use std::error::Error;
 
-use meval::Expr;
-
-use crate::enzyme_ml;
-use crate::enzyme_ml::{Parameter, ParameterBuilder, Variable, VariableBuilder};
-use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder};
+use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder, EquationBuilder, EquationType};
+use crate::prelude::{Parameter, ParameterBuilder, Variable, VariableBuilder};
 
 /// Represents the state of an EnzymeML document, either as a builder or a document.
 pub enum EnzymeMLDocState<'a> {
@@ -41,10 +39,10 @@ impl<'a> From<&'a mut EnzymeMLDocument> for EnzymeMLDocState<'a> {
 /// Returns a `Result` containing the `EquationBuilder` or an error if the creation fails.
 pub fn create_equation(
     eq: &str,
-    variables: Vec<String>,
-    eq_type: enzyme_ml::EquationType,
+    variables: &[String],
+    eq_type: EquationType,
     enzmldoc: EnzymeMLDocState,
-) -> Result<enzyme_ml::EquationBuilder, Box<dyn Error>> {
+) -> Result<EquationBuilder, Box<dyn Error>> {
     // Parse equation
     let equation: Expr = match eq.parse() {
         Ok(e) => e,
@@ -52,7 +50,7 @@ pub fn create_equation(
     };
 
     let (params, variables) = extract_params_and_vars(variables, &equation);
-    let mut eq_builder = enzyme_ml::EquationBuilder::default();
+    let mut eq_builder = EquationBuilder::default();
 
     eq_builder
         .variables(variables)
@@ -67,7 +65,9 @@ pub fn create_equation(
         }
         EnzymeMLDocState::Document(doc) => {
             params.iter().for_each(|p| {
-                doc.parameters.push(p.clone());
+                if !doc.parameters.iter().any(|param| param.symbol == p.symbol) {
+                    doc.parameters.push(p.clone());
+                }
             });
         }
     }
@@ -85,17 +85,16 @@ pub fn create_equation(
 /// # Returns
 ///
 /// Returns a tuple containing a vector of `Parameter` and a vector of `Variable`.
-fn extract_params_and_vars(
-    variables: Vec<String>,
+pub(crate) fn extract_params_and_vars(
+    variables: &[String],
     equation: &Expr,
 ) -> (Vec<Parameter>, Vec<Variable>) {
     // Extract variables from equation and ids from the enzml doc
     let symbols = extract_symbols(equation);
-    check_variable_consistency(&variables, &symbols);
 
     // Sort variables and parameters
-    let params = filter_params(&variables, &symbols);
-    let variables = filter_variables(&variables, &symbols);
+    let params = filter_params(variables, &symbols);
+    let variables = filter_variables(variables, &symbols);
     (params, variables)
 }
 
@@ -110,14 +109,14 @@ fn extract_params_and_vars(
 ///
 /// Returns a vector of `Variable`.
 fn filter_variables(variables: &[String], symbols: &[String]) -> Vec<Variable> {
-    variables
+    symbols
         .iter()
-        .filter(|v| symbols.contains(v))
+        .filter(|v| variables.contains(v))
         .map(|v| {
             VariableBuilder::default()
-                .id(v)
-                .name(v)
-                .symbol(v)
+                .id(v.clone())
+                .name(v.clone())
+                .symbol(v.clone())
                 .build()
                 .expect("Could not build EqVariable.")
         })
@@ -140,9 +139,9 @@ fn filter_params(variables: &[String], symbols: &[String]) -> Vec<Parameter> {
         .filter(|s| !variables.contains(s))
         .map(|s| {
             ParameterBuilder::default()
-                .id(s)
-                .name(s)
-                .symbol(s)
+                .id(s.clone())
+                .name(s.clone())
+                .symbol(s.clone())
                 .build()
                 .expect("Could not build EqParameter.")
         })
@@ -170,20 +169,69 @@ pub fn extract_symbols(eq: &Expr) -> Vec<String> {
     vars.into_iter().collect()
 }
 
-/// Checks the consistency of the given variables with the symbols extracted from the equation.
-///
-/// # Arguments
-///
-/// * `variables` - A reference to a vector of variable names.
-/// * `symbols` - A reference to a vector of symbols extracted from the equation.
-///
-/// # Panics
-///
-/// Panics if a variable is not found in the symbols.
-fn check_variable_consistency(variables: &Vec<String>, symbols: &[String]) {
-    for var in variables {
-        if !symbols.contains(var) {
-            panic!("Variable '{}' not found in equation.", var);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_symbols() {
+        let expr: Expr = "2*x + y*z + k".parse().unwrap();
+        let symbols = extract_symbols(&expr);
+        let mut expected = vec!["x", "y", "z", "k"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        expected.sort();
+        let mut symbols = symbols;
+        symbols.sort();
+        assert_eq!(symbols, expected);
+    }
+
+    #[test]
+    fn test_filter_variables() {
+        let variables = vec!["x".to_string(), "y".to_string()];
+        let symbols = vec!["x".to_string(), "y".to_string(), "k".to_string()];
+        let vars = filter_variables(&variables, &symbols);
+        assert_eq!(vars.len(), 2);
+        assert_eq!(vars[0].id, "x");
+        assert_eq!(vars[1].id, "y");
+    }
+
+    #[test]
+    fn test_filter_params() {
+        let variables = vec!["x".to_string(), "y".to_string()];
+        let symbols = vec!["x".to_string(), "y".to_string(), "k".to_string()];
+        let params = filter_params(&variables, &symbols);
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0].id, "k");
+    }
+
+    #[test]
+    fn test_create_equation() {
+        let mut doc_builder = EnzymeMLDocumentBuilder::default();
+        let eq = "2*x + y";
+        let variables = vec!["x".to_string(), "y".to_string()];
+        let eq_type = EquationType::RATE_LAW;
+
+        let result = create_equation(
+            eq,
+            &variables,
+            eq_type,
+            EnzymeMLDocState::from(&mut doc_builder),
+        );
+
+        assert!(result.is_ok());
+
+        if let Ok(mut eq_builder) = result {
+            let eq_builder = eq_builder
+                .species_id("test".to_string())
+                .build()
+                .expect("Could not build EqBuilder.");
+
+            assert_eq!(eq_builder.species_id, "test");
+            assert_eq!(eq_builder.equation, "2*x + y");
+            assert_eq!(eq_builder.equation_type, EquationType::RATE_LAW);
+            assert_eq!(eq_builder.variables.len(), 2);
         }
     }
 }

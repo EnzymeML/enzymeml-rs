@@ -65,7 +65,7 @@ let mut enzmldoc = EnzymeMLDocumentBuilder::default();
 use enzymeml::prelude::*;
 use std::path::Path;
 
-let path = Path::new("model.md");
+let path = Path::new("model.json");
 let enzmldoc: EnzymeMLDocument = serde_json::from_reader(std::fs::File::open(path)?)?;
 
 println!("{:#?}", enzmldoc);

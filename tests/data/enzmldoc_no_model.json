@@ -79,10 +79,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -107,10 +105,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -173,7 +169,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -198,10 +194,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -211,7 +205,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement0",
+      "id": "measurement1",
       "name": "measurement0 - B2",
       "species_data": [
         {
@@ -236,10 +230,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -264,10 +256,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -330,7 +320,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -355,10 +345,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -368,7 +356,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement0",
+      "id": "measurement2",
       "name": "measurement0 - C2",
       "species_data": [
         {
@@ -393,10 +381,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -421,10 +407,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -487,7 +471,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -512,10 +496,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -525,7 +507,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement1",
+      "id": "measurement3",
       "name": "measurement1 - A3",
       "species_data": [
         {
@@ -550,10 +532,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -578,10 +558,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -644,7 +622,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -669,10 +647,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -682,7 +658,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement1",
+      "id": "measurement4",
       "name": "measurement1 - B3",
       "species_data": [
         {
@@ -707,10 +683,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -735,10 +709,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -801,7 +773,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -826,10 +798,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -839,7 +809,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement1",
+      "id": "measurement5",
       "name": "measurement1 - C3",
       "species_data": [
         {
@@ -864,10 +834,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -892,10 +860,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -958,7 +924,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -983,10 +949,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -996,7 +960,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement2",
+      "id": "measurement6",
       "name": "measurement2 - A4",
       "species_data": [
         {
@@ -1021,10 +985,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1049,10 +1011,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1115,7 +1075,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1140,10 +1100,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -1153,7 +1111,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement2",
+      "id": "measurement7",
       "name": "measurement2 - B4",
       "species_data": [
         {
@@ -1178,10 +1136,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1206,10 +1162,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1272,7 +1226,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1297,10 +1251,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -1310,7 +1262,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement2",
+      "id": "measurement8",
       "name": "measurement2 - C4",
       "species_data": [
         {
@@ -1335,10 +1287,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1363,10 +1313,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1429,7 +1377,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1454,10 +1402,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -1467,7 +1413,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement3",
+      "id": "measurement9",
       "name": "measurement3 - A5",
       "species_data": [
         {
@@ -1492,10 +1438,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1520,10 +1464,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1586,7 +1528,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1611,10 +1553,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -1624,7 +1564,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement3",
+      "id": "measurement10",
       "name": "measurement3 - B5",
       "species_data": [
         {
@@ -1649,10 +1589,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1677,10 +1615,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1743,7 +1679,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1768,10 +1704,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -1781,7 +1715,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement3",
+      "id": "measurement11",
       "name": "measurement3 - C5",
       "species_data": [
         {
@@ -1806,10 +1740,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1834,10 +1766,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1900,7 +1830,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1925,10 +1855,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -1938,7 +1866,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement4",
+      "id": "measurement12",
       "name": "measurement4 - A6",
       "species_data": [
         {
@@ -1963,10 +1891,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -1991,10 +1917,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2057,7 +1981,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2082,10 +2006,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -2095,7 +2017,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement4",
+      "id": "measurement13",
       "name": "measurement4 - B6",
       "species_data": [
         {
@@ -2120,10 +2042,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2148,10 +2068,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2214,7 +2132,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2239,10 +2157,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -2252,7 +2168,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement4",
+      "id": "measurement14",
       "name": "measurement4 - C6",
       "species_data": [
         {
@@ -2277,10 +2193,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2305,10 +2219,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2371,7 +2283,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2396,10 +2308,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -2409,7 +2319,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement5",
+      "id": "measurement15",
       "name": "measurement5 - A7",
       "species_data": [
         {
@@ -2434,10 +2344,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2462,10 +2370,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2528,7 +2434,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2553,10 +2459,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -2566,7 +2470,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement5",
+      "id": "measurement16",
       "name": "measurement5 - B7",
       "species_data": [
         {
@@ -2591,10 +2495,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2619,10 +2521,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2685,7 +2585,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2710,10 +2610,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -2723,7 +2621,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement5",
+      "id": "measurement17",
       "name": "measurement5 - C7",
       "species_data": [
         {
@@ -2748,10 +2646,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2776,10 +2672,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2842,7 +2736,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2867,10 +2761,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -2880,7 +2772,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement6",
+      "id": "measurement18",
       "name": "measurement6 - A8",
       "species_data": [
         {
@@ -2905,10 +2797,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2933,10 +2823,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -2999,7 +2887,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3024,10 +2912,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -3037,7 +2923,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement6",
+      "id": "measurement19",
       "name": "measurement6 - B8",
       "species_data": [
         {
@@ -3062,10 +2948,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3090,10 +2974,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3156,7 +3038,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3181,10 +3063,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -3194,7 +3074,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement6",
+      "id": "measurement20",
       "name": "measurement6 - C8",
       "species_data": [
         {
@@ -3219,10 +3099,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3247,10 +3125,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3313,7 +3189,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3338,10 +3214,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -3351,7 +3225,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement7",
+      "id": "measurement21",
       "name": "measurement7 - A9",
       "species_data": [
         {
@@ -3376,10 +3250,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3404,10 +3276,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3470,7 +3340,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3495,10 +3365,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -3508,7 +3376,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement7",
+      "id": "measurement22",
       "name": "measurement7 - B9",
       "species_data": [
         {
@@ -3533,10 +3401,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3561,10 +3427,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3627,7 +3491,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3652,10 +3516,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -3665,7 +3527,7 @@
       "temperature_unit": null
     },
     {
-      "id": "measurement7",
+      "id": "measurement23",
       "name": "measurement7 - C9",
       "species_data": [
         {
@@ -3690,10 +3552,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3718,10 +3578,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3784,7 +3642,7 @@
               }
             ]
           },
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         },
         {
@@ -3809,10 +3667,8 @@
               }
             ]
           },
-          "data": null,
-          "time": null,
           "time_unit": null,
-          "data_type": "http://purl.obolibrary.org/obo/PATO_0000033",
+          "data_type": "concentration",
           "is_simulated": false
         }
       ],
@@ -3820,75 +3676,6 @@
       "ph": null,
       "temperature": null,
       "temperature_unit": null
-    }
-  ],
-  "equations": [
-    {
-      "species_id": "abts",
-      "equation": "-(k_cat * slac * abts) / (K_M + abts)",
-      "equation_type": "ode",
-      "variables": [
-        {
-          "id": "slac",
-          "name": "slac",
-          "symbol": "slac"
-        },
-        {
-          "id": "abts",
-          "name": "abts",
-          "symbol": "abts"
-        }
-      ]
-    },
-    {
-      "species_id": "slac",
-      "equation": "- k_ie * slac",
-      "equation_type": "ode",
-      "variables": [
-        {
-          "id": "slac",
-          "name": "slac",
-          "symbol": "slac"
-        }
-      ]
-    }
-  ],
-  "parameters": [
-    {
-      "id": "k_cat",
-      "name": "k_cat",
-      "symbol": "k_cat",
-      "value": 0.85,
-      "unit": null,
-      "initial_value": 10.0,
-      "upper": null,
-      "lower": null,
-      "stderr": null,
-      "constant": true
-    },
-    {
-      "id": "K_M",
-      "name": "K_M",
-      "symbol": "K_M",
-      "value": 80.0,
-      "unit": null,
-      "initial_value": 140.0,
-      "upper": null,
-      "lower": null,
-      "stderr": null,
-      "constant": true
-    },
-    {
-      "id": "k_ie",
-      "name": "k_ie",
-      "symbol": "k_ie",
-      "value": 0.01,
-      "unit": null,
-      "initial_value": 0.00000001,
-      "upper": null,
-      "lower": null,
-      "stderr": null,
-      "constant": true
     }
   ]
 }

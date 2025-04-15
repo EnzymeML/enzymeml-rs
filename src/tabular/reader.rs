@@ -1,3 +1,26 @@
+//! Tabular Data Reading Module
+//!
+//! This module provides functionality for reading tabular data from various file formats,
+//! particularly Excel files, and converting them into `Measurement` and `EnzymeMLDocument` structures.
+//!
+//! # Key Features
+//!
+//! - Read Excel files using the `calamine` library
+//! - Convert Excel sheets into Polars DataFrames
+//! - Add measurements to `EnzymeMLDocument` from Excel files
+//!
+//! # Usage
+//!
+//! The module supports:
+//! - Reading multiple sheets from an Excel file
+//! - Creating measurements from tabular data
+//! - Optionally overwriting existing measurements
+//!
+//! # Methods
+//!
+//! - `add_from_excel()`: Adds measurements from an Excel file to an `EnzymeMLDocument`
+//! - `read_excel()`: Reads Excel files and returns a collection of DataFrames
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -9,8 +32,7 @@ use polars::frame::DataFrame;
 use polars::prelude::NamedFrom;
 use polars::series::Series;
 
-use crate::enzyme_ml::{Measurement, MeasurementBuilder};
-use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder};
+use crate::prelude::{EnzymeMLDocument, EnzymeMLDocumentBuilder, Measurement, MeasurementBuilder};
 
 impl EnzymeMLDocument {
     /// Adds measurements from an Excel file to the `EnzymeMLDocument`.
