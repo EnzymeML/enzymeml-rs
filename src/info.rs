@@ -325,7 +325,7 @@ fn measurement_table(measurements: &[Measurement]) -> String {
 
     // Create table builder and add header row
     let mut builder = Builder::default();
-    let mut header = vec!["id".to_string(), "name".to_string()];
+    let mut header = vec!["ID".to_string(), "Name".to_string()];
     header.extend(measured_species.clone());
     builder.push_record(header);
 
