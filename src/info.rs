@@ -71,11 +71,6 @@ impl Display for EnzymeMLDocument {
             builder.push_record(vec![to_table(&self.reactions)]);
         }
 
-        if !self.measurements.is_empty() {
-            builder.push_record(vec!["Measurements"]);
-            builder.push_record(vec![measurement_table(&self.measurements)]);
-        }
-
         if !self.equations.is_empty() {
             builder.push_record(vec!["Equations"]);
             builder.push_record(vec![to_table(&self.equations)]);
@@ -84,6 +79,11 @@ impl Display for EnzymeMLDocument {
         if !self.parameters.is_empty() {
             builder.push_record(vec!["Parameters"]);
             builder.push_record(vec![to_table(&self.parameters)]);
+        }
+
+        if !self.measurements.is_empty() {
+            builder.push_record(vec!["Measurements"]);
+            builder.push_record(vec![measurement_table(&self.measurements)]);
         }
 
         let mut table = builder.build();
@@ -208,6 +208,7 @@ impl TableRecord for Reaction {
             "Name".to_string(),
             "Reversible".to_string(),
             "Scheme".to_string(),
+            "Kinetic Law".to_string(),
         ]
     }
 
@@ -216,11 +217,18 @@ impl TableRecord for Reaction {
     /// # Returns
     /// * Vector of strings containing the reaction's ID, name, reversibility, and reaction scheme
     fn to_record(&self) -> Vec<String> {
+        let kinetic_law = if let Some(kinetic_law) = &self.kinetic_law {
+            kinetic_law.equation.to_string()
+        } else {
+            "-".to_string()
+        };
+
         vec![
             self.id.to_string(),
             self.name.to_string(),
             self.reversible.to_string(),
             self.reaction_scheme(),
+            kinetic_law,
         ]
     }
 }
