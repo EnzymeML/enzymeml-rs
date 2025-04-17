@@ -802,7 +802,7 @@ pub fn main() {
                     .expect("Failed to build problem");
 
                 // Add CLI bounds
-                add_cli_bounds(&mut enzmldoc, &bound);
+                add_cli_bounds(&mut enzmldoc, bound);
 
                 // Convert EnzymeML document to bounds
                 let bounds = (&enzmldoc)
@@ -859,7 +859,7 @@ pub fn main() {
                     .expect("Failed to build problem");
 
                 // Add CLI bounds
-                add_cli_bounds(&mut enzmldoc, &bound);
+                add_cli_bounds(&mut enzmldoc, bound);
 
                 // Convert EnzymeML document to bounds
                 let bounds = (&enzmldoc)
