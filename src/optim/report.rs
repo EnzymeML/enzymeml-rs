@@ -6,6 +6,7 @@ use std::{
 use argmin::core::CostFunction;
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
+use serde::{Deserialize, Serialize};
 use tabled::{builder::Builder, settings::Style};
 
 use crate::prelude::{EnzymeMLDocument, ObjectiveFunction, SimulationResult};
@@ -31,13 +32,15 @@ use super::{
 /// - Statistical metrics evaluating the fit quality
 /// - Simulated model fits to experimental data
 /// - Parameter uncertainties and correlations from the inverse Hessian matrix
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptimizationReport {
     /// The EnzymeML document containing model and data
+    #[serde(skip)]
     pub doc: EnzymeMLDocument,
     /// Map of parameter names to their optimized values
     pub best_params: BTreeMap<String, f64>,
     /// Fits to experimental data, mapping measurement IDs to simulation results
+    #[serde(skip)]
     pub fits: HashMap<String, SimulationResult>,
     /// Akaike Information Criterion
     pub aic: f64,
@@ -48,10 +51,13 @@ pub struct OptimizationReport {
     /// Loss function used
     pub loss_function: String,
     /// Relative uncertainties of the best parameters
+    #[serde(skip)]
     pub uncertainties: Option<HashMap<String, f64>>,
     /// Bounds of the parameters
+    #[serde(skip)]
     pub bounds: Option<Vec<Bound>>,
     /// Initial guesses
+    #[serde(skip)]
     pub initial_guesses: Option<InitialGuesses>,
 }
 
