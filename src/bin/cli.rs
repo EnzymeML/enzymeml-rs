@@ -76,8 +76,8 @@ use enzymeml::{
     io::{load_enzmldoc, save_enzmldoc},
     llm::{query_llm, PromptInput},
     optim::{
-        BFGSBuilder, Bound, EGOBuilder, InitialGuesses, LBFGSBuilder, Optimizer, PSOBuilder,
-        ProblemBuilder, SR1TrustRegionBuilder, SubProblem, Transformation,
+        report::OptimizationReport, BFGSBuilder, EGOBuilder, InitialGuesses, LBFGSBuilder,
+        Optimizer, PSOBuilder, ProblemBuilder, SR1TrustRegionBuilder, SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction},
     validation::{consistency, schema},
@@ -478,7 +478,8 @@ pub fn main() {
             show,
         } => {
             // Load the enzymeml document
-            let enzmldoc = complete_check(path).expect("Failed to validate EnzymeML document");
+            validate_by_schema(path).expect("Failed to validate EnzymeML document");
+            let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
 
             // Get the measurement ids
             let measurement_ids = if !measurement_ids.is_empty() {
@@ -635,14 +636,12 @@ pub fn main() {
                     .build()
                     .expect("Failed to build problem");
 
-                // Convert EnzymeML document to initial guesses
-                let param_order = problem.ode_system().get_sorted_params();
-                let mut initial_guesses: InitialGuesses = (&enzmldoc)
+                // Override initial guesses
+                override_initial_guesses(&mut enzmldoc, initial);
+
+                let initial_guesses: InitialGuesses = (&enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to initial guesses");
-
-                // Override initial guesses
-                override_initial_guesses(&param_order, &mut initial_guesses, initial);
 
                 // Build optimizer
                 let lbfgs = LBFGSBuilder::default()
@@ -661,7 +660,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = output_dir {
-                    save_fitted_enzmldoc(path, &report.doc, output_dir, "lbfgs");
+                    save_results(path, &report, &report.doc, output_dir, "lbfgs");
                 }
             }
 
@@ -692,14 +691,13 @@ pub fn main() {
                     .build()
                     .expect("Failed to build problem");
 
+                // Override initial guesses
+                override_initial_guesses(&mut enzmldoc, initial);
+
                 // Convert EnzymeML document to initial guesses
-                let param_order = problem.ode_system().get_sorted_params();
-                let mut initial_guesses: InitialGuesses = (&enzmldoc)
+                let initial_guesses: InitialGuesses = (&enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to initial guesses");
-
-                // Override initial guesses
-                override_initial_guesses(&param_order, &mut initial_guesses, initial);
 
                 // Build optimizer
                 let bfgs = BFGSBuilder::default()
@@ -718,7 +716,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = output_dir {
-                    save_fitted_enzmldoc(path, &report.doc, output_dir, "bfgs");
+                    save_results(path, &report, &report.doc, output_dir, "bfgs");
                 }
             }
 
@@ -750,14 +748,13 @@ pub fn main() {
                     .build()
                     .expect("Failed to build problem");
 
+                // Override initial guesses
+                override_initial_guesses(&mut enzmldoc, initial);
+
                 // Convert EnzymeML document to initial guesses
-                let param_order = problem.ode_system().get_sorted_params();
-                let mut initial_guesses: InitialGuesses = (&enzmldoc)
+                let initial_guesses: InitialGuesses = (&enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to initial guesses");
-
-                // Override initial guesses
-                override_initial_guesses(&param_order, &mut initial_guesses, initial);
 
                 // Build optimizer
                 let sr1trustregion = SR1TrustRegionBuilder::default()
@@ -775,7 +772,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = output_dir {
-                    save_fitted_enzmldoc(path, &report.doc, output_dir, "sr1trustregion");
+                    save_results(path, &report, &report.doc, output_dir, "sr1trustregion");
                 }
             }
             FitAlgorithm::Ego {
@@ -804,13 +801,13 @@ pub fn main() {
                     .build()
                     .expect("Failed to build problem");
 
+                // Add CLI bounds
+                add_cli_bounds(&mut enzmldoc, &bound);
+
                 // Convert EnzymeML document to bounds
-                let mut bounds = (&enzmldoc)
+                let bounds = (&enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to bounds");
-
-                // Add CLI bounds
-                add_cli_bounds(bound, &mut bounds);
 
                 // Build optimizer
                 let optimizer = EGOBuilder::default()
@@ -828,7 +825,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = output_dir {
-                    save_fitted_enzmldoc(path, &report.doc, output_dir, "ego");
+                    save_results(path, &report, &report.doc, output_dir, "ego");
                 }
             }
 
@@ -861,13 +858,13 @@ pub fn main() {
                     .build()
                     .expect("Failed to build problem");
 
+                // Add CLI bounds
+                add_cli_bounds(&mut enzmldoc, &bound);
+
                 // Convert EnzymeML document to bounds
-                let mut bounds = (&enzmldoc)
+                let bounds = (&enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to bounds");
-
-                // Add CLI bounds
-                add_cli_bounds(bound, &mut bounds);
 
                 // Build optimizer
                 let optimizer = PSOBuilder::default()
@@ -886,7 +883,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = output_dir {
-                    save_fitted_enzmldoc(path, &report.doc, output_dir, "pso");
+                    save_results(path, &report, &report.doc, output_dir, "pso");
                 }
             }
         },
@@ -913,18 +910,11 @@ enum ConversionTarget {
 /// * `Ok(EnzymeMLDocument)` - Valid document
 /// * `Err(String)` - Error message if validation fails
 fn complete_check(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
-    // Check if the file is a valid EnzymeML document
-    let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
-    let report = schema::validate_json(&content).expect("Failed to validate EnzymeML document");
+    validate_by_schema(path)?;
+    check_consistency(path)
+}
 
-    if !report.valid {
-        println!("{}", "EnzymeML document is invalid".bold().red());
-        for error in report.errors {
-            println!("   {}", error);
-        }
-        return Err("EnzymeML document is invalid".to_string());
-    }
-
+fn check_consistency(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
     // Check if the document is consistent
     let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
     let report = consistency::check_consistency(&enzmldoc);
@@ -937,30 +927,46 @@ fn complete_check(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
         return Err("EnzymeML document is inconsistent".to_string());
     }
 
-    println!("{}", "EnzymeML document is valid".bold().green());
-
     Ok(enzmldoc)
+}
+
+/// Validates the EnzymeML document by the JSON schema
+///
+/// # Arguments
+///
+/// * `path` - Path to the EnzymeML document
+///
+/// # Returns
+///
+/// * `Ok(())` - Valid document
+/// * `Err(String)` - Error message if validation fails
+fn validate_by_schema(path: &PathBuf) -> Result<(), String> {
+    // Check if the file is a valid EnzymeML document
+    let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
+    let report = schema::validate_json(&content).expect("Failed to validate EnzymeML document");
+
+    if !report.valid {
+        println!("{}", "EnzymeML document is invalid".bold().red());
+        for error in report.errors {
+            println!("   {}", error);
+        }
+        return Err("EnzymeML document is invalid".to_string());
+    }
+
+    Ok(())
 }
 
 /// Override the initial guesses with the ones from the CLI
 ///
 /// # Arguments
 ///
-/// * `param_order` - The order of the parameters
-/// * `initial_guesses` - The initial guesses
+/// * `enzmldoc` - The EnzymeML document
 /// * `initial` - The initial guesses from the CLI
-fn override_initial_guesses(
-    param_order: &[String],
-    initial_guesses: &mut InitialGuesses,
-    initial: &[(String, f64)],
-) {
-    for (key, value) in initial {
-        let index = param_order
-            .iter()
-            .position(|p| p == key)
-            .expect("Parameter not found");
-
-        initial_guesses.set_value_at(index, *value);
+fn override_initial_guesses(enzmldoc: &mut EnzymeMLDocument, initial: &[(String, f64)]) {
+    for param in enzmldoc.parameters.iter_mut() {
+        if let Some(initial) = initial.iter().find(|(name, _)| name == &param.symbol) {
+            param.initial_value = Some(initial.1);
+        }
     }
 }
 
@@ -1020,16 +1026,13 @@ fn parse_key_bounds(s: &str) -> Result<(String, (f64, f64)), String> {
 /// # Arguments
 ///
 /// * `cli_bounds` - The bounds from the CLI
-/// * `doc_bounds` - The bounds from the EnzymeML document
+/// * `enzmldoc` - The EnzymeML document
 #[allow(clippy::ptr_arg)]
-fn add_cli_bounds(cli_bounds: &Vec<(String, (f64, f64))>, doc_bounds: &mut Vec<Bound>) {
-    for (key, (lower, upper)) in cli_bounds {
-        if let Some(bound) = doc_bounds.iter_mut().find(|b| b.param() == key) {
-            bound.set_lower(*lower);
-            bound.set_upper(*upper);
-            bound.validate().expect("Invalid bounds");
-        } else {
-            println!("Parameter {} not found", key);
+fn add_cli_bounds(enzmldoc: &mut EnzymeMLDocument, cli_bounds: &[(String, (f64, f64))]) {
+    for param in enzmldoc.parameters.iter_mut() {
+        if let Some((_, (upper, lower))) = cli_bounds.iter().find(|(key, _)| key == &param.symbol) {
+            param.lower_bound = Some(*lower);
+            param.upper_bound = Some(*upper);
         }
     }
 }
@@ -1041,13 +1044,14 @@ fn add_cli_bounds(cli_bounds: &Vec<(String, (f64, f64))>, doc_bounds: &mut Vec<B
 /// * `doc_path` - The path to the EnzymeML document
 /// * `enzmldoc` - The fitted EnzymeML document
 /// * `output_dir` - The output directory
-fn save_fitted_enzmldoc(
+fn save_results(
     doc_path: &Path,
+    report: &OptimizationReport,
     enzmldoc: &EnzymeMLDocument,
     output_dir: &Path,
     optimizer: &str,
 ) {
-    let name = format!(
+    let doc_name = format!(
         "{}_{}.json",
         doc_path
             .file_name()
@@ -1059,8 +1063,31 @@ fn save_fitted_enzmldoc(
             .expect("Failed to get file name without extension"),
         optimizer,
     );
-    let output_path = output_dir.join(name);
+    let output_path = output_dir.join(doc_name);
     save_enzmldoc(&output_path, enzmldoc).expect("Failed to save EnzymeML document");
+
+    // Save the report
+    let report_name = format!(
+        "{}_{}_report.json",
+        doc_path
+            .file_name()
+            .expect("Failed to get file name")
+            .to_str()
+            .expect("Failed to get file name as string")
+            .split('.')
+            .next()
+            .expect("Failed to get file name without extension"),
+        optimizer,
+    );
+    let report_path = output_dir.join(report_name);
+    let report_file = File::create(&report_path).expect("Failed to create report file");
+    serde_json::to_writer_pretty(report_file, report).expect("Failed to write report to file");
+
+    println!(
+        "Results saved to {} and {}",
+        output_path.display(),
+        report_path.display()
+    );
 }
 
 #[derive(Debug, Clone, Copy)]
