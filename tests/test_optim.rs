@@ -256,4 +256,37 @@ mod test_optim {
         assert_relative_eq!(k_cat, 0.85, epsilon = 0.1);
         assert_relative_eq!(k_ie, 0.001, epsilon = 0.01);
     }
+
+    #[test]
+    fn test_derived_system_with_constants() {
+        // ARRANGE
+        let mut doc = load_enzmldoc("tests/data/enzmldoc_reaction_init_assign.json")
+            .expect("Failed to load EnzymeML document");
+        doc.derive_system().expect("Failed to derive system");
+
+        let problem = ProblemBuilder::new(&doc, RK5, LossFunction::MSE)
+            .dt(10.0)
+            .transform(Transformation::Log("k_cat".into()))
+            .transform(Transformation::Log("K_M".into()))
+            .build()
+            .expect("Failed to build problem");
+
+        // ACT
+        let sr1trustregion = SR1TrustRegionBuilder::default()
+            .max_iters(40)
+            .subproblem(SubProblem::Steihaug)
+            .build();
+
+        let inits = Array1::from_vec(vec![80.0, 0.83]);
+        let res = sr1trustregion
+            .optimize(&problem, Some(inits))
+            .expect("Failed to optimize");
+
+        // ASSERT
+        let best_params = res.best_params;
+        let k_m = best_params["K_M"];
+        let k_cat = best_params["k_cat"];
+        assert_relative_eq!(k_m, 83.0, epsilon = 5.0);
+        assert_relative_eq!(k_cat, 0.5789, epsilon = 0.1);
+    }
 }
