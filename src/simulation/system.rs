@@ -14,7 +14,7 @@
 
 use std::{
     cell::{Ref, RefCell},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
 };
 
 use evalexpr_jit::prelude::*;
@@ -53,6 +53,7 @@ pub struct ODESystem {
     params_mapping: HashMap<String, u32>,
     initial_assignments_mapping: HashMap<String, u32>,
     assignment_rules_mapping: HashMap<String, u32>,
+    constants_mapping: HashMap<String, u32>,
     sorted_vars: Vec<String>,
 
     // Equation systems for all three types of equations
@@ -69,6 +70,7 @@ pub struct ODESystem {
     assignment_buffer: RefCell<Vec<f64>>,
     species_buffer: RefCell<Vec<f64>>,
     params_buffer: RefCell<Vec<f64>>,
+    constants_buffer: RefCell<Vec<f64>>,
 
     // Mode
     mode: RefCell<Mode>,
@@ -83,6 +85,7 @@ pub struct ODESystem {
     parameters_range: (usize, usize),
     initial_assignments_range: (usize, usize),
     assignment_rules_range: (usize, usize),
+    constants_range: (usize, usize),
 }
 
 impl ODESystem {
@@ -116,6 +119,7 @@ impl ODESystem {
         initial_assignments: HashMap<String, String>,
         assignments: HashMap<String, String>,
         params: HashMap<String, f64>,
+        mut constants: Vec<String>,
         mode: Option<Mode>,
     ) -> Result<Self, SimulationError> {
         // We need to create an index mapping for all variables
@@ -138,6 +142,7 @@ impl ODESystem {
         parameters.sort();
         initial_assignment_rules.sort();
         assignment_rules.sort();
+        constants.sort();
 
         // Create the sorted list of all variables
         let mut sorted_vars = vec!["t".to_string()];
@@ -145,7 +150,7 @@ impl ODESystem {
         sorted_vars.extend(parameters.clone());
         sorted_vars.extend(assignment_rules.clone());
         sorted_vars.extend(initial_assignment_rules.clone());
-
+        sorted_vars.extend(constants.clone());
         // Create the variable mapping
         let var_map = HashMap::from_iter(
             sorted_vars
@@ -161,7 +166,7 @@ impl ODESystem {
         let initial_assignments_mapping =
             Self::derive_mapping(&var_map, &initial_assignment_rules)?;
         let assignment_rules_mapping = Self::derive_mapping(&var_map, &assignment_rules)?;
-
+        let constants_mapping = Self::derive_mapping(&var_map, &constants)?;
         // Parse equations into EquationSystem instances
         let ode_jit = Self::parse_equations_to_systems(&odes, &var_map)?;
         let assignment_jit = Self::parse_equations_to_systems(&assignments, &var_map)?;
@@ -181,13 +186,14 @@ impl ODESystem {
         let assignment_buffer = vec![0.0; assignment_rules.len()];
         let species_buffer = vec![0.0; species.len()];
         let mut params_buffer = vec![0.0; parameters.len()];
-
+        let constants_buffer = vec![0.0; constants.len()];
         for (idx, param) in parameters.iter().enumerate() {
             params_buffer[idx] = *params.get(param).unwrap();
         }
 
         // Create an input buffer we can use for all evaluations
-        let buffer_size = sorted_vars.len() + 1 + parameters.len() * species.len();
+        let buffer_size =
+            sorted_vars.len() + 1 + parameters.len() * species.len() + constants.len();
         let input_buffer = vec![0.0; buffer_size];
 
         // Calculate the ranges for the input buffer
@@ -201,6 +207,10 @@ impl ODESystem {
             assignment_rules_range.1,
             assignment_rules_range.1 + initial_assignments.len(),
         );
+        let constants_range = (
+            initial_assignments_range.1,
+            initial_assignments_range.1 + constants.len(),
+        );
 
         let system = Self {
             ode_jit,
@@ -209,6 +219,7 @@ impl ODESystem {
             var_map,
             species_mapping,
             params_mapping,
+            constants_mapping,
             initial_assignments_mapping,
             assignment_rules_mapping,
             sorted_vars,
@@ -218,6 +229,7 @@ impl ODESystem {
             assignment_buffer: RefCell::new(assignment_buffer),
             species_buffer: RefCell::new(species_buffer),
             params_buffer: RefCell::new(params_buffer),
+            constants_buffer: RefCell::new(constants_buffer),
             mode: RefCell::new(mode.unwrap_or(Mode::Regular)),
             input_buffer: RefCell::new(input_buffer),
             assignments_result_buffer: RefCell::new(vec![0.0; assignments.len()]),
@@ -225,6 +237,7 @@ impl ODESystem {
             parameters_range,
             initial_assignments_range,
             assignment_rules_range,
+            constants_range,
         };
 
         Ok(system)
@@ -266,6 +279,10 @@ impl ODESystem {
         let mode = mode.unwrap_or(Mode::Regular);
         self.mode.replace(mode.clone());
 
+        // Fill the constants buffer from the initial conditions
+        let constants = self.arrange_constants_buffer(&initial_conditions)?;
+        self.set_constants_buffer(&constants);
+
         // Create the initial conditions vector
         let initial_conditions =
             self.arrange_y0_vector(&initial_conditions, matches!(mode, Mode::Sensitivity))?;
@@ -284,6 +301,7 @@ impl ODESystem {
                 self.get_params_buffer().as_slice(),
                 self.get_assignment_buffer().as_slice(),
                 self.get_initial_assignment_buffer().as_slice(),
+                self.get_constants_buffer().as_slice(),
             );
 
             self.initial_assignment_jit.fun()(
@@ -474,6 +492,7 @@ impl ODESystem {
         params: &[f64],
         assignments: &[f64],
         initial_assignments: &[f64],
+        constants: &[f64],
     ) -> Vec<f64> {
         let mut input_vec = Vec::with_capacity(self.sorted_vars.len() + 1);
         input_vec.push(t);
@@ -481,6 +500,7 @@ impl ODESystem {
         input_vec.extend_from_slice(params);
         input_vec.extend_from_slice(assignments);
         input_vec.extend_from_slice(initial_assignments);
+        input_vec.extend_from_slice(constants);
         input_vec
     }
 
@@ -504,6 +524,7 @@ impl ODESystem {
         params: &[f64],
         assignments: &[f64],
         initial_assignments: &[f64],
+        constants: &[f64],
     ) {
         let mut input_vec = self.input_buffer.borrow_mut();
         input_vec.clear();
@@ -512,6 +533,7 @@ impl ODESystem {
         input_vec.extend_from_slice(params);
         input_vec.extend_from_slice(assignments);
         input_vec.extend_from_slice(initial_assignments);
+        input_vec.extend_from_slice(constants);
     }
 
     fn recalculate_assignments(
@@ -529,6 +551,7 @@ impl ODESystem {
                 self.get_params_buffer().as_slice(),
                 &vec![0.0; self.num_assignments()],
                 self.get_initial_assignment_buffer().as_slice(),
+                self.get_constants_buffer().as_slice(),
             );
             input_vecs.push(input_vec);
         }
@@ -589,6 +612,45 @@ impl ODESystem {
             }
         }
         Ok(y0_vec)
+    }
+
+    /// Arranges constants into a vector matching the constants mapping.
+    ///
+    /// This method takes a HashMap of initial conditions (constant names mapped to their
+    /// initial concentrations) and creates a vector where each constant's concentration
+    /// is placed at the index corresponding to its position in the system's constants mapping.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_conditions` - A HashMap mapping constant names to their initial concentrations
+    ///
+    /// # Returns
+    ///
+    /// Returns a Vec<f64> containing the constants arranged in the order defined by constants_mapping
+    ///
+    /// # Panics
+    ///
+    /// Will panic if a constant name in initial_conditions is not found in the constants_mapping
+    fn arrange_constants_buffer(
+        &self,
+        initial_conditions: &HashMap<String, f64>,
+    ) -> Result<Vec<f64>, SimulationError> {
+        let mut constants = vec![0.0; self.get_constants_mapping().len()];
+        let mut missing_constants = vec![];
+
+        for (idx, constant) in self.get_sorted_constants().iter().enumerate() {
+            if let Some(value) = initial_conditions.get(constant) {
+                constants[idx] = *value;
+            } else {
+                missing_constants.push(constant.clone());
+            }
+        }
+
+        if !missing_constants.is_empty() {
+            return Err(SimulationError::MissingConstants(missing_constants));
+        }
+
+        Ok(constants)
     }
 
     /// Updates the parameter buffer with new values.
@@ -704,6 +766,31 @@ impl ODESystem {
             .replace(initial_assignments.to_vec());
     }
 
+    /// Returns a reference to the constants buffer.
+    ///
+    /// The constants buffer contains the values of all constants in the system,
+    /// ordered according to sorted_vars. These constants represent initial concentrations
+    /// of species that are not involved in any equations.
+    ///
+    /// # Returns
+    ///
+    /// A slice containing the current constant values
+    pub fn get_constants_buffer(&self) -> Ref<Vec<f64>> {
+        self.constants_buffer.borrow()
+    }
+
+    /// Updates the constants buffer with new values.
+    ///
+    /// This method allows updating the values of constants during simulation.
+    /// Constants are species that are not involved in any equations.
+    ///
+    /// # Arguments
+    ///
+    /// * `constants` - A slice containing the new constant values in the same order as sorted_vars
+    pub fn set_constants_buffer(&self, constants: &[f64]) {
+        self.constants_buffer.replace(constants.to_vec());
+    }
+
     /// Returns a reference to the species mapping.
     ///
     /// The species mapping contains the mapping between species names and their indices
@@ -768,6 +855,19 @@ impl ODESystem {
         &self.params_mapping
     }
 
+    /// Returns a reference to the constants mapping.
+    ///
+    /// The constants mapping contains the mapping between constant names and their indices
+    /// in the constant vector. This mapping is used to track where each constant value
+    /// is stored during simulation and parameter optimization.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping constant names to their indices
+    pub fn get_constants_mapping(&self) -> &HashMap<String, u32> {
+        &self.constants_mapping
+    }
+
     /// Returns a sorted vector of parameter names.
     ///
     /// This method retrieves all parameter names from the parameters mapping and returns them
@@ -781,6 +881,24 @@ impl ODESystem {
         let mut param_pairs: Vec<_> = self.params_mapping.iter().collect();
         param_pairs.sort_by_key(|(_, &idx)| idx);
         param_pairs
+            .into_iter()
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// Returns a sorted vector of constant names.
+    ///
+    /// This method retrieves all constant names from the constants mapping and returns them
+    /// in numerically sorted order. This can be useful for consistent iteration over
+    /// constants or displaying constants in a deterministic order.
+    ///
+    /// # Returns
+    ///
+    /// A Vec<String> containing all constant names in numerically sorted order
+    pub fn get_sorted_constants(&self) -> Vec<String> {
+        let mut constant_pairs: Vec<_> = self.constants_mapping.iter().collect();
+        constant_pairs.sort_by_key(|(_, &idx)| idx);
+        constant_pairs
             .into_iter()
             .map(|(name, _)| name.clone())
             .collect()
@@ -916,6 +1034,15 @@ impl ODESystem {
         &self.parameters_range
     }
 
+    /// Returns the index range for constants in the input vector.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the start and end indices for constant values
+    pub fn get_constants_range(&self) -> &(usize, usize) {
+        &self.constants_range
+    }
+
     /// Returns the index range for initial assignments in the input vector.
     ///
     /// # Returns
@@ -952,9 +1079,11 @@ impl ODEProblem for ODESystem {
             self.get_params_buffer().as_slice(),
             self.get_assignment_buffer().as_slice(),
             self.get_initial_assignment_buffer().as_slice(),
+            self.get_constants_buffer().as_slice(),
         );
 
         let mut input_vec = self.input_buffer.borrow_mut();
+
         let species_len = self.num_equations();
 
         if self.has_assignments() {
@@ -1041,20 +1170,7 @@ impl TryFrom<EnzymeMLDocument> for ODESystem {
     type Error = SimulationError;
 
     fn try_from(doc: EnzymeMLDocument) -> Result<Self, Self::Error> {
-        // Extract equations by type
-        let odes = extract_equation_by_type(&doc.equations, EquationType::ODE);
-        let assignments = extract_equation_by_type(&doc.equations, EquationType::ASSIGNMENT);
-        let initial_assignments =
-            extract_equation_by_type(&doc.equations, EquationType::INITIAL_ASSIGNMENT);
-
-        // Extract parameters
-        let params = doc
-            .parameters
-            .iter()
-            .map(|p| (p.id.clone(), p.value.unwrap_or(0.0)))
-            .collect::<HashMap<String, f64>>();
-
-        Self::new(odes, initial_assignments, assignments, params, None)
+        ODESystem::try_from(&doc)
     }
 }
 
@@ -1068,14 +1184,21 @@ impl TryFrom<&EnzymeMLDocument> for ODESystem {
         let initial_assignments =
             extract_equation_by_type(&doc.equations, EquationType::INITIAL_ASSIGNMENT);
 
-        // Extract parameters
+        let constants = collect_constants(doc);
         let params = doc
             .parameters
             .iter()
             .map(|p| (p.id.clone(), p.value.unwrap_or(0.0)))
             .collect::<HashMap<String, f64>>();
 
-        Self::new(odes, initial_assignments, assignments, params, None)
+        Self::new(
+            odes,
+            initial_assignments,
+            assignments,
+            params,
+            constants,
+            None,
+        )
     }
 }
 
@@ -1094,8 +1217,44 @@ impl std::fmt::Debug for ODESystem {
             "Assignment rules mapping: {:#?}",
             self.assignment_rules_mapping
         )?;
+        writeln!(f, "Constants mapping: {:#?}", self.constants_mapping)?;
         Ok(())
     }
+}
+
+/// Collects species that appear in any equation.
+///
+/// This function iterates through all species in the document and checks if they appear in any equation.
+/// It returns a Vec<String> containing the species that appear in any equation.
+///
+/// # Arguments
+///
+/// * `doc` - The EnzymeMLDocument to collect constants from
+///
+/// # Returns
+///
+/// A Vec<String> containing the species that appear in any equation
+fn collect_constants(doc: &EnzymeMLDocument) -> Vec<String> {
+    let all_species = doc
+        .small_molecules
+        .iter()
+        .map(|m| m.id.clone())
+        .chain(doc.proteins.iter().map(|p| p.id.clone()))
+        .chain(doc.complexes.iter().map(|c| c.id.clone()))
+        .collect::<HashSet<String>>();
+
+    all_species
+        .into_iter()
+        .filter(|species| {
+            doc.equations
+                .iter()
+                .filter(|equation| equation.species_id == *species)
+                .count() == 0 && // if species id is same, do not proceed
+                doc.equations
+                    .iter()
+                    .any(|equation| equation.equation.contains(species))
+        })
+        .collect()
 }
 
 /// Extracts equations of a specific type from a collection of equations.

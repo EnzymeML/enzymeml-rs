@@ -95,7 +95,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
         }
 
         // JIT the ODE system
-        let ode_system = ODESystem::try_from(&doc).unwrap();
+        let ode_system = ODESystem::try_from(&doc)?;
 
         // Collect evaluation times and measurement data
         let evaluation_times = Self::get_evaluation_times(&doc)?;
