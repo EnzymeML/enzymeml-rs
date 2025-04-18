@@ -52,4 +52,6 @@ pub enum SimulationError {
     #[cfg(not(feature = "wasm"))]
     #[error("Failed to plot")]
     PlotError(#[from] PlotError),
+    #[error("Missing constants in initial conditions: {0:?}")]
+    MissingConstants(Vec<String>),
 }
