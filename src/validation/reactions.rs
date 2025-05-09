@@ -38,7 +38,8 @@ fn check_reaction_species(
     all_species: &[String],
     reaction_idx: usize,
 ) {
-    for (elem_idx, reac_elem) in reaction.species.iter().enumerate() {
+    let all_elements = reaction.reactants.iter().chain(reaction.products.iter());
+    for (elem_idx, reac_elem) in all_elements.enumerate() {
         if !all_species.contains(&reac_elem.species_id) {
             let result = ValidationResult::new(
                 format!("/reactions/{}/species/{}", reaction_idx, elem_idx),
@@ -65,8 +66,8 @@ fn check_reaction_species(
 /// Checks that the reaction has at least one reactant and one product.
 /// If not, adds a validation error to the report with the reaction's location and ID.
 fn check_reaction_stoichiometry(report: &mut Report, reaction: &Reaction, reaction_idx: usize) {
-    let has_reactant = reaction.species.iter().any(|elem| elem.stoichiometry < 0.0);
-    let has_product = reaction.species.iter().any(|elem| elem.stoichiometry > 0.0);
+    let has_reactant = !reaction.reactants.is_empty();
+    let has_product = !reaction.products.is_empty();
 
     if !has_reactant || !has_product {
         let result = ValidationResult::new(
@@ -114,17 +115,17 @@ mod tests {
                     .id("R1".to_string())
                     .name("R1".to_string())
                     .reversible(true)
-                    .to_species(
+                    .to_products(
                         ReactionElementBuilder::default()
                             .species_id("S1".to_string())
                             .stoichiometry(1.0)
                             .build()
                             .expect("Failed to build species"),
                     )
-                    .to_species(
+                    .to_reactants(
                         ReactionElementBuilder::default()
                             .species_id("S2".to_string())
-                            .stoichiometry(-1.0)
+                            .stoichiometry(1.0)
                             .build()
                             .expect("Failed to build species"),
                     )
@@ -157,17 +158,17 @@ mod tests {
                     .id("R1".to_string())
                     .name("R1".to_string())
                     .reversible(true)
-                    .to_species(
+                    .to_products(
                         ReactionElementBuilder::default()
                             .species_id("S2".to_string())
                             .stoichiometry(1.0)
                             .build()
                             .expect("Failed to build species"),
                     )
-                    .to_species(
+                    .to_reactants(
                         ReactionElementBuilder::default()
                             .species_id("S3".to_string())
-                            .stoichiometry(-1.0)
+                            .stoichiometry(1.0)
                             .build()
                             .expect("Failed to build species"),
                     )
@@ -225,7 +226,7 @@ mod tests {
                     .id("R1".to_string())
                     .name("R1".to_string())
                     .reversible(true)
-                    .to_species(
+                    .to_products(
                         ReactionElementBuilder::default()
                             .species_id("S1".to_string())
                             .stoichiometry(1.0)
@@ -263,10 +264,10 @@ mod tests {
                     .id("R1".to_string())
                     .name("R1".to_string())
                     .reversible(true)
-                    .to_species(
+                    .to_reactants(
                         ReactionElementBuilder::default()
                             .species_id("S1".to_string())
-                            .stoichiometry(-1.0)
+                            .stoichiometry(1.0)
                             .build()
                             .expect("Failed to build species"),
                     )

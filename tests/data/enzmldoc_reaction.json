@@ -66,11 +66,13 @@
       "id": "reaction0",
       "name": "reaction0",
       "reversible": false,
-      "species": [
+      "reactants": [
         {
           "species_id": "abts",
-          "stoichiometry": -1.0
-        },
+          "stoichiometry": 1.0
+        }
+      ],
+      "products": [
         {
           "species_id": "abts_radical",
           "stoichiometry": 1.0
@@ -86,11 +88,13 @@
       "id": "reaction1",
       "name": "reaction1",
       "reversible": false,
-      "species": [
+      "reactants": [
         {
           "species_id": "slac",
-          "stoichiometry": -1.0
-        },
+          "stoichiometry": 1.0
+        }
+      ],
+      "products": [
         {
           "species_id": "slac_inactive",
           "stoichiometry": 1.0

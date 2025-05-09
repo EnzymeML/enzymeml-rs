@@ -152,11 +152,21 @@ pub fn build_species_equations(
 
         if let Some(kinetic_law) = &reaction.kinetic_law {
             let law_equation = &kinetic_law.equation;
-            for species_data in &reaction.species {
+
+            // Process reactants (Stoichiometry is negative)
+            for reactant in &reaction.reactants {
                 species_to_equation
-                    .entry(species_data.species_id.clone())
+                    .entry(reactant.species_id.clone())
                     .or_default()
-                    .push((species_data.stoichiometry, law_equation.clone()));
+                    .push((-reactant.stoichiometry, law_equation.clone()));
+            }
+
+            // Process products (Stoichiometry is positive)
+            for product in &reaction.products {
+                species_to_equation
+                    .entry(product.species_id.clone())
+                    .or_default()
+                    .push((product.stoichiometry, law_equation.clone()));
             }
         }
     }

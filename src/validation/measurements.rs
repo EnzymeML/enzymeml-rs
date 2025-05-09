@@ -62,17 +62,19 @@ fn check_initial_concentrations(
     }
 
     // Check if the initial concentration matches the first data point
-    if meas_data.data.first().unwrap() != &meas_data.initial {
-        let result = ValidationResult::new(
-            format!("/measurements/{}/species/{}", meas_idx, data_idx),
-            format!(
+    if let Some(initial) = meas_data.initial {
+        if meas_data.data.first().unwrap() != &initial {
+            let result = ValidationResult::new(
+                format!("/measurements/{}/species/{}", meas_idx, data_idx),
+                format!(
                 "Initial concentration does not match first data point at t=0 for species '{}'.",
                 meas_data.species_id
             ),
-            Severity::Warning,
-        );
+                Severity::Warning,
+            );
 
-        report.add_result(result);
+            report.add_result(result);
+        }
     }
 }
 

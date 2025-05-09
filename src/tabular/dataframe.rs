@@ -238,7 +238,7 @@ fn collect_data<'a>(
     if !data.data.is_empty() && !data.time.is_empty() {
         times.push(data.time.clone());
         series.push(Series::new(&data.species_id, data.data.clone()))
-    } else {
-        non_measured.push((&data.species_id, &data.initial))
+    } else if let Some(initial) = data.initial.as_ref() {
+        non_measured.push((&data.species_id, initial));
     }
 }

@@ -47,11 +47,13 @@
       "id": "reaction_1",
       "name": "Reaction 1",
       "reversible": true,
-      "species": [
+      "reactants": [
         {
           "species_id": "substrate____",
-          "stoichiometry": -1.0
-        },
+          "stoichiometry": 1.0
+        }
+      ],
+      "products": [
         {
           "species_id": "product",
           "stoichiometry": 1.0

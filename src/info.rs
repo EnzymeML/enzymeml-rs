@@ -347,7 +347,9 @@ fn measurement_table(measurements: &[Measurement]) -> String {
                 .species_data
                 .iter()
                 .find(|data| &data.species_id == species_id)
-                .map_or("-".to_string(), |data| data.initial.to_string());
+                .map_or("-".to_string(), |data| {
+                    data.initial.map_or("-".to_string(), |val| val.to_string())
+                });
 
             row.push(value);
         }
@@ -373,16 +375,14 @@ impl Reaction {
     /// * A string representing the reaction scheme
     fn reaction_scheme(&self) -> String {
         let reactants = self
-            .species
+            .reactants
             .iter()
-            .filter(|s| s.stoichiometry < 0.0)
             .map(|s| format!("{} {}", s.stoichiometry.abs(), s.species_id))
             .collect::<Vec<_>>();
 
         let products = self
-            .species
+            .products
             .iter()
-            .filter(|s| s.stoichiometry > 0.0)
             .map(|s| format!("{} {}", s.stoichiometry, s.species_id))
             .collect::<Vec<_>>();
 

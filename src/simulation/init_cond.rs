@@ -59,12 +59,15 @@ impl From<&Measurement> for InitialCondition {
     ///
     /// A `HashMap` mapping species IDs to their initial values.
     fn from(measurement: &Measurement) -> Self {
-        HashMap::from_iter(
-            measurement
-                .species_data
-                .iter()
-                .map(|species| (species.species_id.clone(), species.initial)),
-        )
+        measurement
+            .species_data
+            .iter()
+            .filter_map(|species| {
+                species
+                    .initial
+                    .map(|initial| (species.species_id.clone(), initial))
+            })
+            .collect()
     }
 }
 
