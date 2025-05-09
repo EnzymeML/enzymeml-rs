@@ -26,6 +26,16 @@ pub struct EnzymeMLDocument {
     #[builder(setter(into))]
     pub name: String,
 
+    /// The version of the EnzymeML Document.
+    #[serde(default)]
+    #[builder(default = "2.0.to_string().into()", setter(into))]
+    pub version: String,
+
+    /// Description of the EnzymeML Document.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default, setter(into))]
+    pub description: Option<String>,
+
     /// Date the EnzymeML Document was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
@@ -37,12 +47,12 @@ pub struct EnzymeMLDocument {
     pub modified: Option<String>,
 
     /// Contains descriptions of all authors that are part of the experiment.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ///
     #[builder(default, setter(into, each(name = "to_creators")))]
     pub creators: Vec<Creator>,
 
     /// Contains descriptions of all vessels that are part of the experiment.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ///
     #[builder(default, setter(into, each(name = "to_vessels")))]
     pub vessels: Vec<Vessel>,
 
@@ -290,6 +300,11 @@ pub struct SmallMolecule {
     #[builder(default, setter(into))]
     pub inchikey: Option<String>,
 
+    /// List of synonymous names for the small molecule.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default, setter(into, each(name = "to_synonymous_names")))]
+    pub synonymous_names: Vec<String>,
+
     /// List of references to publications, database entries, etc. that
     /// describe or reference the small molecule.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -323,16 +338,21 @@ pub struct Reaction {
     #[builder(default, setter(into))]
     pub kinetic_law: Option<Equation>,
 
-    /// List of reaction elements that are part of the reaction.
+    /// List of reactants that are part of the reaction.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[builder(default, setter(into, each(name = "to_species")))]
-    pub species: Vec<ReactionElement>,
+    #[builder(default, setter(into, each(name = "to_reactants")))]
+    pub reactants: Vec<ReactionElement>,
+
+    /// List of products that are part of the reaction.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[builder(default, setter(into, each(name = "to_products")))]
+    pub products: Vec<ReactionElement>,
 
     /// List of reaction elements that are not part of the reaction but
     /// influence it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[builder(default, setter(into, each(name = "to_modifiers")))]
-    pub modifiers: Vec<String>,
+    pub modifiers: Vec<ModifierElement>,
 }
 
 /// This object is part of the object and describes a species
@@ -350,12 +370,27 @@ pub struct ReactionElement {
     #[builder(setter(into))]
     pub species_id: String,
 
-    /// Float number representing the associated stoichiometry. Negative
-    /// values indicate that the species is a reactant and positive
-    /// values indicate that the species is a product of the reaction.
+    /// Float number representing the associated stoichiometry.
+    #[serde(default)]
+    #[builder(default = "1.0.into()", setter(into))]
+    pub stoichiometry: f64,
+}
+
+/// The ModifierElement object represents a species that is not part of
+/// the reaction but influences it.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Builder, Default)]
+#[allow(non_snake_case)]
+pub struct ModifierElement {
+    /// Internal identifier to either a protein or reactant defined in the
+    /// EnzymeML Document.
     ///
     #[builder(setter(into))]
-    pub stoichiometry: f64,
+    pub species_id: String,
+
+    /// Role of the modifier in the reaction.
+    ///
+    #[builder(setter(into))]
+    pub role: ModifierRole,
 }
 
 /// The Equation object describes a mathematical equation used to model
@@ -531,22 +566,6 @@ pub struct MeasurementData {
     #[builder(setter(into))]
     pub species_id: String,
 
-    /// Initial amount of the measurement data. This must be the same as the
-    /// first data point in the array.
-    ///
-    #[builder(setter(into))]
-    pub initial: f64,
-
-    /// SI unit of the data that was measured.
-    ///
-    #[builder(setter(into))]
-    pub data_unit: UnitDefinition,
-
-    /// Type of data that was measured (e.g. concentration, absorbance, etc.)
-    ///
-    #[builder(setter(into))]
-    pub data_type: DataTypes,
-
     /// Amount of the the species before starting the measurement. This field
     /// can be used for specifying the prepared amount of a species
     /// in the reaction mix. Not to be confused with , specifying
@@ -555,6 +574,17 @@ pub struct MeasurementData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
     pub prepared: Option<f64>,
+
+    /// Initial amount of the measurement data. This must be the same as the
+    /// first data point in the array.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default, setter(into))]
+    pub initial: Option<f64>,
+
+    /// SI unit of the data that was measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default, setter(into))]
+    pub data_unit: Option<UnitDefinition>,
 
     /// Data that was measured.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -571,11 +601,16 @@ pub struct MeasurementData {
     #[builder(default, setter(into))]
     pub time_unit: Option<UnitDefinition>,
 
+    /// Type of data that was measured (e.g. concentration, absorbance, etc.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default, setter(into))]
+    pub data_type: Option<DataTypes>,
+
     /// Whether or not the data has been generated by simulation. Default
     /// is False.
-    ///
-    #[builder(setter(into))]
-    pub is_simulated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default, setter(into))]
+    pub is_simulated: Option<bool>,
 }
 
 /// Represents a unit definition that is based on the SI unit system.
@@ -628,6 +663,32 @@ pub struct BaseUnit {
 //
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, PartialEq, Eq)]
+pub enum ModifierRole {
+    #[default]
+    #[serde(rename = "activator")]
+    ACTIVATOR,
+
+    #[serde(rename = "additive")]
+    ADDITIVE,
+
+    #[serde(rename = "biocatalyst")]
+    BIOCATALYST,
+
+    #[serde(rename = "buffer")]
+    BUFFER,
+
+    #[serde(rename = "catalyst")]
+    CATALYST,
+
+    #[serde(rename = "inhibitor")]
+    INHIBITOR,
+
+    #[serde(rename = "solvent")]
+    SOLVENT,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default, PartialEq, Eq)]
 pub enum EquationType {
     #[default]
     #[serde(rename = "assignment")]
@@ -650,6 +711,9 @@ pub enum DataTypes {
     #[serde(rename = "absorbance")]
     ABSORBANCE,
 
+    #[serde(rename = "amount")]
+    AMOUNT,
+
     #[serde(rename = "concentration")]
     CONCENTRATION,
 
@@ -664,6 +728,12 @@ pub enum DataTypes {
 
     #[serde(rename = "transmittance")]
     TRANSMITTANCE,
+
+    #[serde(rename = "turnover")]
+    TURNOVER,
+
+    #[serde(rename = "yield")]
+    YIELD,
 }
 
 #[allow(non_camel_case_types)]
