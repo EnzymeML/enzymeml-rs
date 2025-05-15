@@ -8,13 +8,14 @@ on:
       - 'tests/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/test.yml'
   pull_request:
     paths:
       - 'src/**'
       - 'tests/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-
+      - '.github/workflows/test.yml'
 env:
   CARGO_TERM_COLOR: always
 
