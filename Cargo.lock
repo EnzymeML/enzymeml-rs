@@ -1280,6 +1280,7 @@ dependencies = [
  "itertools 0.14.0",
  "jsonschema 0.30.0",
  "lazy_static",
+ "libxlsxwriter-sys",
  "log",
  "md5",
  "mdmodels",
