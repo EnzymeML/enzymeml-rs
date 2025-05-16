@@ -46,9 +46,7 @@ plotly = "0.12.1"
 
 # Feature: simulation
 peroxide = { version = "0.39.2", optional = true }
-evalexpr-jit = { git = "https://github.com/JR-1991/evalexpr-jit", branch = "fix-thread-safety", features = [
-    "nalgebra",
-], optional = true }
+evalexpr-jit = { version = "0.2.1", features = ["nalgebra"], optional = true }
 splines = { version = "5.0.0", features = ["nalgebra"], optional = true }
 
 # Feature: optimization
