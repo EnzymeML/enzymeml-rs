@@ -22,304 +22,221 @@
 //! - Conversion of data with optional template creation
 
 use std::error::Error;
-use std::path::{Path, PathBuf};
 
 use polars::prelude::{AnyValue, DataFrame};
-use xlsxwriter::prelude::*;
-use xlsxwriter::worksheet::validation::{
-    DataValidation, DataValidationErrorType, DataValidationNumberOptions, DataValidationType,
-    ErrorAlertOptions,
+use rust_xlsxwriter::workbook::Workbook;
+use rust_xlsxwriter::{
+    DataValidation, DataValidationErrorStyle, DataValidationRule, Format, FormatAlign, FormatBorder,
 };
 
 use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementDataBuilder};
 use crate::validation::consistency::get_species_ids;
 
-static ERROR_MESSAGE: &str = "Only positive numbers are allowed in this cell.";
+/// Error message for data validation
+const ERROR_MESSAGE: &str = "Only positive numbers are allowed in this cell.";
 
-impl EnzymeMLDocument {
-    /// Converts the EnzymeMLDocument to a spreadsheet and saves it to the specified path.
+/// Default number of rows to set up in worksheet
+const DEFAULT_ROW_COUNT: u32 = 99;
+
+/// Default column width
+const DEFAULT_COLUMN_WIDTH: f64 = 20.0;
+
+/// Default row height
+const DEFAULT_ROW_HEIGHT: f64 = 15.0;
+
+/// Border color for cells
+const BORDER_COLOR: u32 = 0xB0B0B0;
+
+/// Header background color
+const HEADER_BG_COLOR: u32 = 0xD9EAD3;
+
+impl TryFrom<EnzymeMLDocument> for Workbook {
+    type Error = Box<dyn std::error::Error>;
+
+    /// Converts an EnzymeMLDocument into a Workbook
     ///
-    /// # Arguments
-    ///
-    /// * `path` - The path where the spreadsheet will be saved.
-    pub fn to_excel(
-        &self,
-        path: PathBuf,
-        create_template: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        to_excel(
-            ConversionOptions::EnzymeMLDocument(self.clone()),
-            path,
-            create_template,
-        )
-    }
-}
-
-impl Measurement {
-    /// Converts the Measurement to a spreadsheet and saves it to the specified path.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - The path where the spreadsheet will be saved.
-    pub fn to_excel(&self, path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-        to_excel(ConversionOptions::Measurement(self.clone()), path, false)
-    }
-}
-
-/// Represents the conversion options for the spreadsheet.
-///
-/// This enum allows for the conversion of either an EnzymeMLDocument or a Measurement.
-/// Hence, it provides a flexible way to handle different types of conversions based
-/// on the type provided.
-pub enum ConversionOptions {
-    EnzymeMLDocument(EnzymeMLDocument),
-    Measurement(Measurement),
-}
-
-impl From<EnzymeMLDocument> for ConversionOptions {
-    fn from(enzmldoc: EnzymeMLDocument) -> Self {
-        ConversionOptions::EnzymeMLDocument(enzmldoc)
-    }
-}
-
-impl From<Measurement> for ConversionOptions {
-    fn from(measurement: Measurement) -> Self {
-        ConversionOptions::Measurement(measurement)
-    }
-}
-
-/// Converts the given EnzymeMLDocument or Measurement to a spreadsheet and saves it to the specified path.
-///
-/// # Arguments
-///
-/// * `options` - The conversion options, which can be either an EnzymeMLDocument or a Measurement.
-/// * `path` - The path where the spreadsheet will be saved.
-pub fn to_excel(
-    options: ConversionOptions,
-    path: PathBuf,
-    create_template: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    match options {
-        ConversionOptions::EnzymeMLDocument(enzmldoc) => {
-            doc_to_spreadsheet(&enzmldoc, path, create_template)
+    /// Creates a template if the document has no measurements,
+    /// otherwise adds each measurement as a separate worksheet.
+    fn try_from(enzmldoc: EnzymeMLDocument) -> Result<Self, Self::Error> {
+        let mut workbook = Workbook::new();
+        if enzmldoc.measurements.is_empty() {
+            create_meas_template(&enzmldoc, &mut workbook)?;
+        } else {
+            for measurement in &enzmldoc.measurements {
+                add_meas_sheet(measurement, &mut workbook)?;
+            }
         }
-        ConversionOptions::Measurement(measurement) => meas_to_spreadsheet(&measurement, path),
+
+        Ok(workbook)
     }
 }
 
-/// Converts the given EnzymeMLDocument to a spreadsheet and saves it to the specified path.
-///
-/// # Arguments
-///
-/// * `enzmldoc` - A reference to the EnzymeMLDocument to be converted.
-/// * `path` - The path where the spreadsheet will be saved.
-fn doc_to_spreadsheet(
-    enzmldoc: &EnzymeMLDocument,
-    path: PathBuf,
-    create_template: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    directory_exists(&path)?;
+impl TryFrom<Measurement> for Workbook {
+    type Error = Box<dyn std::error::Error>;
 
-    let path = path.to_str().ok_or("Invalid path")?;
-    let workbook = Workbook::new(path)?;
-
-    if enzmldoc.measurements.is_empty() || create_template {
-        // Create a template if there are no measurements
-        create_meas_template(enzmldoc, &workbook)?;
-    } else {
-        // Add a worksheet for each measurement in the document
-        for measurement in &enzmldoc.measurements {
-            add_meas_sheet(measurement, &workbook)?;
-        }
+    /// Converts a single Measurement into a Workbook
+    fn try_from(measurement: Measurement) -> Result<Self, Self::Error> {
+        let mut workbook = Workbook::new();
+        add_meas_sheet(&measurement, &mut workbook)?;
+        Ok(workbook)
     }
-
-    // Close the workbook
-    workbook.close()?;
-
-    Ok(())
 }
 
-/// Creates a measurement template and adds it to the workbook.
+/// Creates a measurement template and adds it to the workbook
 ///
 /// # Arguments
 ///
-/// * `enzmldoc` - A reference to the EnzymeMLDocument.
-/// * `workbook` - A reference to the Workbook where the template will be added.
+/// * `enzmldoc` - The EnzymeMLDocument to use as template basis
+/// * `workbook` - The Workbook to add the template sheet to
 fn create_meas_template(
     enzmldoc: &EnzymeMLDocument,
-    workbook: &Workbook,
+    workbook: &mut Workbook,
 ) -> Result<(), Box<dyn Error>> {
-    // Take all the species that exists in the document and create a template
     let all_species = get_species_ids(enzmldoc);
 
-    // Create a measurement that has all species with empty data
     let mut measurement_template = MeasurementBuilder::default()
         .name(String::from("EnzymeML Measurement Template"))
         .build()?;
 
     for species in all_species {
-        measurement_template.species_data.push(
-            MeasurementDataBuilder::default()
-                .species_id(species)
-                .initial(0.0)
-                .time(vec![])
-                .data(vec![])
-                .build()
-                .expect("Failed to create measurement data"),
-        );
+        let data = MeasurementDataBuilder::default()
+            .species_id(species)
+            .initial(0.0)
+            .time(Vec::new())
+            .data(Vec::new())
+            .build()
+            .map_err(|e| format!("Failed to create measurement data: {}", e))?;
+
+        measurement_template.species_data.push(data);
     }
 
-    // Now add this template to the workbook
     add_meas_sheet(&measurement_template, workbook)
 }
 
-/// Converts the given Measurement to a spreadsheet and saves it to the specified path.
+/// Adds a measurement as a worksheet to the workbook
 ///
 /// # Arguments
 ///
-/// * `measurement` - A reference to the Measurement to be converted.
-/// * `path` - The path where the spreadsheet will be saved.
-fn meas_to_spreadsheet(
+/// * `measurement` - The Measurement to add as a worksheet
+/// * `workbook` - The Workbook to add the worksheet to
+///
+/// # Returns
+///
+/// * `Ok(())` if the worksheet was successfully added
+/// * `Err(...)` if an error occurred during the process
+fn add_meas_sheet(
     measurement: &Measurement,
-    path: PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
-    directory_exists(&path)?;
-
-    let path = path.to_str().ok_or("Invalid path")?;
-    let workbook = Workbook::new(path)?;
-
-    // Add a worksheet for the measurement
-    add_meas_sheet(measurement, &workbook)?;
-
-    // Close the workbook
-    workbook.close()?;
-
-    Ok(())
-}
-
-/// Adds a measurement sheet to the workbook.
-///
-/// # Arguments
-///
-/// * `measurement` - A reference to the Measurement to be added.
-/// * `workbook` - A reference to the Workbook where the sheet will be added.
-fn add_meas_sheet(measurement: &Measurement, workbook: &Workbook) -> Result<(), Box<dyn Error>> {
-    // If the length of the name is 0, return an error
+    workbook: &mut Workbook,
+) -> Result<(), Box<dyn Error>> {
     if measurement.name.is_empty() {
         return Err("Measurement name cannot be empty".into());
     }
 
-    let mut sheet = workbook.add_worksheet(Some(&measurement.name))?;
+    let sheet = workbook.add_worksheet();
+    sheet.set_name(&measurement.name)?;
 
-    // First, convert the measurement to a dataframe
+    // Convert the measurement to a dataframe
     let df: DataFrame = measurement.clone().into();
+    let column_count = df.width();
 
-    // Use the dataframe to write the data
+    // Write headers
+    let header_format = get_header_format();
     for (i, column) in df.get_columns().iter().enumerate() {
+        let col_idx = i as u16;
         let header_name = if column.name() == "time" {
             "Time"
         } else {
             column.name()
         };
 
-        sheet.write_string(0, i as u16, header_name, Some(&get_header_format()))?;
+        sheet.write_string(0, col_idx, header_name)?;
+        sheet.set_cell_format(0, col_idx, &header_format)?;
     }
 
-    // Write the data
-    for (col_index, row) in df.iter().enumerate() {
-        for (row_index, value) in row.iter().enumerate() {
-            let value = match value {
-                AnyValue::Null => String::from(""),
+    // Write data rows
+    let data_format = get_non_header_format();
+    for (col_idx, row) in df.iter().enumerate() {
+        for (row_idx, value) in row.iter().enumerate() {
+            let value_str = match value {
+                AnyValue::Null => String::new(),
                 _ => value.to_string(),
             };
 
-            sheet.write_string(row_index as u32 + 1, col_index as u16, &value, None)?;
+            let row_pos = row_idx as u32 + 1;
+            let col_pos = col_idx as u16;
+
+            sheet.write_string(row_pos, col_pos, &value_str)?;
+            sheet.set_cell_format(row_pos, col_pos, &data_format)?;
         }
     }
 
-    // Set the column widths
-    for i in 0..df.get_columns().len() {
-        sheet.set_column(i as u16, i as u16, 20.0, Some(&get_non_header_format()))?;
+    // Set column widths
+    for i in 0..column_count {
+        sheet.set_column_width(i as u16, DEFAULT_COLUMN_WIDTH)?;
     }
 
-    // Set all rows to 15.0 height
-    for i in 0..99 {
-        sheet.set_row(i as u32, 40.0, None)?;
+    // Set row heights
+    for i in 0..DEFAULT_ROW_COUNT {
+        sheet.set_row_height(i, DEFAULT_ROW_HEIGHT)?;
     }
 
-    // Add validation to all rows in all columns to only accept numbers
-    sheet.data_validation_range(
-        1,
-        0,
-        99,
-        df.width() as u16 - 1,
-        &DataValidation::new(
-            DataValidationType::Decimal {
-                ignore_blank: true,
-                number_options: DataValidationNumberOptions::GreaterThanOrEqualTo(0.0),
-            },
-            None,
-            Some(ErrorAlertOptions {
-                style: DataValidationErrorType::Stop,
-                title: "Invalid input".to_string(),
-                message: ERROR_MESSAGE.to_string(),
-            }),
-        ),
-    )?;
+    // Add data validation
+    add_data_validation(sheet, column_count as u16)?;
 
     Ok(())
 }
 
-/// Checks if the directory of the given path exists.
+/// Adds positive number validation to the data cells in the worksheet
 ///
 /// # Arguments
 ///
-/// * `path` - A reference to the PathBuf to be checked.
-///
-/// # Returns
-///
-/// Returns true if the directory exists, false otherwise.
-fn directory_exists(path: &Path) -> Result<(), Box<dyn Error>> {
-    if let Some(dir_path) = path.parent() {
-        // Check if the directory exists
-        if !dir_path.exists() {
-            return Err(format!("Directory does not exist: {:?}", dir_path).into());
-        }
-    }
+/// * `sheet` - The worksheet to add validation to
+/// * `column_count` - The number of columns in the worksheet
+fn add_data_validation(
+    sheet: &mut rust_xlsxwriter::Worksheet,
+    column_count: u16,
+) -> Result<(), Box<dyn Error>> {
+    let validation = DataValidation::new()
+        .allow_decimal_number(DataValidationRule::GreaterThanOrEqualTo(0.0))
+        .ignore_blank(true)
+        .set_error_style(DataValidationErrorStyle::Stop)
+        .set_error_title("Invalid input")?
+        .set_error_message(ERROR_MESSAGE)?;
 
+    sheet.add_data_validation(1, 0, DEFAULT_ROW_COUNT, column_count - 1, &validation)?;
     Ok(())
 }
 
+/// Returns a format for non-header cells
 fn get_non_header_format() -> Format {
     Format::new()
         .set_font_size(14f64)
-        .set_vertical_align(FormatVerticalAlignment::VerticalCenter)
-        .set_align(FormatAlignment::Center)
+        .set_align(FormatAlign::VerticalCenter)
+        .set_align(FormatAlign::Center)
         .set_border_left(FormatBorder::Thin)
-        .set_border_left_color(FormatColor::Custom(0xB0B0B0))
+        .set_border_left_color(BORDER_COLOR)
         .set_border_right(FormatBorder::Thin)
-        .set_border_right_color(FormatColor::Custom(0xB0B0B0))
+        .set_border_right_color(BORDER_COLOR)
         .set_border_top(FormatBorder::Thin)
-        .set_border_top_color(FormatColor::Custom(0xB0B0B0))
+        .set_border_top_color(BORDER_COLOR)
         .set_border_bottom(FormatBorder::Thin)
-        .set_border_bottom_color(FormatColor::Custom(0xB0B0B0))
-        .clone()
+        .set_border_bottom_color(BORDER_COLOR)
 }
 
+/// Returns a format for header cells
 fn get_header_format() -> Format {
     Format::new()
-        .set_bg_color(FormatColor::Custom(0xD9EAD3))
+        .set_background_color(HEADER_BG_COLOR)
         .set_bold()
         .set_font_size(18f64)
         .set_border_left(FormatBorder::Thin)
-        .set_border_left_color(FormatColor::Gray)
+        .set_border_left_color(BORDER_COLOR)
         .set_border_right(FormatBorder::Thin)
-        .set_border_right_color(FormatColor::Gray)
+        .set_border_right_color(BORDER_COLOR)
         .set_border_top(FormatBorder::Thin)
-        .set_border_top_color(FormatColor::Gray)
+        .set_border_top_color(BORDER_COLOR)
         .set_border_bottom(FormatBorder::Double)
-        .set_border_bottom_color(FormatColor::Gray)
-        .set_vertical_align(FormatVerticalAlignment::VerticalCenter)
-        .set_align(FormatAlignment::Center)
-        .clone()
+        .set_border_bottom_color(BORDER_COLOR)
+        .set_align(FormatAlign::VerticalCenter)
+        .set_align(FormatAlign::Center)
 }
