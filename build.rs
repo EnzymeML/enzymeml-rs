@@ -40,10 +40,6 @@ fn main() {
         // If the file doesn't exist, or if it exists but is different from the generated code, write the code to the file
         if !out_path.exists() {
             fs::write(out_path, code).expect("Failed to write file");
-        } else if let Ok(content) = fs::read_to_string(&out_path) {
-            if content != code {
-                fs::write(out_path, code).expect("Failed to write file");
-            }
         } else {
             fs::write(out_path, code).expect("Failed to write file");
         }
