@@ -63,8 +63,7 @@ polars = { version = "0.41", features = [
     "csv",
 ], default-features = false, optional = true }
 calamine = { version = "0.26.0", optional = true }
-xlsxwriter = { version = "0.6.1", optional = true }
-libxlsxwriter-sys = { version = "*", optional = true, features = ["no-md5"] }
+rust_xlsxwriter = { version = "0.87.0", optional = true }
 
 # Feature: wasm
 wasm-bindgen = { version = "0.2.92", optional = true }
@@ -82,7 +81,7 @@ codegen-units = 1
 
 [features]
 default = ["optimization", "simulation", "llm", "tabular", "plotly-kaleido"]
-tabular = ["polars", "calamine", "xlsxwriter"]
+tabular = ["polars", "calamine", "rust_xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
 llm = ["mdmodels", "tokio"]
