@@ -733,7 +733,7 @@ pub enum DataTypes {
     TURNOVER,
 
     #[serde(rename = "yield")]
-    YIELD,
+    YIELD_VALUE,
 }
 
 #[allow(non_camel_case_types)]
