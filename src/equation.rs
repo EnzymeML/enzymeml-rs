@@ -211,7 +211,7 @@ mod tests {
         let mut doc_builder = EnzymeMLDocumentBuilder::default();
         let eq = "2*x + y";
         let variables = vec!["x".to_string(), "y".to_string()];
-        let eq_type = EquationType::RATE_LAW;
+        let eq_type = EquationType::RateLaw;
 
         let result = create_equation(
             eq,
@@ -230,7 +230,7 @@ mod tests {
 
             assert_eq!(eq_builder.species_id, "test");
             assert_eq!(eq_builder.equation, "2*x + y");
-            assert_eq!(eq_builder.equation_type, EquationType::RATE_LAW);
+            assert_eq!(eq_builder.equation_type, EquationType::RateLaw);
             assert_eq!(eq_builder.variables.len(), 2);
         }
     }

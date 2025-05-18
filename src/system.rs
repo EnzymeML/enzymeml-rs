@@ -51,7 +51,7 @@ impl EnzymeMLDocument {
         let has_odes = self
             .equations
             .iter()
-            .any(|eq| matches!(eq.equation_type, EquationType::ODE));
+            .any(|eq| matches!(eq.equation_type, EquationType::Ode));
         let has_kinetic_laws = self.reactions.iter().any(|rxn| rxn.kinetic_law.is_some());
 
         if has_odes && has_kinetic_laws {
@@ -212,7 +212,7 @@ fn create_species_ode(
     let equation = create_equation(
         &equation_string,
         species_ids,
-        EquationType::ODE,
+        EquationType::Ode,
         EnzymeMLDocState::Document(enzmldoc),
     )
     .map_err(|e| ODEError::EquationCreationFailed(e.to_string()))?

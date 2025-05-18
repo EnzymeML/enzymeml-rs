@@ -11,7 +11,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
             EquationBuilder::default()
                 .species_id("substrate")
                 .equation("-v_max * substrate / (K_M + substrate)")
-                .equation_type(EquationType::ODE)
+                .equation_type(EquationType::Ode)
                 .build()
                 .expect("Failed to build equation"),
         )
@@ -19,7 +19,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
             EquationBuilder::default()
                 .species_id("product")
                 .equation("v_max * substrate / (K_M + substrate)")
-                .equation_type(EquationType::ODE)
+                .equation_type(EquationType::Ode)
                 .build()
                 .expect("Failed to build equation"),
         )

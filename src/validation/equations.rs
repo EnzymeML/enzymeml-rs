@@ -24,7 +24,7 @@ pub fn check_equations(enzmldoc: &EnzymeMLDocument, report: &mut Report) {
     for (eq_idx, equation) in enzmldoc.equations.iter().enumerate() {
         check_equation_variables(report, equation, &all_species, eq_idx);
 
-        if matches!(equation.equation_type, EquationType::ODE) {
+        if matches!(equation.equation_type, EquationType::Ode) {
             check_ode_species_id(report, equation, &all_species, eq_idx);
         }
     }
@@ -142,7 +142,7 @@ mod tests {
             .to_equations(
                 EquationBuilder::default()
                     .species_id("S1".to_string())
-                    .equation_type(EquationType::ODE)
+                    .equation_type(EquationType::Ode)
                     .equation("S1 * 2".to_string())
                     .to_variables(
                         VariableBuilder::default()
@@ -182,7 +182,7 @@ mod tests {
             .to_equations(
                 EquationBuilder::default()
                     .species_id("S2".to_string())
-                    .equation_type(EquationType::ODE)
+                    .equation_type(EquationType::Ode)
                     .equation("S2 * 2".to_string())
                     .to_variables(
                         VariableBuilder::default()

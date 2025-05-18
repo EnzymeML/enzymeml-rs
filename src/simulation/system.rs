@@ -1179,10 +1179,10 @@ impl TryFrom<&EnzymeMLDocument> for ODESystem {
 
     fn try_from(doc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
         // Extract equations by type
-        let odes = extract_equation_by_type(&doc.equations, EquationType::ODE);
-        let assignments = extract_equation_by_type(&doc.equations, EquationType::ASSIGNMENT);
+        let odes = extract_equation_by_type(&doc.equations, EquationType::Ode);
+        let assignments = extract_equation_by_type(&doc.equations, EquationType::Assignment);
         let initial_assignments =
-            extract_equation_by_type(&doc.equations, EquationType::INITIAL_ASSIGNMENT);
+            extract_equation_by_type(&doc.equations, EquationType::InitialAssignment);
 
         let constants = collect_constants(doc);
         let params = doc
@@ -1318,7 +1318,7 @@ mod tests {
                 EquationBuilder::default()
                     .species_id("substrate".to_string())
                     .equation("-v_max * substrate / (K_M + substrate)".to_string())
-                    .equation_type(EquationType::ODE)
+                    .equation_type(EquationType::Ode)
                     .build()
                     .unwrap(),
             )
