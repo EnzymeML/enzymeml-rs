@@ -63,7 +63,7 @@ impl Transformation {
         let equation = EquationBuilder::default()
             .species_id(format!("{variable}_transformed"))
             .equation(equation_string.clone())
-            .equation_type(EquationType::INITIAL_ASSIGNMENT)
+            .equation_type(EquationType::InitialAssignment)
             .build()
             .map_err(|e| OptimizeError::TransformationError {
                 variable: variable.to_string(),

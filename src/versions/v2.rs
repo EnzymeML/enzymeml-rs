@@ -666,25 +666,25 @@ pub struct BaseUnit {
 pub enum ModifierRole {
     #[default]
     #[serde(rename = "activator")]
-    ACTIVATOR,
+    Activator,
 
     #[serde(rename = "additive")]
-    ADDITIVE,
+    Additive,
 
     #[serde(rename = "biocatalyst")]
-    BIOCATALYST,
+    Biocatalyst,
 
     #[serde(rename = "buffer")]
-    BUFFER,
+    Buffer,
 
     #[serde(rename = "catalyst")]
-    CATALYST,
+    Catalyst,
 
     #[serde(rename = "inhibitor")]
-    INHIBITOR,
+    Inhibitor,
 
     #[serde(rename = "solvent")]
-    SOLVENT,
+    Solvent,
 }
 
 #[allow(non_camel_case_types)]
@@ -692,16 +692,16 @@ pub enum ModifierRole {
 pub enum EquationType {
     #[default]
     #[serde(rename = "assignment")]
-    ASSIGNMENT,
+    Assignment,
 
     #[serde(rename = "initialAssignment")]
-    INITIAL_ASSIGNMENT,
+    InitialAssignment,
 
     #[serde(rename = "ode")]
-    ODE,
+    Ode,
 
     #[serde(rename = "rateLaw")]
-    RATE_LAW,
+    RateLaw,
 }
 
 #[allow(non_camel_case_types)]
@@ -709,31 +709,31 @@ pub enum EquationType {
 pub enum DataTypes {
     #[default]
     #[serde(rename = "absorbance")]
-    ABSORBANCE,
+    Absorbance,
 
     #[serde(rename = "amount")]
-    AMOUNT,
+    Amount,
 
     #[serde(rename = "concentration")]
-    CONCENTRATION,
+    Concentration,
 
     #[serde(rename = "conversion")]
-    CONVERSION,
+    Conversion,
 
     #[serde(rename = "fluorescence")]
-    FLUORESCENCE,
+    Fluorescence,
 
     #[serde(rename = "peakarea")]
-    PEAK_AREA,
+    PeakArea,
 
     #[serde(rename = "transmittance")]
-    TRANSMITTANCE,
+    Transmittance,
 
     #[serde(rename = "turnover")]
-    TURNOVER,
+    Turnover,
 
     #[serde(rename = "yield")]
-    YIELD,
+    Yield_,
 }
 
 #[allow(non_camel_case_types)]
@@ -741,104 +741,104 @@ pub enum DataTypes {
 pub enum UnitType {
     #[default]
     #[serde(rename = "ampere")]
-    AMPERE,
+    Ampere,
 
     #[serde(rename = "avogadro")]
-    AVOGADRO,
+    Avogadro,
 
     #[serde(rename = "becquerel")]
-    BECQUEREL,
+    Becquerel,
 
     #[serde(rename = "candela")]
-    CANDELA,
+    Candela,
 
     #[serde(rename = "celsius")]
-    CELSIUS,
+    Celsius,
 
     #[serde(rename = "coulomb")]
-    COULOMB,
+    Coulomb,
 
     #[serde(rename = "dimensionless")]
-    DIMENSIONLESS,
+    Dimensionless,
 
     #[serde(rename = "farad")]
-    FARAD,
+    Farad,
 
     #[serde(rename = "gram")]
-    GRAM,
+    Gram,
 
     #[serde(rename = "gray")]
-    GRAY,
+    Gray,
 
     #[serde(rename = "henry")]
-    HENRY,
+    Henry,
 
     #[serde(rename = "hertz")]
-    HERTZ,
+    Hertz,
 
     #[serde(rename = "item")]
-    ITEM,
+    Item,
 
     #[serde(rename = "joule")]
-    JOULE,
+    Joule,
 
     #[serde(rename = "katal")]
-    KATAL,
+    Katal,
 
     #[serde(rename = "kelvin")]
-    KELVIN,
+    Kelvin,
 
     #[serde(rename = "kilogram")]
-    KILOGRAM,
+    Kilogram,
 
     #[serde(rename = "litre")]
-    LITRE,
+    Litre,
 
     #[serde(rename = "lumen")]
-    LUMEN,
+    Lumen,
 
     #[serde(rename = "lux")]
-    LUX,
+    Lux,
 
     #[serde(rename = "metre")]
-    METRE,
+    Metre,
 
     #[serde(rename = "mole")]
-    MOLE,
+    Mole,
 
     #[serde(rename = "newton")]
-    NEWTON,
+    Newton,
 
     #[serde(rename = "ohm")]
-    OHM,
+    Ohm,
 
     #[serde(rename = "pascal")]
-    PASCAL,
+    Pascal,
 
     #[serde(rename = "radian")]
-    RADIAN,
+    Radian,
 
     #[serde(rename = "second")]
-    SECOND,
+    Second,
 
     #[serde(rename = "siemens")]
-    SIEMENS,
+    Siemens,
 
     #[serde(rename = "sievert")]
-    SIEVERT,
+    Sievert,
 
     #[serde(rename = "steradian")]
-    STERADIAN,
+    Steradian,
 
     #[serde(rename = "tesla")]
-    TESLA,
+    Tesla,
 
     #[serde(rename = "volt")]
-    VOLT,
+    Volt,
 
     #[serde(rename = "watt")]
-    WATT,
+    Watt,
 
     #[serde(rename = "weber")]
-    WEBER,
+    Weber,
 }

@@ -92,6 +92,7 @@ use case::CaseExt;
 use log::error;
 #[cfg(not(feature = "wasm"))]
 use plotly::ImageFormat;
+use rust_xlsxwriter::workbook::Workbook;
 
 // List all available transformations
 const AVAILABLE_TRANSFORMATIONS: &[&str] =
@@ -538,14 +539,18 @@ pub fn main() {
             }
 
             // We know the document is valid, so we can unwrap it
-            let enzmldoc = enzmldoc.unwrap();
+            let mut enzmldoc = enzmldoc.unwrap();
 
             match target {
                 ConversionTarget::Xlsx => {
+                    if *template {
+                        enzmldoc.measurements.clear();
+                    }
+
                     // Convert the document to XLSX
-                    enzmldoc
-                        .to_excel(output.to_path_buf(), *template)
+                    let mut workbook = Workbook::try_from(enzmldoc)
                         .expect("Failed to convert EnzymeML document to XLSX");
+                    workbook.save(output).expect("Failed to save XLSX file");
                 }
             }
         }

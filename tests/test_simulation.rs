@@ -359,7 +359,7 @@ mod test_simulation {
                 EquationBuilder::default()
                     .species_id("substrate")
                     .equation("-v_max * substrate / (K_M + substrate)") // Michaelis-Menten equation
-                    .equation_type(EquationType::ODE)
+                    .equation_type(EquationType::Ode)
                     .build()
                     .unwrap(),
             )
@@ -400,7 +400,7 @@ mod test_simulation {
             EquationBuilder::default()
                 .species_id("S_total")
                 .equation("substrate + product")
-                .equation_type(EquationType::INITIAL_ASSIGNMENT)
+                .equation_type(EquationType::InitialAssignment)
                 .build()
                 .unwrap(),
         );
@@ -409,7 +409,7 @@ mod test_simulation {
             EquationBuilder::default()
                 .species_id("product")
                 .equation("S_total - substrate")
-                .equation_type(EquationType::ASSIGNMENT)
+                .equation_type(EquationType::Assignment)
                 .build()
                 .unwrap(),
         );

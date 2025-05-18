@@ -8,25 +8,27 @@ on:
       - 'tests/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/test.yml'
   pull_request:
     paths:
       - 'src/**'
       - 'tests/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-
+      - '.github/workflows/test.yml'
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Build
-        run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose

@@ -13,59 +13,75 @@ name = "enzymeml"
 path = "src/bin/cli.rs"
 
 [dependencies]
+# Core dependencies
 derive_builder = "0.20.0"
 lazy_static = "1.5.0"
 meval = { version = "0.2.0", features = ["serde"] }
 schemars = "0.8.22"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.119"
-plotly = "0.12.1"
-ordered-float = "5.0"
-ndarray = "^0.15.6"
 thiserror = "2.0.9"
+jsonschema = { version = "0.30.0", default-features = false }
+itertools = "0.14.0"
+regex = "1.11.1"
+case = "1.0.0"
+getrandom = { version = "*", features = ["js"] }
+
+# CLI and logging
+clap = { version = "4.5.31", features = ["derive"] }
+colored = "3.0.0"
+tabled = "0.19.0"
+env_logger = "0.11.8"
+log = "0.4.27"
+
+# Math and numerical
+ndarray = "^0.15.6"
 nalgebra = "0.33.2"
+ordered-float = "5.0"
+rayon = "1.10.0"
 sha2 = "0.10.8"
+
+# Visualization
+plotly = "0.12.1"
+
+# Feature: simulation
 peroxide = { version = "0.39.2", optional = true }
-evalexpr-jit = { version = "0.2.0", features = ["nalgebra"], optional = true }
-splines = { version = "4.4.2", features = ["nalgebra"], optional = true }
-polars = { version = "0.41", features = [
-    "csv",
-], default-features = false, optional = true }
-calamine = { version = "0.25.0", optional = true }
-xlsxwriter = { version = "0.6.1", optional = true }
-argmin-observer-slog = { version = "0.1.0", optional = true }
+evalexpr-jit = { version = "0.2.1", features = ["nalgebra"], optional = true }
+splines = { version = "5.0.0", features = ["nalgebra"], optional = true }
+
+# Feature: optimization
 argmin = { version = "0.10.0", optional = true }
 argmin-math = { version = "0.4.0", features = [
     "ndarray_latest-nolinalg",
 ], optional = true }
+argmin-observer-slog = { version = "0.1.0", optional = true }
 finitediff = { version = "0.1.4", features = ["ndarray"], optional = true }
-egobox-ego = { version = "0.26.0", optional = true }
-getrandom = { version = "*", features = ["js"] }
-serde-wasm-bindgen = { version = "0.6.5", optional = true }
+egobox-ego = { version = "0.29.0", optional = true }
+
+# Feature: tabular
+polars = { version = "0.41", features = [
+    "csv",
+], default-features = false, optional = true }
+calamine = { version = "0.26.0", optional = true }
+rust_xlsxwriter = { version = "0.87.0", optional = true }
+
+# Feature: wasm
 wasm-bindgen = { version = "0.2.92", optional = true }
-jsonschema = { version = "0.29.0", default-features = false }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
 tsify-next = { version = "0.5.5", optional = true }
-clap = { version = "4.5.31", features = ["derive"] }
-itertools = "0.14.0"
-mdmodels = { version = "0.2.3", optional = true }
+
+# Feature: llm
+mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "main", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
-colored = "3.0.0"
-regex = "1.11.1"
-tabled = "0.18.0"
-env_logger = "0.11.8"
-log = "0.4.27"
-case = "1.0.0"
-rayon = "1.10.0"
 
 [profile.release]
 opt-level = 2
 lto = true
 codegen-units = 1
-debug = false
 
 [features]
 default = ["optimization", "simulation", "llm", "tabular", "plotly-kaleido"]
-tabular = ["polars", "calamine", "xlsxwriter"]
+tabular = ["polars", "calamine", "rust_xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
 llm = ["mdmodels", "tokio"]
@@ -90,4 +106,4 @@ glob = "0.3.2"
 md5 = "0.7.0"
 prettyplease = "0.2.31"
 syn = { version = "2.0.100", features = ["full", "parsing"] }
-mdmodels = "0.2.3"
+mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "main" }
