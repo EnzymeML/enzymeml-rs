@@ -71,7 +71,7 @@ serde-wasm-bindgen = { version = "0.6.5", optional = true }
 tsify-next = { version = "0.5.5", optional = true }
 
 # Feature: llm
-mdmodels = { version = "0.2.3", optional = true }
+mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "main", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
 
 [profile.release]
@@ -106,4 +106,4 @@ glob = "0.3.2"
 md5 = "0.7.0"
 prettyplease = "0.2.31"
 syn = { version = "2.0.100", features = ["full", "parsing"] }
-mdmodels = "0.2.3"
+mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "main" }

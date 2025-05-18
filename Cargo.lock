@@ -2436,8 +2436,7 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 [[package]]
 name = "mdmodels"
 version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "418f6d43ccfcc00aa61eb906140b1277f9a4cc7c41ee82e5a4f7b0ef2ca43dc8"
+source = "git+https://github.com/FAIRChemistry/md-models.git?branch=main#333965068bf75fecad6829440e608f0f3a4b1350"
 dependencies = [
  "clap",
  "colored",
