@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-use crate::{conversion::ConversionError, simulation::error::SimulationError};
+use crate::{
+    conversion::ConversionError, objective::error::ObjectiveError,
+    simulation::error::SimulationError,
+};
 
 #[derive(Error, Debug)]
 pub enum OptimizeError {
@@ -10,8 +13,6 @@ pub enum OptimizeError {
     MissingInitialValues { missing: Vec<String> },
     #[error("Error optimizing")]
     ArgMinError(argmin::core::Error),
-    #[error("Failed to convert measurement to array format")]
-    MeasurementConversionError(#[from] Box<dyn std::error::Error>),
     #[error("No time data found in measurement")]
     MissingTimeData,
     #[error("Failed to simulate with given parameters")]
@@ -67,4 +68,10 @@ pub enum OptimizeError {
     HessianNotInvertible,
     #[error("Hessian can not be converted to ndarray")]
     HessianNotConvertibleToNdarray,
+    #[error("Unknown parameter {0}")]
+    UnknownParameter(String),
+    #[error("Failed to calculate log probability")]
+    ObjectiveError(#[from] ObjectiveError),
+    #[error("Failed to parse profile parameter {0}. Expected format: 'param_name=from,to'.")]
+    ProfileParameterParseError(String),
 }
