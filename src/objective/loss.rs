@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
 };
 
-use clap::ValueEnum;
 /// # Loss Functions Module
 ///
 /// This module provides a comprehensive implementation of various loss functions
@@ -39,7 +38,7 @@ use super::{error::ObjectiveError, objfun::ObjectiveFunction};
 /// Loss functions are used to measure the discrepancy between predicted and actual values
 /// in machine learning and optimization problems. Each variant represents a different
 /// approach to calculating the error or cost of a model's predictions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, ValueEnum)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum LossFunction {
     /// Sum of Squared Errors (SSE): Measures sum of squared differences between predictions and actual values
     SSE,
@@ -52,6 +51,8 @@ pub enum LossFunction {
     LogCosh,
     /// Mean Absolute Error (MAE): Measures average absolute difference between predictions and actual values
     MAE,
+    /// Negative Log Likelihood (NLL): Measures the negative log likelihood of observing the data given a model with Gaussian NLL
+    NLL(NegativeLogLikelihood),
 }
 
 impl ObjectiveFunction for LossFunction {
@@ -70,6 +71,7 @@ impl ObjectiveFunction for LossFunction {
             LossFunction::RMSE => RootMeanSquaredError.cost(residuals, n_points),
             LossFunction::LogCosh => LogCosh.cost(residuals, n_points),
             LossFunction::MAE => MeanAbsoluteError.cost(residuals, n_points),
+            LossFunction::NLL(nll) => nll.cost(residuals, n_points),
         }
     }
 }
@@ -82,6 +84,7 @@ impl Display for LossFunction {
             LossFunction::RMSE => write!(f, "Root Mean Squared Error"),
             LossFunction::LogCosh => write!(f, "Log-Cosh Loss"),
             LossFunction::MAE => write!(f, "Mean Absolute Error"),
+            LossFunction::NLL(sigma) => write!(f, "Negative Log Likelihood (sigma={})", sigma),
         }
     }
 }
@@ -90,14 +93,33 @@ impl FromStr for LossFunction {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "sse" => Ok(LossFunction::SSE),
-            "mse" => Ok(LossFunction::MSE),
-            "rmse" => Ok(LossFunction::RMSE),
-            "logcosh" => Ok(LossFunction::LogCosh),
-            "mae" => Ok(LossFunction::MAE),
-            _ => Err(format!("Invalid loss function: {}", s)),
+        use regex::Regex;
+
+        let s = s.to_lowercase();
+
+        // Simple string matches for basic cases
+        match s.as_str() {
+            "sse" => return Ok(LossFunction::SSE),
+            "mse" => return Ok(LossFunction::MSE),
+            "rmse" => return Ok(LossFunction::RMSE),
+            "logcosh" => return Ok(LossFunction::LogCosh),
+            "mae" => return Ok(LossFunction::MAE),
+            _ => {}
         }
+
+        // Use regex for complex pattern matching
+        let nll_pattern = Regex::new(r"^nll\((\d+\.?\d*)\)$").map_err(|e| e.to_string())?;
+        if let Some(captures) = nll_pattern.captures(&s) {
+            let sigma = captures
+                .get(1)
+                .ok_or_else(|| "Failed to capture sigma value".to_string())?
+                .as_str()
+                .parse::<f64>()
+                .map_err(|e| format!("Invalid sigma value: {}", e))?;
+            return Ok(LossFunction::NLL(NegativeLogLikelihood::new(sigma)));
+        }
+
+        Err(format!("Invalid loss function: {}", s))
     }
 }
 
@@ -277,6 +299,64 @@ impl ObjectiveFunction for MeanAbsoluteError {
 impl Display for MeanAbsoluteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Mean Absolute Error")
+    }
+}
+
+/// Negative Log Likelihood Loss Function
+///
+/// This loss function represents the negative log likelihood of observing the data
+/// given a model with Gaussian noise. It is commonly used in statistical modeling
+/// and maximum likelihood estimation.
+///
+/// Key characteristics:
+/// - Statistically motivated cost function
+/// - Accounts for measurement uncertainty via sigma parameter
+/// - Equivalent to MSE with additional normalization terms
+/// - Suitable for parameter estimation with known measurement error
+#[derive(Debug, Clone, Copy)]
+pub struct NegativeLogLikelihood {
+    /// 0.5 * ln(2π σ²)   (pre‑multiplied constant part per data point)
+    log_norm_half: f64,
+    /// 0.5 / σ²          (multiply with SSE)
+    half_inv_sigma_sq: f64,
+    sigma: f64,
+}
+
+impl NegativeLogLikelihood {
+    /// Construct a new loss function for a *known* noise standard deviation σ.
+    #[inline]
+    pub fn new(sigma: f64) -> Self {
+        assert!(
+            sigma.is_finite() && sigma > 0.0,
+            "σ must be a positive finite number"
+        );
+        let sigma_sq = sigma * sigma;
+        Self {
+            log_norm_half: 0.5 * (2.0 * std::f64::consts::PI * sigma_sq).ln(),
+            half_inv_sigma_sq: 0.5 / sigma_sq,
+            sigma,
+        }
+    }
+
+    /// Evaluate −log L for an arbitrary Nd array of residuals.
+    ///
+    /// Accepts `Array1` (`y - f`), a view, or a flattened `Array2`.
+    #[inline]
+    fn cost(&self, residuals: &Array2<f64>, n_points: usize) -> Result<f64, ObjectiveError> {
+        let sse: f64 = residuals.mapv(|r| r * r).sum();
+        Ok(n_points as f64 * self.log_norm_half + self.half_inv_sigma_sq * sse)
+    }
+}
+
+impl Display for NegativeLogLikelihood {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Negative Log Likelihood (sigma={})", self.sigma)
+    }
+}
+
+impl From<NegativeLogLikelihood> for LossFunction {
+    fn from(value: NegativeLogLikelihood) -> Self {
+        LossFunction::NLL(value)
     }
 }
 
