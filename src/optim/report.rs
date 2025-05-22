@@ -79,7 +79,7 @@ impl OptimizationReport {
     /// # Returns
     /// * `Result<OptimizationReport, OptimizeError>` - A report containing all optimization
     ///   results and analysis if successful, or an error if analysis fails
-    pub(crate) fn new<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+    pub(crate) fn new<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
         problem: &Problem<S, L>,
         doc: EnzymeMLDocument,
         param_vec: &[f64],
@@ -159,7 +159,7 @@ impl OptimizationReport {
     ///
     /// # Returns
     /// * `Result<HashMap<String, SimulationResult>, OptimizeError>` - Map of measurement IDs to simulation results
-    fn simulate_fits<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+    fn simulate_fits<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
         problem: &Problem<S, L>,
         doc: &EnzymeMLDocument,
         param_vec: &[f64],
@@ -188,8 +188,8 @@ impl OptimizationReport {
     /// * `doc` - EnzymeML document with data
     ///
     /// # Returns
-    /// * `Result<(f64, f64), OptimizeError>` - Tuple of (AIC, BIC) values
-    fn calculate_metrics<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+    /// * `Result<(f64, f64, f64), OptimizeError>` - Tuple of (AIC, BIC, cost) values
+    fn calculate_metrics<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
         problem: &Problem<S, L>,
         param_vec: &[f64],
         doc: &EnzymeMLDocument,
