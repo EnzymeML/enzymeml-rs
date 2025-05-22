@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use ndarray::{Array2, Array3};
+use ndarray::{Array1, Array2};
 use peroxide::fuga::ODEIntegrator;
 use sha2::{Digest, Sha256};
 
@@ -49,12 +48,11 @@ pub struct Problem<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
     measurement_buffer: Array2<f64>,
     n_points: usize,
 
-    // Buffers for intermediate calculations
-    residual_buffer: RefCell<Array2<f64>>,
-    sensitivity_buffer: RefCell<Array3<f64>>,
-
     // Buffers for evaluation times
     evaluation_times: Vec<Vec<f64>>,
+
+    // Fixed parameters
+    pub(crate) fixed_params: Array1<f64>,
 }
 
 impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
@@ -70,6 +68,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
         solver: S,
         dt: Option<f64>,
         transformations: Option<Vec<Transformation>>,
+        fixed_params: impl Into<Option<Vec<String>>>,
     ) -> Result<Self, OptimizeError> {
         // Cloning the enzymeml document to avoid modifying the original document
         // We might need to add transformations, which will be used for initial assignments
@@ -109,6 +108,18 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
             .filter_map(|s| species_order.iter().position(|sp| sp == s))
             .collect();
 
+        // Get fixed parameters
+        let fixed_params = fixed_params.into();
+        let mut fixed_params_array: Array1<f64> = Array1::ones(doc.parameters.len());
+
+        if let Some(fixed_params) = fixed_params {
+            for (i, param) in ode_system.get_sorted_params().iter().enumerate() {
+                if fixed_params.contains(&param) {
+                    fixed_params_array[i] = 0.0;
+                }
+            }
+        }
+
         Ok(Self {
             doc: enzmldoc.clone(),
             initials,
@@ -118,11 +129,10 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
             objective,
             ode_system,
             measurement_buffer,
-            residual_buffer: RefCell::new(Array2::zeros((0, 0))),
-            sensitivity_buffer: RefCell::new(Array3::zeros((0, 0, 0))),
             evaluation_times,
             n_points,
             observable_species,
+            fixed_params: fixed_params_array,
         })
     }
 
@@ -334,6 +344,14 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
         &self.doc
     }
 
+    /// Returns a reference to the underlying EnzymeML document
+    ///
+    /// # Returns
+    /// * `&EnzymeMLDocument` - Reference to the EnzymeML document containing the model definition
+    pub fn enzmldoc_mut(&mut self) -> &mut EnzymeMLDocument {
+        &mut self.doc
+    }
+
     /// Returns a reference to the ODE system representation of the model
     ///
     /// # Returns
@@ -398,38 +416,6 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
         &self.measurement_buffer
     }
 
-    /// Returns a reference to the residual buffer
-    ///
-    /// # Returns
-    /// * `&Array2<f64>` - Reference to the residual buffer
-    pub fn residual_buffer(&self) -> &RefCell<Array2<f64>> {
-        &self.residual_buffer
-    }
-
-    /// Sets the residual buffer
-    ///
-    /// # Arguments
-    /// * `residual_buffer` - The residual buffer to set
-    pub fn set_residual_buffer(&self, residual_buffer: Array2<f64>) {
-        *self.residual_buffer.borrow_mut() = residual_buffer;
-    }
-
-    /// Returns a reference to the sensitivity buffer
-    ///
-    /// # Returns
-    /// * `&RefCell<Array3<f64>>` - Reference to the sensitivity buffer
-    pub fn sensitivity_buffer(&self) -> &RefCell<Array3<f64>> {
-        &self.sensitivity_buffer
-    }
-
-    /// Sets the sensitivity buffer
-    ///
-    /// # Arguments
-    /// * `sensitivity_buffer` - The sensitivity buffer to set
-    pub fn set_sensitivity_buffer(&self, sensitivity_buffer: Array3<f64>) {
-        *self.sensitivity_buffer.borrow_mut() = sensitivity_buffer;
-    }
-
     /// Returns the total number of data points across all measurements
     ///
     /// Counts the number of data points by summing up the length of data arrays
@@ -448,6 +434,45 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
     pub fn evaluation_times(&self) -> &Vec<Vec<f64>> {
         &self.evaluation_times
     }
+
+    /// Fixes a parameter
+    ///
+    /// # Arguments
+    /// * `param` - The parameter to fix
+    ///
+    /// # Returns
+    /// * `Result<(), OptimizeError>` - Ok(()) if the parameter was fixed
+    pub fn fix_param(&mut self, param: &str) -> Result<(), OptimizeError> {
+        let index = self
+            .ode_system
+            .get_sorted_params()
+            .iter()
+            .position(|p| p == param)
+            .ok_or(OptimizeError::UnknownParameter(param.to_string()))?;
+        self.fixed_params[index] = 0.0;
+        Ok(())
+    }
+
+    /// Unfixes a parameter
+    ///
+    /// # Arguments
+    /// * `param` - The parameter to unfix
+    ///
+    /// # Returns
+    pub fn unfix_param(&mut self, param: &str) -> Result<(), OptimizeError> {
+        let index = self
+            .ode_system
+            .get_sorted_params()
+            .iter()
+            .position(|p| p == param)
+            .ok_or(OptimizeError::UnknownParameter(param.to_string()))?;
+        self.fixed_params[index] = 1.0;
+        Ok(())
+    }
+
+    pub fn fixed_params(&self) -> &Array1<f64> {
+        &self.fixed_params
+    }
 }
 
 pub struct ProblemBuilder<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
@@ -455,6 +480,7 @@ pub struct ProblemBuilder<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
     objective: L,
     dt: f64,
     transformations: Vec<Transformation>,
+    fixed_params: Vec<String>,
     solver: S,
 }
 
@@ -474,6 +500,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> ProblemBuilder<S, L> {
             objective,
             dt: 0.1,
             transformations: vec![],
+            fixed_params: vec![],
             solver,
         }
     }
@@ -505,6 +532,24 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> ProblemBuilder<S, L> {
         self
     }
 
+    /// Adds a fixed parameter
+    ///
+    /// # Arguments
+    /// * `param` - Parameter to add
+    pub fn fixed_param(mut self, param: String) -> Self {
+        self.fixed_params.push(param);
+        self
+    }
+
+    /// Sets the fixed parameters
+    ///
+    /// # Arguments
+    /// * `fixed_params` - Vector of fixed parameters
+    pub fn fixed_params(mut self, fixed_params: Vec<String>) -> Self {
+        self.fixed_params = fixed_params;
+        self
+    }
+
     /// Builds the Problem instance with the configured settings
     ///
     /// # Returns
@@ -521,6 +566,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> ProblemBuilder<S, L> {
             self.solver,
             Some(self.dt),
             transformations,
+            Some(self.fixed_params),
         )
     }
 }
