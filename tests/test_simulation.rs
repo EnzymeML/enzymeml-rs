@@ -52,7 +52,7 @@ mod test_simulation {
         let system: ODESystem = enzmldoc.try_into().unwrap();
         let result = system.integrate::<SimulationResult>(
             &setup,
-            initial_conditions.clone(),
+            &initial_conditions,
             None,
             None,
             RK5,
@@ -207,7 +207,7 @@ mod test_simulation {
         let system: ODESystem = enzmldoc.try_into().unwrap();
         let result = system.integrate::<MatrixResult>(
             &setup,
-            initial_conditions.clone(),
+            &initial_conditions,
             None,
             None,
             RK5,
@@ -283,7 +283,7 @@ mod test_simulation {
         let system: ODESystem = enzmldoc.try_into().unwrap();
         let result = system.integrate::<SimulationResult>(
             &setup,
-            initial_conditions.clone(),
+            &initial_conditions,
             None,
             None,
             RK5,
@@ -333,7 +333,7 @@ mod test_simulation {
         let result = system
             .integrate::<SimulationResult>(
                 &setup,
-                initial_conditions.clone(),
+                &initial_conditions,
                 None,
                 None,
                 RK5,
