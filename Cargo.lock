@@ -2465,8 +2465,9 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "mdmodels"
-version = "0.2.3"
-source = "git+https://github.com/FAIRChemistry/md-models.git?branch=main#333965068bf75fecad6829440e608f0f3a4b1350"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7b0ce59fe3d5f5c3ddb65c59f64b1a803f8c38d2ad2112de7095d86edd8463c"
 dependencies = [
  "clap",
  "colored",
@@ -3072,7 +3073,8 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 [[package]]
 name = "peroxide"
 version = "0.39.6"
-source = "git+https://github.com/JR-1991/Peroxide.git?branch=butcher-tableau-send#a28b3fb6b888c8ca27c55dfac0444eb67f26a3d2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "356458acb21e3207365c720f0cd32754f45279dfc88b838a0f1ea38bdc2856ed"
 dependencies = [
  "anyhow",
  "matrixmultiply",
