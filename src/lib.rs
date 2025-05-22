@@ -113,6 +113,11 @@ pub mod objective {
     pub mod objfun;
 }
 
+#[cfg(feature = "optimization")]
+pub mod identifiability {
+    pub mod profile;
+}
+
 #[cfg(feature = "llm")]
 pub mod llm;
 
