@@ -174,7 +174,7 @@ fn get_simulation_traces(
 
     let result = system.integrate::<SimulationResult>(
         &setup,
-        initial_conditions,
+        &initial_conditions,
         None,
         None,
         solver,
