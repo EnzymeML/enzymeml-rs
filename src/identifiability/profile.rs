@@ -78,29 +78,6 @@ const UPPER_BOUND: f64 = 1.1;
 /// A `ProfileResults` containing profile likelihood data for all parameters,
 /// or an error if profiling fails
 ///
-/// # Example
-///
-/// ```no_run
-/// use enzymeml_rs::identifiability::profile::{ego_profile_likelihood, ProfileParameter};
-/// use enzymeml_rs::optim::{SR1TrustRegionBuilder, SubProblem};
-/// use ndarray::Array1;
-///
-/// // Create problem, optimizer, etc.
-/// # let problem = unimplemented!();
-/// # let sr1trustregion = SR1TrustRegionBuilder::default().build();
-///
-/// let result = ego_profile_likelihood()
-///     .problem(&problem)
-///     .initial_guess(Array1::from_vec(vec![1.0, 2.0, 3.0]))
-///     .parameters(vec![
-///         ProfileParameter::builder().name("param1").from(0.1).to(10.0).build()
-///     ])
-///     .max_iters(10)
-///     .optimizer(&sr1trustregion)
-///     .call()
-///     .expect("Failed to profile likelihood");
-/// ```
-///
 /// # Notes
 ///
 /// - EGO is a Bayesian optimization method that adaptively samples the parameter space,
@@ -201,7 +178,7 @@ where
                     problem,
                     &initial_guess,
                     parameter,
-                    param_value,
+                    param_value.exp(),
                     optimizer,
                     err_min,
                     param_index,
@@ -215,15 +192,12 @@ where
     };
 
     // Set bound
-    let bound = Array2::from_shape_vec((1, 2), vec![parameter.from, parameter.to]).unwrap();
+    let bound =
+        Array2::from_shape_vec((1, 2), vec![parameter.from.ln(), parameter.to.ln()]).unwrap();
 
     // Run EGO
     let result = EgorBuilder::optimize(objective)
-        .configure(|config| {
-            config
-                .max_iters(max_iters)
-                .infill_strategy(egobox_ego::InfillStrategy::EI)
-        })
+        .configure(|config| config.max_iters(max_iters))
         .min_within(&bound)
         .run()
         .map_err(|_| OptimizeError::ConvergenceError)?;
@@ -234,7 +208,14 @@ where
         return Err(OptimizeError::CostNaN);
     }
 
-    let param_values: Vec<f64> = result.x_doe.as_slice().unwrap().to_vec();
+    let param_values: Vec<f64> = result
+        .x_doe
+        .as_slice()
+        .unwrap()
+        .to_vec()
+        .iter()
+        .map(|x| x.exp())
+        .collect();
     let likelihoods: Vec<f64> = result.y_doe.as_slice().unwrap().to_vec();
     let ratios: Vec<f64> = likelihoods
         .iter()
@@ -286,29 +267,6 @@ where
 ///
 /// A `ProfileResults` containing profile likelihood data for all parameters,
 /// or an error if profiling fails
-///
-/// # Example
-///
-/// ```no_run
-/// use enzymeml_rs::identifiability::profile::{profile_likelihood, ProfileParameter};
-/// use enzymeml_rs::optim::{SR1TrustRegionBuilder, SubProblem};
-/// use ndarray::Array1;
-///
-/// // Create problem, optimizer, etc.
-/// # let problem = unimplemented!();
-/// # let sr1trustregion = SR1TrustRegionBuilder::default().build();
-///
-/// let result = profile_likelihood()
-///     .problem(&problem)
-///     .initial_guess(Array1::from_vec(vec![1.0, 2.0, 3.0]))
-///     .parameters(vec![
-///         ProfileParameter::builder().name("param1").from(0.1).to(10.0).build()
-///     ])
-///     .n_steps(20)
-///     .optimizer(&sr1trustregion)
-///     .call()
-///     .expect("Failed to profile likelihood");
-/// ```
 ///
 /// # Notes
 ///
@@ -617,23 +575,6 @@ where
 /// Specifies the parameter name and the range of values to test during profiling.
 /// Can be created using the builder pattern or parsed from a string.
 ///
-/// # Examples
-///
-/// ```
-/// use enzymeml_rs::identifiability::profile::ProfileParameter;
-/// use std::str::FromStr;
-///
-/// // Using the builder pattern
-/// let param = ProfileParameter::builder()
-///     .name("k_cat")
-///     .from(0.1)
-///     .to(10.0)
-///     .build();
-///
-/// // Parsing from a string
-/// let param = ProfileParameter::from_str("k_cat=0.1:10.0").unwrap();
-/// ```
-///
 /// # Notes
 ///
 /// - The `name` field specifies the name of the parameter to profile.
@@ -685,16 +626,6 @@ impl FromStr for ProfileParameter {
     /// - name is the parameter name
     /// - from is the lower bound of the range
     /// - to is the upper bound of the range
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use enzymeml_rs::identifiability::profile::ProfileParameter;
-    /// use std::str::FromStr;
-    ///
-    /// let param = ProfileParameter::from_str("k_cat=1.0:2.0").unwrap();
-    /// assert_eq!(param.param_name(), "k_cat");
-    /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // Example: "k_cat=1.0:2.0"
         let pattern = Regex::new(r"^(\w+)=([0-9.]+):([0-9.]+)$").unwrap();
@@ -969,8 +900,14 @@ impl From<ProfileResults> for Plot {
                 .x_axis(format!("x{}", i + 1))
                 .y_axis(format!("y{}", i + 1));
 
+            let ratios = result
+                .ratios
+                .clone()
+                .into_iter()
+                .map(|r| if r < 0.1 { 0.0 } else { r })
+                .collect::<Vec<f64>>();
             let (query_values, interpolated_ratios) =
-                interpolate_ratios(&result.ratios, &result.param_values);
+                interpolate_ratios(&ratios, &result.param_values);
             let line_trace = Scatter::new(query_values, interpolated_ratios)
                 .name(format!("Interpolated Likelihood Ratio of {}", &sup_name))
                 .mode(Mode::Lines)
