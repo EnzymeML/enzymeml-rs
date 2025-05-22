@@ -112,7 +112,7 @@ impl<'a> ODEProblemWithContext<'a> {
     }
 }
 
-impl<'a> ODEProblem for ODEProblemWithContext<'a> {
+impl ODEProblem for ODEProblemWithContext<'_> {
     fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
         // This is safe because we know ODEProblemWithContext has exclusive access to the context
         // during the ODE solver's execution, and the solver won't call rhs concurrently
@@ -129,12 +129,9 @@ impl<'a> ODEProblem for ODEProblemWithContext<'a> {
 
         context.input_buffer[0] = t;
 
-        // Copy species values - direct copy is faster than multiple slices
-        for i in 0..species_len {
-            context.input_buffer[i + 1] = y[i];
-        }
+        // Copy species values
+        context.input_buffer[1..(species_len + 1)].copy_from_slice(&y[..species_len]);
 
-        // Copy parameters - avoid slice operations
         let params_start = self.system.species_range.1;
         let params_len = context.params_buffer.len();
         for i in 0..params_len {
@@ -442,6 +439,7 @@ impl ODESystem {
     }
 
     // Internal implementation for integrate_with_context
+    #[allow(clippy::too_many_arguments)]
     fn integrate_internal<T: OutputFormat>(
         &self,
         context: &mut ODESystemContext,
@@ -490,9 +488,8 @@ impl ODESystem {
             // Copy values directly into buffer for better performance
             // Species values
             let species_len = self.num_equations();
-            for i in 0..species_len {
-                context.input_buffer[i + 1] = initial_conditions[i];
-            }
+            context.input_buffer[1..(species_len + 1)]
+                .copy_from_slice(&initial_conditions[..species_len]);
 
             // Parameters
             let params_start = self.species_range.1;
@@ -577,6 +574,7 @@ impl ODESystem {
     }
 
     // Internal implementation for bulk_integrate_with_context
+    #[allow(clippy::too_many_arguments)]
     fn bulk_integrate_internal<T: OutputFormat + Send>(
         &self,
         context: &ODESystemContext,
@@ -654,38 +652,33 @@ impl ODESystem {
 
             // Species - use direct indexing for better cache performance
             let species_len = self.num_equations();
-            for i in 0..species_len {
-                input_buffer[i + 1] = y[i];
-            }
+            input_buffer[1..(species_len + 1)].copy_from_slice(&y[..species_len]);
 
             // Copy other values from context buffers
             // Parameters
             let params_start = self.species_range.1;
             let params_len = context.params_buffer.len();
-            for i in 0..params_len {
-                input_buffer[params_start + i] = context.params_buffer[i];
-            }
+            input_buffer[params_start..(params_len + params_start)]
+                .copy_from_slice(&context.params_buffer[..params_len]);
 
             // Assignments
             let assignments_start = self.parameters_range.1;
             let assignments_len = context.assignment_buffer.len();
-            for i in 0..assignments_len {
-                input_buffer[assignments_start + i] = context.assignment_buffer[i];
-            }
+            input_buffer[assignments_start..(assignments_len + assignments_start)]
+                .copy_from_slice(&context.assignment_buffer[..assignments_len]);
 
             // Initial assignments
             let initial_assignments_start = self.assignment_rules_range.1;
             let initial_assignments_len = context.initial_assignment_buffer.len();
-            for i in 0..initial_assignments_len {
-                input_buffer[initial_assignments_start + i] = context.initial_assignment_buffer[i];
-            }
+            input_buffer
+                [initial_assignments_start..(initial_assignments_len + initial_assignments_start)]
+                .copy_from_slice(&context.initial_assignment_buffer[..initial_assignments_len]);
 
             // Constants
             let constants_start = self.initial_assignments_range.1;
             let constants_len = context.constants_buffer.len();
-            for i in 0..constants_len {
-                input_buffer[constants_start + i] = context.constants_buffer[i];
-            }
+            input_buffer[constants_start..(constants_len + constants_start)]
+                .copy_from_slice(&context.constants_buffer[..constants_len]);
 
             // Evaluate and push results
             let mut result = vec![0.0; n_assignments];
@@ -714,6 +707,7 @@ impl ODESystem {
     /// # Returns
     ///
     /// Returns a Result containing the integration results in the specified output format
+    #[allow(clippy::too_many_arguments)]
     pub fn integrate_with_context<T: OutputFormat>(
         &self,
         context: &mut ODESystemContext,
@@ -754,6 +748,7 @@ impl ODESystem {
     /// # Returns
     ///
     /// Returns a Result containing a Vec of integration results
+    #[allow(clippy::too_many_arguments)]
     pub fn bulk_integrate_with_context<T: OutputFormat + Send>(
         &self,
         context: &ODESystemContext,
