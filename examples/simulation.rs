@@ -104,7 +104,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
     // By implementing the OutputFormat trait, you can create your own custom output formats
     let result = system.integrate::<SimulationResult>(
         &setup,
-        initial_conditions,
+        &initial_conditions,
         None,                // We could also dynamically set new parameters
         None,                // We could also provide specific time points to extract
         RK5,                 // We could also use a different solver
