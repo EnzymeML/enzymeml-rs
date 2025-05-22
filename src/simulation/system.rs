@@ -13,8 +13,8 @@
 //! indices in the state vector, along with buffers for efficient computation.
 
 use std::{
+    cell::UnsafeCell,
     collections::{HashMap, HashSet},
-    sync::Mutex,
 };
 
 use evalexpr_jit::prelude::*;
@@ -65,20 +65,8 @@ pub struct ODESystem {
     grad_params: EquationSystem,
     grad_species: EquationSystem,
 
-    // Buffers used for intermediate calculations
-    initial_assignment_buffer: Mutex<Vec<f64>>,
-    assignment_buffer: Mutex<Vec<f64>>,
-    species_buffer: Mutex<Vec<f64>>,
-    params_buffer: Mutex<Vec<f64>>,
-    constants_buffer: Mutex<Vec<f64>>,
-
-    // Mode
-    mode: Mutex<Mode>,
-
-    /// Buffer for system evaluation input vector
-    input_buffer: Mutex<Vec<f64>>,
-    /// Buffer for assignment rule evaluations
-    assignments_result_buffer: Mutex<Vec<f64>>,
+    // Default values for parameters - these will be used to initialize contexts
+    default_params: Vec<f64>,
 
     /// Starts and ends of the parts of the input vector
     species_range: (usize, usize),
@@ -86,6 +74,138 @@ pub struct ODESystem {
     initial_assignments_range: (usize, usize),
     assignment_rules_range: (usize, usize),
     constants_range: (usize, usize),
+}
+
+/// Context object that contains mutable state for an ODESystem.
+///
+/// This allows thread-safe execution by holding mutable state that can be passed
+/// explicitly to simulation methods.
+#[derive(Clone)]
+pub struct ODESystemContext {
+    // Buffers used for intermediate calculations
+    pub(crate) initial_assignment_buffer: Vec<f64>,
+    pub(crate) assignment_buffer: Vec<f64>,
+    pub(crate) params_buffer: Vec<f64>,
+    pub(crate) constants_buffer: Vec<f64>,
+
+    // Mode
+    pub(crate) mode: Mode,
+
+    // Buffer for system evaluation input vector
+    pub(crate) input_buffer: Vec<f64>,
+    // Buffer for assignment rule evaluations
+    pub(crate) assignments_result_buffer: Vec<f64>,
+}
+
+/// Wrapper struct that implements ODEProblem for an ODESystem with its context
+struct ODEProblemWithContext<'a> {
+    system: &'a ODESystem,
+    context: UnsafeCell<&'a mut ODESystemContext>,
+}
+
+impl<'a> ODEProblemWithContext<'a> {
+    fn new(system: &'a ODESystem, context: &'a mut ODESystemContext) -> Self {
+        Self {
+            system,
+            context: UnsafeCell::new(context),
+        }
+    }
+}
+
+impl<'a> ODEProblem for ODEProblemWithContext<'a> {
+    fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
+        // This is safe because we know ODEProblemWithContext has exclusive access to the context
+        // during the ODE solver's execution, and the solver won't call rhs concurrently
+        let context = unsafe { &mut *self.context.get() };
+
+        // Build the input vector (reuse the existing buffer instead of clearing and refilling)
+        let species_len = self.system.num_equations();
+
+        if context.input_buffer.len() < self.system.sorted_vars.len() + 1 {
+            context
+                .input_buffer
+                .resize(self.system.sorted_vars.len() + 1, 0.0);
+        }
+
+        context.input_buffer[0] = t;
+
+        // Copy species values - direct copy is faster than multiple slices
+        for i in 0..species_len {
+            context.input_buffer[i + 1] = y[i];
+        }
+
+        // Copy parameters - avoid slice operations
+        let params_start = self.system.species_range.1;
+        let params_len = context.params_buffer.len();
+        for i in 0..params_len {
+            context.input_buffer[params_start + i] = context.params_buffer[i];
+        }
+
+        // Copy assignment values
+        let assignments_start = self.system.parameters_range.1;
+        let assignments_len = context.assignment_buffer.len();
+        for i in 0..assignments_len {
+            context.input_buffer[assignments_start + i] = context.assignment_buffer[i];
+        }
+
+        // Copy initial assignment values
+        let initial_assignments_start = self.system.assignment_rules_range.1;
+        let initial_assignments_len = context.initial_assignment_buffer.len();
+        for i in 0..initial_assignments_len {
+            context.input_buffer[initial_assignments_start + i] =
+                context.initial_assignment_buffer[i];
+        }
+
+        // Copy constants
+        let constants_start = self.system.initial_assignments_range.1;
+        let constants_len = context.constants_buffer.len();
+        for i in 0..constants_len {
+            context.input_buffer[constants_start + i] = context.constants_buffer[i];
+        }
+
+        if self.system.has_assignments() {
+            // Evaluate Assignment rules
+            self.system.assignment_jit.fun()(
+                &context.input_buffer,
+                &mut context.assignments_result_buffer,
+            );
+
+            // Update assignments in input buffer
+            let (assignments_start, _) = self.system.get_assignment_ranges();
+            for i in 0..context.assignments_result_buffer.len() {
+                context.input_buffer[*assignments_start + i] = context.assignments_result_buffer[i];
+                context.assignment_buffer[i] = context.assignments_result_buffer[i];
+            }
+        }
+
+        // Compute based on mode
+        match context.mode {
+            Mode::Sensitivity => {
+                let params_len = context.params_buffer.len();
+                let (species_slice, sensitivity_slice) = dy.split_at_mut(species_len);
+
+                // Calculate species derivatives
+                self.system.ode_jit.fun()(&context.input_buffer, species_slice);
+
+                // Calculate sensitivity
+                let s = DMatrixView::from_slice(&y[species_len..], species_len, params_len);
+                let mut ds = DMatrixViewMut::from_slice(sensitivity_slice, species_len, params_len);
+
+                calculate_sensitivity(
+                    &context.input_buffer,
+                    &self.system.grad_species,
+                    &self.system.grad_params,
+                    s,
+                    &mut ds,
+                );
+            }
+            Mode::Regular => {
+                self.system.ode_jit.fun()(&context.input_buffer, dy);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl ODESystem {
@@ -120,7 +240,7 @@ impl ODESystem {
         assignments: HashMap<String, String>,
         params: HashMap<String, f64>,
         mut constants: Vec<String>,
-        mode: Option<Mode>,
+        _mode: Option<Mode>,
     ) -> Result<Self, SimulationError> {
         // We need to create an index mapping for all variables
         // 0. Time
@@ -151,6 +271,7 @@ impl ODESystem {
         sorted_vars.extend(assignment_rules.clone());
         sorted_vars.extend(initial_assignment_rules.clone());
         sorted_vars.extend(constants.clone());
+
         // Create the variable mapping
         let var_map = HashMap::from_iter(
             sorted_vars
@@ -167,6 +288,7 @@ impl ODESystem {
             Self::derive_mapping(&var_map, &initial_assignment_rules)?;
         let assignment_rules_mapping = Self::derive_mapping(&var_map, &assignment_rules)?;
         let constants_mapping = Self::derive_mapping(&var_map, &constants)?;
+
         // Parse equations into EquationSystem instances
         let ode_jit = Self::parse_equations_to_systems(&odes, &var_map)?;
         let assignment_jit = Self::parse_equations_to_systems(&assignments, &var_map)?;
@@ -181,20 +303,11 @@ impl ODESystem {
             .jacobian_wrt(&species.iter().map(|x| x.as_str()).collect::<Vec<&str>>())
             .map_err(SimulationError::EquationError)?;
 
-        // Create buffers that can be used in other functions
-        let initial_assignment_buffer = vec![0.0; initial_assignments.len()];
-        let assignment_buffer = vec![0.0; assignment_rules.len()];
-        let species_buffer = vec![0.0; species.len()];
-        let mut params_buffer = vec![0.0; parameters.len()];
-        let constants_buffer = vec![0.0; constants.len()];
+        // Create default parameter values
+        let mut default_params = vec![0.0; parameters.len()];
         for (idx, param) in parameters.iter().enumerate() {
-            params_buffer[idx] = *params.get(param).unwrap();
+            default_params[idx] = *params.get(param).unwrap();
         }
-
-        // Create an input buffer we can use for all evaluations
-        let buffer_size =
-            sorted_vars.len() + 1 + parameters.len() * species.len() + constants.len();
-        let input_buffer = vec![0.0; buffer_size];
 
         // Calculate the ranges for the input buffer
         let species_range = (1, 1 + species.len());
@@ -225,14 +338,7 @@ impl ODESystem {
             sorted_vars,
             grad_params,
             grad_species,
-            initial_assignment_buffer: Mutex::new(initial_assignment_buffer),
-            assignment_buffer: Mutex::new(assignment_buffer),
-            species_buffer: Mutex::new(species_buffer),
-            params_buffer: Mutex::new(params_buffer),
-            constants_buffer: Mutex::new(constants_buffer),
-            mode: Mutex::new(mode.unwrap_or(Mode::Regular)),
-            input_buffer: Mutex::new(input_buffer),
-            assignments_result_buffer: Mutex::new(vec![0.0; assignments.len()]),
+            default_params,
             species_range,
             parameters_range,
             initial_assignments_range,
@@ -245,27 +351,20 @@ impl ODESystem {
 
     /// Integrates the ODE system over a specified time period.
     ///
-    /// This method performs numerical integration of the system using the Dormand-Prince (DOPRI5) method.
-    /// It handles initial conditions, parameter updates, initial assignments, and can operate in different modes
-    /// including sensitivity analysis.
+    /// This method creates a default context and then calls integrate_with_context.
     ///
     /// # Arguments
     ///
-    /// * `setup` - Configuration parameters for the integration including time span and tolerances
+    /// * `setup` - Configuration parameters for the integration
     /// * `initial_conditions` - HashMap mapping species names to their initial concentrations
-    /// * `parameters` - Optional slice of parameter values to use for integration. If None, uses current values
+    /// * `parameters` - Optional slice of parameter values to use for integration
     /// * `evaluate` - Optional vector of specific time points at which to evaluate the solution
-    /// * `mode` - Optional integration mode (Regular or Sensitivity). Defaults to Regular if None
+    /// * `solver` - The ODE solver to use for integration
+    /// * `mode` - Optional integration mode (Regular or Sensitivity)
     ///
     /// # Returns
     ///
-    /// Returns a Result containing either:
-    /// * `Ok(T::Output)` - The integration results in the specified output format
-    /// * `Err(SimulationError)` - An error that occurred during integration
-    ///
-    /// # Type Parameters
-    ///
-    /// * `T: OutputFormat` - The desired output format for the integration results
+    /// Returns a Result containing the integration results in the specified output format
     #[inline]
     pub fn integrate<T: OutputFormat>(
         &self,
@@ -276,53 +375,180 @@ impl ODESystem {
         solver: impl ODEIntegrator + Copy,
         mode: Option<Mode>,
     ) -> Result<T::Output, SimulationError> {
-        let solver = BasicODESolver::new(solver);
-        let mode = mode.unwrap_or(Mode::Regular);
+        // Create a default context, possibly with the specified mode
+        let mut context = if let Some(m) = mode.clone() {
+            self.create_context_with_mode(m)
+        } else {
+            self.create_context()
+        };
 
-        {
-            let mut mode_lock = self.mode.lock().unwrap();
-            *mode_lock = mode.clone();
+        // Use integrate_internal directly with explicit type parameter
+        self.integrate_internal::<T>(
+            &mut context,
+            setup,
+            initial_conditions,
+            parameters,
+            evaluate,
+            solver,
+            mode,
+        )
+    }
+
+    /// Integrates the ODE system over a list of setups in parallel.
+    ///
+    /// This method creates a default context and then calls bulk_integrate_with_context.
+    ///
+    /// # Arguments
+    ///
+    /// * `setups` - A slice of SimulationSetup instances for each integration
+    /// * `initial_conditions` - A slice of HashMap instances mapping species names to initial concentrations
+    /// * `parameters` - Optional slice of parameter values to use for integration
+    /// * `evaluate` - Optional slice of time points at which to evaluate solutions
+    /// * `solver` - The ODE solver to use for integration
+    /// * `mode` - Optional integration mode (Regular or Sensitivity)
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing a Vec of integration results
+    pub fn bulk_integrate<T: OutputFormat + Send>(
+        &self,
+        setups: &[SimulationSetup],
+        initial_conditions: &[HashMap<String, f64>],
+        parameters: Option<&[f64]>,
+        evaluate: Option<&[Vec<f64>]>,
+        solver: impl ODEIntegrator + Copy + Send + Sync,
+        mode: Option<Mode>,
+    ) -> Result<Vec<T::Output>, SimulationError>
+    where
+        T::Output: Send,
+    {
+        // Create a default context, possibly with the specified mode
+        let context = if let Some(m) = mode.clone() {
+            self.create_context_with_mode(m)
+        } else {
+            self.create_context()
+        };
+
+        // Call the context version
+        self.bulk_integrate_with_context::<T>(
+            &context,
+            setups,
+            initial_conditions,
+            parameters,
+            evaluate,
+            solver,
+            mode,
+        )
+    }
+
+    // Internal implementation for integrate_with_context
+    fn integrate_internal<T: OutputFormat>(
+        &self,
+        context: &mut ODESystemContext,
+        setup: &SimulationSetup,
+        initial_conditions: &HashMap<String, f64>,
+        parameters: Option<&[f64]>,
+        evaluate: Option<&Vec<f64>>,
+        solver: impl ODEIntegrator + Copy,
+        mode: Option<Mode>,
+    ) -> Result<T::Output, SimulationError> {
+        let solver = BasicODESolver::new(solver);
+
+        // Update mode if provided
+        if let Some(m) = mode {
+            context.mode = m;
         }
 
         // Fill the constants buffer from the initial conditions
         let constants = self.arrange_constants_buffer(initial_conditions)?;
-        self.set_constants_buffer(&constants);
+        context.constants_buffer = constants;
 
         // Create the initial conditions vector
-        let initial_conditions =
-            self.arrange_y0_vector(initial_conditions, matches!(mode, Mode::Sensitivity))?;
+        let initial_conditions = self.arrange_y0_vector(
+            initial_conditions,
+            matches!(context.mode, Mode::Sensitivity),
+        )?;
 
         if let Some(params) = parameters {
-            self.set_params_buffer(params);
+            // Avoid allocation by copying directly into the existing buffer
+            if context.params_buffer.len() == params.len() {
+                context.params_buffer.copy_from_slice(params);
+            } else {
+                context.params_buffer = params.to_vec();
+            }
         }
 
         // Evaluate the initial assignments before the integration
-        // This is done because the initial assignments are not part of the state vector
-        // and need to be evaluated separately
         if self.has_initial_assignments() {
-            let input_vec = self.arrange_input_vector(
-                setup.t0,
-                &initial_conditions[..self.num_equations()],
-                self.get_params_buffer().as_slice(),
-                self.get_assignment_buffer().as_slice(),
-                self.get_initial_assignment_buffer().as_slice(),
-                self.get_constants_buffer().as_slice(),
-            );
+            // OPTIMIZATION: Reuse the input buffer to avoid allocation
+            if context.input_buffer.len() < self.sorted_vars.len() + 1 {
+                context.input_buffer.resize(self.sorted_vars.len() + 1, 0.0);
+            }
 
+            context.input_buffer[0] = setup.t0;
+
+            // Copy values directly into buffer for better performance
+            // Species values
+            let species_len = self.num_equations();
+            for i in 0..species_len {
+                context.input_buffer[i + 1] = initial_conditions[i];
+            }
+
+            // Parameters
+            let params_start = self.species_range.1;
+            let params_len = context.params_buffer.len();
+            for i in 0..params_len {
+                context.input_buffer[params_start + i] = context.params_buffer[i];
+            }
+
+            // Assignments
+            let assignments_start = self.parameters_range.1;
+            let assignments_len = context.assignment_buffer.len();
+            for i in 0..assignments_len {
+                context.input_buffer[assignments_start + i] = context.assignment_buffer[i];
+            }
+
+            // Initial assignments
+            let initial_assignments_start = self.assignment_rules_range.1;
+            let initial_assignments_len = context.initial_assignment_buffer.len();
+            for i in 0..initial_assignments_len {
+                context.input_buffer[initial_assignments_start + i] =
+                    context.initial_assignment_buffer[i];
+            }
+
+            // Constants
+            let constants_start = self.initial_assignments_range.1;
+            let constants_len = context.constants_buffer.len();
+            for i in 0..constants_len {
+                context.input_buffer[constants_start + i] = context.constants_buffer[i];
+            }
+
+            // Ensure result buffer is sized correctly
+            if context.initial_assignment_buffer.len() != self.num_initial_assignments() {
+                context
+                    .initial_assignment_buffer
+                    .resize(self.num_initial_assignments(), 0.0);
+            }
+
+            // Compute results directly into the context buffer
             self.initial_assignment_jit.fun()(
-                &input_vec,
-                self.initial_assignment_buffer
-                    .lock()
-                    .unwrap()
-                    .as_mut_slice(),
+                &context.input_buffer,
+                &mut context.initial_assignment_buffer,
             );
         }
 
-        // Solve the ODE system
-        let (x_out, y_out) =
-            solver.solve(self, (setup.t0, setup.t1), setup.dt, &initial_conditions)?;
+        // Create a wrapper that implements ODEProblem
+        let ode_problem = ODEProblemWithContext::new(self, context);
 
-        // If we want to evaluate at specific times, we need to interpolate the output to match the evaluation times
+        // Solve the ODE system
+        let (x_out, y_out) = solver.solve(
+            &ode_problem,
+            (setup.t0, setup.t1),
+            setup.dt,
+            &initial_conditions,
+        )?;
+
+        // If we want to evaluate at specific times, interpolate the output
         let (x_out, y_out) = if let Some(evaluate) = evaluate {
             let interpolated_output = interpolate(&y_out, &x_out, evaluate)?;
             (evaluate.to_vec(), interpolated_output)
@@ -331,45 +557,29 @@ impl ODESystem {
         };
 
         let assignment_out: Option<StepperOutput> = if self.has_assignments() {
-            Some(self.recalculate_assignments(&x_out, &y_out)?)
+            Some(self.recalculate_assignments_with_context(context, &x_out, &y_out)?)
         } else {
             None
         };
 
+        // OPTIMIZATION: Convert to Array1 without intermediate vec
+        let times = Array1::from_vec(x_out);
+
         let output = T::create_output(
             y_out,
             assignment_out,
-            Array1::from_vec(x_out.to_vec()),
+            times,
             self,
-            matches!(mode, Mode::Sensitivity),
+            matches!(context.mode, Mode::Sensitivity),
         );
 
         Ok(output)
     }
 
-    /// Integrates the ODE system over a list of setups in parallel.
-    ///
-    /// This method performs numerical integration of the system using the Dormand-Prince (DOPRI5) method.
-    /// It handles initial conditions, parameter updates, initial assignments, and can operate in different modes
-    /// including sensitivity analysis.
-    ///
-    /// # Arguments
-    ///
-    /// * `setups` - A slice of SimulationSetup instances defining the time span and tolerances for each integration
-    /// * `initial_conditions` - A slice of HashMap instances mapping species names to their initial concentrations
-    /// * `parameters` - An optional slice of parameter values to use for integration. If None, uses current values
-    /// * `evaluate` - An optional slice of Vec<f64> instances defining the time points at which to evaluate the solution
-    /// * `mode` - An optional Mode instance defining the integration mode (Regular or Sensitivity). Defaults to Regular if None
-    ///
-    /// # Returns
-    ///
-    /// Returns a Result containing a Vec of the integration results in the specified output format
-    ///
-    /// # Type Parameters
-    ///
-    /// * `T: OutputFormat + Send` - The desired output format for the integration results
-    pub fn bulk_integrate<T: OutputFormat + Send>(
+    // Internal implementation for bulk_integrate_with_context
+    fn bulk_integrate_internal<T: OutputFormat + Send>(
         &self,
+        context: &ODESystemContext,
         setups: &[SimulationSetup],
         initial_conditions: &[HashMap<String, f64>],
         parameters: Option<&[f64]>,
@@ -392,11 +602,18 @@ impl ODESystem {
             .zip(evaluates.iter())
             .collect::<Vec<_>>();
 
+        // Clone self to ensure thread safety
+        let self_clone = self.clone();
+
         let results = zipped
             .into_par_iter()
             .map(|((setup, initial_conditions), evaluate)| {
-                let system = self.clone();
-                system.integrate::<T>(
+                // Create a new context for each thread based on the template
+                let mut thread_context = context.clone();
+
+                // Use the cloned self to avoid sharing self across threads
+                self_clone.integrate_internal::<T>(
+                    &mut thread_context,
                     setup,
                     initial_conditions,
                     parameters,
@@ -408,6 +625,158 @@ impl ODESystem {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(results)
+    }
+
+    // Version of recalculate_assignments that uses a context
+    fn recalculate_assignments_with_context(
+        &self,
+        context: &ODESystemContext,
+        x_out: &[f64],
+        y_out: &[Vec<f64>],
+    ) -> Result<StepperOutput, SimulationError> {
+        let n_timepoints = x_out.len();
+        let n_assignments = self.num_assignments();
+
+        // Pre-allocate the output to avoid resizing
+        let mut assignments = Vec::with_capacity(n_timepoints);
+
+        // Reuse this buffer for each evaluation to avoid allocations
+        let mut input_buffer = context.input_buffer.clone();
+
+        for (t_idx, (t, y)) in x_out.iter().zip(y_out.iter()).enumerate() {
+            // Resize only once on the first iteration
+            if t_idx == 0 && input_buffer.len() < self.sorted_vars.len() + 1 {
+                input_buffer.resize(self.sorted_vars.len() + 1, 0.0);
+            }
+
+            // Time
+            input_buffer[0] = *t;
+
+            // Species - use direct indexing for better cache performance
+            let species_len = self.num_equations();
+            for i in 0..species_len {
+                input_buffer[i + 1] = y[i];
+            }
+
+            // Copy other values from context buffers
+            // Parameters
+            let params_start = self.species_range.1;
+            let params_len = context.params_buffer.len();
+            for i in 0..params_len {
+                input_buffer[params_start + i] = context.params_buffer[i];
+            }
+
+            // Assignments
+            let assignments_start = self.parameters_range.1;
+            let assignments_len = context.assignment_buffer.len();
+            for i in 0..assignments_len {
+                input_buffer[assignments_start + i] = context.assignment_buffer[i];
+            }
+
+            // Initial assignments
+            let initial_assignments_start = self.assignment_rules_range.1;
+            let initial_assignments_len = context.initial_assignment_buffer.len();
+            for i in 0..initial_assignments_len {
+                input_buffer[initial_assignments_start + i] = context.initial_assignment_buffer[i];
+            }
+
+            // Constants
+            let constants_start = self.initial_assignments_range.1;
+            let constants_len = context.constants_buffer.len();
+            for i in 0..constants_len {
+                input_buffer[constants_start + i] = context.constants_buffer[i];
+            }
+
+            // Evaluate and push results
+            let mut result = vec![0.0; n_assignments];
+            self.assignment_jit.fun()(&input_buffer, &mut result);
+            assignments.push(result);
+        }
+
+        Ok(assignments)
+    }
+
+    /// Integrates the ODE system over a specified time period using a provided context.
+    ///
+    /// This method performs numerical integration of the system using the provided solver.
+    /// It uses the state from the provided context for buffers and mode settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The context containing mutable state for this integration
+    /// * `setup` - Configuration parameters for the integration
+    /// * `initial_conditions` - HashMap mapping species names to their initial concentrations
+    /// * `parameters` - Optional slice of parameter values to use for integration
+    /// * `evaluate` - Optional vector of specific time points at which to evaluate the solution
+    /// * `solver` - The ODE solver to use for integration
+    /// * `mode` - Optional integration mode. If provided, updates the context's mode
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the integration results in the specified output format
+    pub fn integrate_with_context<T: OutputFormat>(
+        &self,
+        context: &mut ODESystemContext,
+        setup: &SimulationSetup,
+        initial_conditions: &HashMap<String, f64>,
+        parameters: Option<&[f64]>,
+        evaluate: Option<&Vec<f64>>,
+        solver: impl ODEIntegrator + Copy,
+        mode: Option<Mode>,
+    ) -> Result<T::Output, SimulationError> {
+        // Use a wrapper to call the existing integrate method with the context
+        self.integrate_internal::<T>(
+            context,
+            setup,
+            initial_conditions,
+            parameters,
+            evaluate,
+            solver,
+            mode,
+        )
+    }
+
+    /// Integrates the ODE system over a list of setups in parallel using a provided context.
+    ///
+    /// This method performs parallel numerical integration for multiple setups.
+    /// It creates a clone of the context for each parallel task.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The context containing mutable state to use as a template
+    /// * `setups` - A slice of SimulationSetup instances for each integration
+    /// * `initial_conditions` - A slice of HashMap instances mapping species names to initial concentrations
+    /// * `parameters` - Optional slice of parameter values to use for integration
+    /// * `evaluate` - Optional slice of time points at which to evaluate solutions
+    /// * `solver` - The ODE solver to use for integration
+    /// * `mode` - Optional integration mode. If provided, updates each context's mode
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing a Vec of integration results
+    pub fn bulk_integrate_with_context<T: OutputFormat + Send>(
+        &self,
+        context: &ODESystemContext,
+        setups: &[SimulationSetup],
+        initial_conditions: &[HashMap<String, f64>],
+        parameters: Option<&[f64]>,
+        evaluate: Option<&[Vec<f64>]>,
+        solver: impl ODEIntegrator + Copy + Send + Sync,
+        mode: Option<Mode>,
+    ) -> Result<Vec<T::Output>, SimulationError>
+    where
+        T::Output: Send,
+    {
+        // Use a wrapper to call the existing bulk_integrate method with the context
+        self.bulk_integrate_internal::<T>(
+            context,
+            setups,
+            initial_conditions,
+            parameters,
+            evaluate,
+            solver,
+            mode,
+        )
     }
 
     /// Creates a mapping between variable names and their indices in the state vector.
@@ -511,64 +880,6 @@ impl ODESystem {
         input_vec
     }
 
-    /// Internal method to set the input vector buffer.
-    ///
-    /// This method is used to set the input vector for the ODE system.
-    /// It is internal to the ODESystem struct and not exposed to the public API.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - The current time
-    /// * `y` - The current state
-    /// * `params` - The current parameters
-    /// * `assignments` - The current assignments
-    /// * `initial_assignments` - The current initial assignments
-    ///
-    pub(crate) fn set_input_vector(
-        &self,
-        t: f64,
-        y: &[f64],
-        params: &[f64],
-        assignments: &[f64],
-        initial_assignments: &[f64],
-        constants: &[f64],
-    ) {
-        let mut input_vec = self.input_buffer.lock().unwrap();
-        input_vec.clear();
-        input_vec.push(t);
-        input_vec.extend_from_slice(&y[..self.num_equations()]);
-        input_vec.extend_from_slice(params);
-        input_vec.extend_from_slice(assignments);
-        input_vec.extend_from_slice(initial_assignments);
-        input_vec.extend_from_slice(constants);
-    }
-
-    fn recalculate_assignments(
-        &self,
-        x_out: &[f64],
-        y_out: &[Vec<f64>],
-    ) -> Result<StepperOutput, SimulationError> {
-        // Create input vectors
-        let mut input_vecs = Vec::with_capacity(x_out.len());
-
-        for (t, y) in x_out.iter().zip(y_out.iter()) {
-            let input_vec = self.arrange_input_vector(
-                *t,
-                &y.as_slice()[..self.num_equations()],
-                self.get_params_buffer().as_slice(),
-                &vec![0.0; self.num_assignments()],
-                self.get_initial_assignment_buffer().as_slice(),
-                self.get_constants_buffer().as_slice(),
-            );
-            input_vecs.push(input_vec);
-        }
-
-        // Compute the assignments in parallel
-        let assignments = self.assignment_jit.eval_parallel(&input_vecs)?;
-
-        Ok(assignments)
-    }
-
     /// Arranges initial conditions into a vector matching the species ordering.
     ///
     /// This method takes a HashMap of initial conditions (species names mapped to their
@@ -667,287 +978,9 @@ impl ODESystem {
     /// # Arguments
     ///
     /// * `params` - A slice containing the new parameter values in the same order as sorted_vars
-    pub fn set_params_buffer(&self, params: &[f64]) {
-        *self.params_buffer.lock().unwrap() = params.to_vec();
-    }
-
-    /// Returns a reference to the current parameter buffer.
-    ///
-    /// The parameter buffer contains the values of all parameters in the system,
-    /// ordered according to sorted_vars. These parameters represent constants
-    /// that can affect the behavior of the ODEs and other equations.
-    ///
-    /// # Returns
-    ///
-    /// A slice containing the current parameter values
-    pub fn get_params_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
-        self.params_buffer.lock().unwrap()
-    }
-
-    /// Updates the species buffer with new values.
-    ///
-    /// This method allows dynamic updating of species concentrations during simulation.
-    /// The species buffer stores the current concentrations of all chemical species in the system.
-    ///
-    /// # Arguments
-    ///
-    /// * `species` - A slice containing the new species values in the same order as sorted_vars
-    pub fn set_species_buffer(&self, species: &[f64]) {
-        *self.species_buffer.lock().unwrap() = species.to_vec();
-    }
-
-    /// Returns a reference to the current species buffer.
-    ///
-    /// The species buffer contains the concentrations of all chemical species in the system,
-    /// ordered according to sorted_vars.
-    ///
-    /// # Returns
-    ///
-    /// A slice containing the current species concentrations
-    pub fn get_species_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
-        self.species_buffer.lock().unwrap()
-    }
-
-    /// Returns a reference to the current assignment rules buffer.
-    ///
-    /// The assignment buffer contains the values of all assignment rules that must be
-    /// satisfied at all times during simulation. These are equations that define relationships
-    /// between variables that must hold throughout the integration.
-    ///
-    /// # Returns
-    ///
-    /// A slice containing the current assignment rule values
-    pub fn get_assignment_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
-        self.assignment_buffer.lock().unwrap()
-    }
-
-    /// Updates the assignment rules buffer with new values.
-    ///
-    /// This method allows updating the values of assignment rules during simulation.
-    /// Assignment rules are equations that must be satisfied at all times.
-    ///
-    /// # Arguments
-    ///
-    /// * `assignments` - A slice containing the new assignment rule values in the same order as sorted_vars
-    pub fn set_assignment_buffer(&self, assignments: &[f64]) {
-        *self.assignment_buffer.lock().unwrap() = assignments.to_vec();
-    }
-
-    /// Returns a reference to the variable mapping.
-    ///
-    /// The variable mapping contains the mapping between all variable names (including species,
-    /// parameters, and other variables) and their indices in the system state vector. This mapping
-    /// is used to track where each variable's value is stored during simulation.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap mapping variable names to their indices
-    pub fn get_var_mapping(&self) -> &HashMap<String, u32> {
-        &self.var_map
-    }
-
-    /// Returns a reference to the initial assignments buffer.
-    ///
-    /// The initial assignments buffer contains values of equations that are only evaluated
-    /// at the start of simulation (t=0). These assignments help set up the initial state
-    /// of the system.
-    ///
-    /// # Returns
-    ///
-    /// A slice containing the initial assignment values
-    pub fn get_initial_assignment_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
-        self.initial_assignment_buffer.lock().unwrap()
-    }
-
-    /// Updates the initial assignments buffer with new values.
-    ///
-    /// This method allows updating the values of initial assignments.
-    /// Initial assignments are equations that are only evaluated at t=0 to help
-    /// set up the initial state of the system.
-    ///
-    /// # Arguments
-    ///
-    /// * `initial_assignments` - A slice containing the new initial assignment values in the same order as sorted_vars
-    pub fn set_initial_assignment_buffer(&self, initial_assignments: &[f64]) {
-        *self.initial_assignment_buffer.lock().unwrap() = initial_assignments.to_vec();
-    }
-
-    /// Returns a reference to the constants buffer.
-    ///
-    /// The constants buffer contains the values of all constants in the system,
-    /// ordered according to sorted_vars. These constants represent initial concentrations
-    /// of species that are not involved in any equations.
-    ///
-    /// # Returns
-    ///
-    /// A slice containing the current constant values
-    pub fn get_constants_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
-        self.constants_buffer.lock().unwrap()
-    }
-
-    /// Updates the constants buffer with new values.
-    ///
-    /// This method allows updating the values of constants during simulation.
-    /// Constants are species that are not involved in any equations.
-    ///
-    /// # Arguments
-    ///
-    /// * `constants` - A slice containing the new constant values in the same order as sorted_vars
-    pub fn set_constants_buffer(&self, constants: &[f64]) {
-        *self.constants_buffer.lock().unwrap() = constants.to_vec();
-    }
-
-    /// Returns a reference to the species mapping.
-    ///
-    /// The species mapping contains the mapping between species names and their indices
-    /// in the state vector used during simulation. This mapping is used to track where
-    /// each species' concentration is stored in the system state.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap mapping species names to their indices
-    pub fn get_species_mapping(&self) -> &HashMap<String, u32> {
-        &self.species_mapping
-    }
-
-    /// Returns a sorted vector of species names.
-    ///
-    /// This method retrieves all species names from the species mapping and returns them
-    /// in alphabetically sorted order. This can be useful for consistent iteration over
-    /// species or displaying species in a deterministic order.
-    ///
-    /// # Returns
-    ///
-    /// A Vec<String> containing all species names in alphabetical order
-    pub fn get_sorted_species(&self) -> Vec<String> {
-        let mut sorted_species = self
-            .species_mapping
-            .keys()
-            .cloned()
-            .collect::<Vec<String>>();
-        sorted_species.sort();
-        sorted_species
-    }
-
-    /// Returns a sorted vector of assignment rule names.
-    ///
-    /// This method retrieves all assignment rule names from the assignment rules mapping and returns them
-    /// in alphabetically sorted order. This can be useful for consistent iteration over
-    /// assignment rules or displaying assignment rules in a deterministic order.
-    ///
-    /// # Returns
-    ///
-    /// A Vec<String> containing all assignment rule names in alphabetical order    
-    pub fn get_sorted_assignments(&self) -> Vec<String> {
-        let mut sorted_assignments = self
-            .assignment_rules_mapping
-            .keys()
-            .cloned()
-            .collect::<Vec<String>>();
-        sorted_assignments.sort();
-        sorted_assignments
-    }
-
-    /// Returns a reference to the parameters mapping.
-    ///
-    /// The parameters mapping contains the mapping between parameter names and their indices
-    /// in the parameter vector. This mapping is used to track where each parameter value
-    /// is stored during simulation and parameter optimization.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap mapping parameter names to their indices
-    pub fn get_params_mapping(&self) -> &HashMap<String, u32> {
-        &self.params_mapping
-    }
-
-    /// Returns a reference to the constants mapping.
-    ///
-    /// The constants mapping contains the mapping between constant names and their indices
-    /// in the constant vector. This mapping is used to track where each constant value
-    /// is stored during simulation and parameter optimization.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap mapping constant names to their indices
-    pub fn get_constants_mapping(&self) -> &HashMap<String, u32> {
-        &self.constants_mapping
-    }
-
-    /// Returns a sorted vector of parameter names.
-    ///
-    /// This method retrieves all parameter names from the parameters mapping and returns them
-    /// in numerically sorted order. This can be useful for consistent iteration over
-    /// parameters or displaying parameters in a deterministic order.
-    ///
-    /// # Returns
-    ///
-    /// A Vec<String> containing all parameter names in numerically sorted order
-    pub fn get_sorted_params(&self) -> Vec<String> {
-        let mut param_pairs: Vec<_> = self.params_mapping.iter().collect();
-        param_pairs.sort_by_key(|(_, &idx)| idx);
-        param_pairs
-            .into_iter()
-            .map(|(name, _)| name.clone())
-            .collect()
-    }
-
-    /// Returns a sorted vector of constant names.
-    ///
-    /// This method retrieves all constant names from the constants mapping and returns them
-    /// in numerically sorted order. This can be useful for consistent iteration over
-    /// constants or displaying constants in a deterministic order.
-    ///
-    /// # Returns
-    ///
-    /// A Vec<String> containing all constant names in numerically sorted order
-    pub fn get_sorted_constants(&self) -> Vec<String> {
-        let mut constant_pairs: Vec<_> = self.constants_mapping.iter().collect();
-        constant_pairs.sort_by_key(|(_, &idx)| idx);
-        constant_pairs
-            .into_iter()
-            .map(|(name, _)| name.clone())
-            .collect()
-    }
-
-    /// Returns a reference to the initial assignments mapping.
-    ///
-    /// The initial assignments mapping contains the mapping between variable names and their
-    /// indices for equations that are only evaluated at t=0. This mapping helps track
-    /// where each initial assignment value is stored when setting up the initial system state.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap mapping initial assignment variable names to their indices
-    pub fn get_initial_assignments_mapping(&self) -> &HashMap<String, u32> {
-        &self.initial_assignments_mapping
-    }
-
-    /// Returns a reference to the assignment rules mapping.
-    ///
-    /// The assignment rules mapping contains the mapping between variable names and their
-    /// indices for equations that must be satisfied at all times during simulation.
-    /// This mapping helps track where each assignment rule value is stored during integration.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the HashMap mapping assignment rule variable names to their indices
-    pub fn get_assignment_rules_mapping(&self) -> &HashMap<String, u32> {
-        &self.assignment_rules_mapping
-    }
-
-    /// Returns the total number of sensitivity equations.
-    ///
-    /// This is calculated as the number of species equations multiplied by
-    /// the number of parameters, since we need one sensitivity equation
-    /// per species-parameter pair.
-    ///
-    /// # Returns
-    ///
-    /// The total number of sensitivity equations
-    pub fn get_sensitivity_dims(&self) -> usize {
-        // Equations * Parameters
-        self.species_buffer.lock().unwrap().len() * self.params_buffer.lock().unwrap().len()
+    /// * `context` - The context whose parameters should be updated
+    pub fn set_params(&self, params: &[f64], context: &mut ODESystemContext) {
+        context.params_buffer.copy_from_slice(params);
     }
 
     /// Returns the number of ODE equations in the system.
@@ -959,7 +992,7 @@ impl ODESystem {
     ///
     /// The number of ODE equations
     pub fn num_equations(&self) -> usize {
-        self.species_buffer.lock().unwrap().len()
+        self.species_mapping.len()
     }
 
     /// Returns the number of parameters in the system.
@@ -968,7 +1001,7 @@ impl ODESystem {
     ///
     /// The total number of model parameters
     pub fn num_parameters(&self) -> usize {
-        self.params_buffer.lock().unwrap().len()
+        self.params_mapping.len()
     }
 
     /// Returns the number of assignment rules in the system.
@@ -993,6 +1026,20 @@ impl ODESystem {
     /// The number of initial assignments
     pub fn num_initial_assignments(&self) -> usize {
         self.initial_assignments_mapping.len()
+    }
+
+    /// Returns the total number of sensitivity equations.
+    ///
+    /// This is calculated as the number of species equations multiplied by
+    /// the number of parameters, since we need one sensitivity equation
+    /// per species-parameter pair.
+    ///
+    /// # Returns
+    ///
+    /// The total number of sensitivity equations
+    pub fn get_sensitivity_dims(&self) -> usize {
+        // Equations * Parameters
+        self.species_mapping.len() * self.params_mapping.len()
     }
 
     /// Checks if the system has any assignment rules.
@@ -1057,93 +1104,261 @@ impl ODESystem {
     pub fn get_initial_assignments_range(&self) -> &(usize, usize) {
         &self.initial_assignments_range
     }
-}
 
-impl ODEProblem for ODESystem {
-    /// Defines the ODE system by computing derivatives at the current state.
+    /// Creates a new context for this ODESystem.
     ///
-    /// This method implements the system of ODEs by:
-    /// 1. Building an input vector with current values
-    /// 2. Evaluating assignment rules
-    /// 3. Computing derivatives for each species
+    /// This method allocates all necessary buffers based on the current state
+    /// of the system.
     ///
-    /// The method is called by the ODE solver during integration.
+    /// # Returns
+    ///
+    /// A new ODESystemContext initialized with default values
+    pub fn create_context(&self) -> ODESystemContext {
+        let mut context = ODESystemContext {
+            initial_assignment_buffer: Vec::with_capacity(self.num_initial_assignments()),
+            assignment_buffer: Vec::with_capacity(self.num_assignments()),
+            params_buffer: self.default_params.clone(),
+            constants_buffer: Vec::with_capacity(self.constants_mapping.len()),
+            mode: Mode::Regular,
+            input_buffer: Vec::with_capacity(self.sorted_vars.len() + 1),
+            assignments_result_buffer: Vec::with_capacity(self.num_assignments()),
+        };
+
+        // Pre-allocate all buffers for maximum performance
+        self.pre_allocate_context_buffers(&mut context, None);
+
+        context
+    }
+
+    /// Creates a context with the specified mode.
     ///
     /// # Arguments
     ///
-    /// * `t` - The current time point
-    /// * `y` - The current state vector containing species concentrations
-    /// * `dy` - Mutable reference to store computed derivatives
+    /// * `mode` - The mode to use for simulation
     ///
-    /// # Panics
+    /// # Returns
     ///
-    /// May panic if equation evaluation fails (which shouldn't happen with valid equations)
-    #[inline]
-    fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
-        let params_guard = self.params_buffer.lock().unwrap();
-        let assignment_guard = self.assignment_buffer.lock().unwrap();
-        let initial_assignment_guard = self.initial_assignment_buffer.lock().unwrap();
-        let constants_guard = self.constants_buffer.lock().unwrap();
+    /// A new ODESystemContext initialized with default values and the specified mode
+    pub fn create_context_with_mode(&self, mode: Mode) -> ODESystemContext {
+        let mut context = self.create_context();
+        context.mode = mode;
+        context
+    }
 
-        self.set_input_vector(
-            t,
-            y,
-            &params_guard,
-            &assignment_guard,
-            &initial_assignment_guard,
-            &constants_guard,
-        );
+    /// Returns a reference to the variable mapping.
+    ///
+    /// The variable mapping contains the mapping between all variable names (including species,
+    /// parameters, and other variables) and their indices in the system state vector. This mapping
+    /// is used to track where each variable's value is stored during simulation.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping variable names to their indices
+    pub fn get_var_mapping(&self) -> &HashMap<String, u32> {
+        &self.var_map
+    }
 
-        let mut input_vec = self.input_buffer.lock().unwrap();
+    /// Returns a reference to the species mapping.
+    ///
+    /// The species mapping contains the mapping between species names and their indices
+    /// in the state vector used during simulation. This mapping is used to track where
+    /// each species' concentration is stored in the system state.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping species names to their indices
+    pub fn get_species_mapping(&self) -> &HashMap<String, u32> {
+        &self.species_mapping
+    }
 
-        let species_len = self.num_equations();
+    /// Returns a reference to the parameters mapping.
+    ///
+    /// The parameters mapping contains the mapping between parameter names and their indices
+    /// in the parameter vector. This mapping is used to track where each parameter value
+    /// is stored during simulation and parameter optimization.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping parameter names to their indices
+    pub fn get_params_mapping(&self) -> &HashMap<String, u32> {
+        &self.params_mapping
+    }
 
-        if self.has_assignments() {
-            let (assignments_start, assignments_end) = self.get_assignment_ranges();
-            let mut assignments_result = self.assignments_result_buffer.lock().unwrap();
+    /// Returns a reference to the constants mapping.
+    ///
+    /// The constants mapping contains the mapping between constant names and their indices
+    /// in the constant vector. This mapping is used to track where each constant value
+    /// is stored during simulation and parameter optimization.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping constant names to their indices
+    pub fn get_constants_mapping(&self) -> &HashMap<String, u32> {
+        &self.constants_mapping
+    }
 
-            // Evaluate Assignment rules
-            self.assignment_jit
-                .eval_into(&input_vec.to_vec(), &mut *assignments_result)
-                .unwrap();
+    /// Returns a reference to the initial assignments mapping.
+    ///
+    /// The initial assignments mapping contains the mapping between variable names and their
+    /// indices for equations that are only evaluated at t=0. This mapping helps track
+    /// where each initial assignment value is stored when setting up the initial system state.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping initial assignment variable names to their indices
+    pub fn get_initial_assignments_mapping(&self) -> &HashMap<String, u32> {
+        &self.initial_assignments_mapping
+    }
 
-            // Copy assignments to input vector
-            input_vec[*assignments_start..*assignments_end].copy_from_slice(&assignments_result);
+    /// Returns a reference to the assignment rules mapping.
+    ///
+    /// The assignment rules mapping contains the mapping between variable names and their
+    /// indices for equations that must be satisfied at all times during simulation.
+    /// This mapping helps track where each assignment rule value is stored during integration.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the HashMap mapping assignment rule variable names to their indices
+    pub fn get_assignment_rules_mapping(&self) -> &HashMap<String, u32> {
+        &self.assignment_rules_mapping
+    }
 
-            // Copy assignments to assignment buffer
-            self.assignment_buffer
-                .lock()
-                .unwrap()
-                .copy_from_slice(&assignments_result);
+    /// Returns a sorted vector of species names.
+    ///
+    /// This method retrieves all species names from the species mapping and returns them
+    /// in alphabetically sorted order. This can be useful for consistent iteration over
+    /// species or displaying species in a deterministic order.
+    ///
+    /// # Returns
+    ///
+    /// A Vec<String> containing all species names in alphabetical order
+    pub fn get_sorted_species(&self) -> Vec<String> {
+        let mut sorted_species = self
+            .species_mapping
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>();
+        sorted_species.sort();
+        sorted_species
+    }
+
+    /// Returns a sorted vector of assignment rule names.
+    ///
+    /// This method retrieves all assignment rule names from the assignment rules mapping and returns them
+    /// in alphabetically sorted order. This can be useful for consistent iteration over
+    /// assignment rules or displaying assignment rules in a deterministic order.
+    ///
+    /// # Returns
+    ///
+    /// A Vec<String> containing all assignment rule names in alphabetical order    
+    pub fn get_sorted_assignments(&self) -> Vec<String> {
+        let mut sorted_assignments = self
+            .assignment_rules_mapping
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>();
+        sorted_assignments.sort();
+        sorted_assignments
+    }
+
+    /// Returns a sorted vector of parameter names.
+    ///
+    /// This method retrieves all parameter names from the parameters mapping and returns them
+    /// in numerically sorted order. This can be useful for consistent iteration over
+    /// parameters or displaying parameters in a deterministic order.
+    ///
+    /// # Returns
+    ///
+    /// A Vec<String> containing all parameter names in numerically sorted order
+    pub fn get_sorted_params(&self) -> Vec<String> {
+        let mut param_pairs: Vec<_> = self.params_mapping.iter().collect();
+        param_pairs.sort_by_key(|(_, &idx)| idx);
+        param_pairs
+            .into_iter()
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// Returns a sorted vector of constant names.
+    ///
+    /// This method retrieves all constant names from the constants mapping and returns them
+    /// in numerically sorted order. This can be useful for consistent iteration over
+    /// constants or displaying constants in a deterministic order.
+    ///
+    /// # Returns
+    ///
+    /// A Vec<String> containing all constant names in numerically sorted order
+    pub fn get_sorted_constants(&self) -> Vec<String> {
+        let mut constant_pairs: Vec<_> = self.constants_mapping.iter().collect();
+        constant_pairs.sort_by_key(|(_, &idx)| idx);
+        constant_pairs
+            .into_iter()
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
+    /// Pre-allocates all buffers in the context to avoid reallocations during simulation.
+    ///
+    /// This method can significantly improve performance by ensuring that all buffers
+    /// are properly sized before running simulations, avoiding costly reallocations
+    /// during the simulation process.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The context to pre-allocate buffers for
+    /// * `max_size` - Optional maximum size to allocate for temporary buffers
+    pub fn pre_allocate_context_buffers(
+        &self,
+        context: &mut ODESystemContext,
+        max_size: Option<usize>,
+    ) {
+        // Determine buffer sizes
+        let params_len = self.num_parameters();
+        let assignments_len = self.num_assignments();
+        let initial_assignments_len = self.num_initial_assignments();
+        let constants_len = self.constants_mapping.len();
+
+        // Add extra space for temporary buffers to avoid reallocations
+        let max_buffer_size = max_size.unwrap_or(1000);
+
+        // Resize input buffer to hold all variables plus some extra space
+        let min_input_size = self.sorted_vars.len() + 1;
+        let input_size = std::cmp::max(min_input_size, max_buffer_size);
+
+        if context.input_buffer.len() < input_size {
+            context.input_buffer.resize(input_size, 0.0);
         }
 
-        // This is where we decide if we are doing a regular simulation or a sensitivity analysis
-        // - In case of a sensitivity analysis, we need to calculate the right hand side of the ODEs and the sensitivities wrt parameters
-        // - In case of a regular simulation, we only need to calculate the right hand side of the ODEs
-        match *self.mode.lock().unwrap() {
-            Mode::Sensitivity => {
-                let params_len = self.params_buffer.lock().unwrap().len();
-                let (species_slice, sensitivity_slice) = dy.split_at_mut(species_len);
-
-                // Calculate species derivatives
-                self.ode_jit.fun()(&input_vec, species_slice);
-
-                // Calculate sensitivity
-                let s = DMatrixView::from_slice(&y[species_len..], species_len, params_len);
-                let mut ds = DMatrixViewMut::from_slice(sensitivity_slice, species_len, params_len);
-                calculate_sensitivity(
-                    &input_vec,
-                    &self.grad_species,
-                    &self.grad_params,
-                    s,
-                    &mut ds,
-                );
-            }
-            Mode::Regular => {
-                self.ode_jit.fun()(&input_vec, dy);
-            }
+        // Ensure parameter buffer is sized correctly
+        if context.params_buffer.len() != params_len {
+            context.params_buffer.resize(params_len, 0.0);
+            // Copy default parameter values
+            context.params_buffer.copy_from_slice(&self.default_params);
         }
-        Ok(())
+
+        // Ensure assignment buffer is sized correctly
+        if context.assignment_buffer.len() != assignments_len {
+            context.assignment_buffer.resize(assignments_len, 0.0);
+        }
+
+        // Ensure assignment result buffer is sized correctly
+        if context.assignments_result_buffer.len() != assignments_len {
+            context
+                .assignments_result_buffer
+                .resize(assignments_len, 0.0);
+        }
+
+        // Ensure initial assignment buffer is sized correctly
+        if context.initial_assignment_buffer.len() != initial_assignments_len {
+            context
+                .initial_assignment_buffer
+                .resize(initial_assignments_len, 0.0);
+        }
+
+        // Ensure constants buffer is sized correctly
+        if context.constants_buffer.len() != constants_len {
+            context.constants_buffer.resize(constants_len, 0.0);
+        }
     }
 }
 
@@ -1172,11 +1387,17 @@ fn calculate_sensitivity(
     s: DMatrixView<f64>,
     ds: &mut DMatrixViewMut<f64>,
 ) {
-    let input_vec = input_vec.to_vec();
-    let dfdx: DMatrix<f64> = dfdx.eval_matrix(&input_vec).unwrap();
-    let dfdp: DMatrix<f64> = dfdp.eval_matrix(&input_vec).unwrap();
+    // We need to use to_vec here as the eval_matrix method requires owned data
+    // But we only create these copies once instead of twice
+    let input_copy = input_vec.to_vec();
 
-    ds.copy_from(&(dfdx * s + dfdp));
+    // Evaluate both Jacobians with a single copy of the input
+    let dfdx: DMatrix<f64> = dfdx.eval_matrix(&input_copy).unwrap();
+    let dfdp: DMatrix<f64> = dfdp.eval_matrix(&input_copy).unwrap();
+
+    // Compute directly into ds, avoiding temporary allocations
+    dfdx.mul_to(&s, ds); // ds = dfdx * s
+    *ds += dfdp; // ds += dfdp
 }
 
 impl TryFrom<EnzymeMLDocument> for ODESystem {
@@ -1315,27 +1536,12 @@ pub enum Mode {
 impl Clone for ODESystem {
     /// Clones the ODESystem
     ///
-    /// We need to manually implement the clone, since we do not want to share the buffers
-    /// between the cloned ODESystem and the original ODESystem. This is sepcifically important
-    /// when we want to parallelize across multiple conditions (inits and/or parameters). Leaving
-    /// the buffers as is will lead to unexpected results.
-    ///
     /// # Returns
     ///
     /// A new ODESystem with the same fields as the original
     fn clone(&self) -> Self {
-        // Helper function to clone mutex contents with clear error messages
-        fn clone_mutex<T: Clone>(mutex: &Mutex<T>, name: &str) -> Mutex<T> {
-            Mutex::new(
-                mutex
-                    .lock()
-                    .unwrap_or_else(|_| panic!("Failed to lock {} mutex", name))
-                    .clone(),
-            )
-        }
-
         Self {
-            // Clone all the non-mutex fields
+            // Clone all fields
             var_map: self.var_map.clone(),
             species_mapping: self.species_mapping.clone(),
             params_mapping: self.params_mapping.clone(),
@@ -1348,22 +1554,7 @@ impl Clone for ODESystem {
             initial_assignment_jit: self.initial_assignment_jit.clone(),
             grad_params: self.grad_params.clone(),
             grad_species: self.grad_species.clone(),
-
-            // Clone all mutex fields using the helper function
-            initial_assignment_buffer: clone_mutex(
-                &self.initial_assignment_buffer,
-                "initial_assignment_buffer",
-            ),
-            assignment_buffer: clone_mutex(&self.assignment_buffer, "assignment_buffer"),
-            species_buffer: clone_mutex(&self.species_buffer, "species_buffer"),
-            params_buffer: clone_mutex(&self.params_buffer, "params_buffer"),
-            constants_buffer: clone_mutex(&self.constants_buffer, "constants_buffer"),
-            mode: clone_mutex(&self.mode, "mode"),
-            input_buffer: clone_mutex(&self.input_buffer, "input_buffer"),
-            assignments_result_buffer: clone_mutex(
-                &self.assignments_result_buffer,
-                "assignments_result_buffer",
-            ),
+            default_params: self.default_params.clone(),
 
             // Copy the range tuples
             species_range: self.species_range,
