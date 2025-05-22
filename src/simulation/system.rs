@@ -273,7 +273,7 @@ impl ODESystem {
         initial_conditions: &HashMap<String, f64>,
         parameters: Option<&[f64]>,
         evaluate: Option<&Vec<f64>>,
-        solver: impl ODEIntegrator + Clone + Copy,
+        solver: impl ODEIntegrator + Copy,
         mode: Option<Mode>,
     ) -> Result<T::Output, SimulationError> {
         let solver = BasicODESolver::new(solver);
@@ -285,12 +285,12 @@ impl ODESystem {
         }
 
         // Fill the constants buffer from the initial conditions
-        let constants = self.arrange_constants_buffer(&initial_conditions)?;
+        let constants = self.arrange_constants_buffer(initial_conditions)?;
         self.set_constants_buffer(&constants);
 
         // Create the initial conditions vector
         let initial_conditions =
-            self.arrange_y0_vector(&initial_conditions, matches!(mode, Mode::Sensitivity))?;
+            self.arrange_y0_vector(initial_conditions, matches!(mode, Mode::Sensitivity))?;
 
         if let Some(params) = parameters {
             self.set_params_buffer(params);
@@ -374,7 +374,7 @@ impl ODESystem {
         initial_conditions: &[HashMap<String, f64>],
         parameters: Option<&[f64]>,
         evaluate: Option<&[Vec<f64>]>,
-        solver: impl ODEIntegrator + Clone + Copy + Send + Sync,
+        solver: impl ODEIntegrator + Copy + Send + Sync,
         mode: Option<Mode>,
     ) -> Result<Vec<T::Output>, SimulationError>
     where
@@ -401,7 +401,7 @@ impl ODESystem {
                     initial_conditions,
                     parameters,
                     *evaluate,
-                    solver.clone(),
+                    solver,
                     mode.clone(),
                 )
             })
@@ -1329,7 +1329,7 @@ impl Clone for ODESystem {
             Mutex::new(
                 mutex
                     .lock()
-                    .expect(&format!("Failed to lock {} mutex", name))
+                    .unwrap_or_else(|_| panic!("Failed to lock {} mutex", name))
                     .clone(),
             )
         }

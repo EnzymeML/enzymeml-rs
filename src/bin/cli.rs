@@ -707,7 +707,7 @@ pub fn main() {
                         &params.params.path,
                         &report,
                         &report.doc,
-                        &output_dir,
+                        output_dir,
                         "lbfgs",
                     );
                 }
@@ -749,7 +749,7 @@ pub fn main() {
                         &params.params.path,
                         &report,
                         &report.doc,
-                        &output_dir,
+                        output_dir,
                         "bfgs",
                     );
                 }
@@ -791,7 +791,7 @@ pub fn main() {
                         &params.params.path,
                         &report,
                         &report.doc,
-                        &output_dir,
+                        output_dir,
                         "sr1trustregion",
                     );
                 }
@@ -828,13 +828,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
-                    save_results(
-                        &params.params.path,
-                        &report,
-                        &report.doc,
-                        &output_dir,
-                        "ego",
-                    );
+                    save_results(&params.params.path, &report, &report.doc, output_dir, "ego");
                 }
             }
 
@@ -871,13 +865,7 @@ pub fn main() {
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
-                    save_results(
-                        &params.params.path,
-                        &report,
-                        &report.doc,
-                        &output_dir,
-                        "pso",
-                    );
+                    save_results(&params.params.path, &report, &report.doc, output_dir, "pso");
                 }
             }
         },

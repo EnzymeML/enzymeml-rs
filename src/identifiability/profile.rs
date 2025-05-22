@@ -112,7 +112,7 @@ const UPPER_BOUND: f64 = 1.1;
 ///   optimizer that can handle the specific problem at hand.
 
 #[bon::builder]
-pub fn ego_profile_likelihood<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction, O, T>(
+pub fn ego_profile_likelihood<S, L, O, T>(
     problem: &Problem<S, L>,
     initial_guess: T,
     parameters: Vec<impl Into<ProfileParameter>>,
@@ -173,12 +173,7 @@ where
 /// - It uses EGO to adaptively sample the parameter space, focusing on regions of interest.
 /// - The `max_iters` parameter controls the number of EGO iterations. A higher value will
 ///   result in more accurate profiles but will take longer to compute.
-pub fn ego_profile_likelihood_core<
-    S: ODEIntegrator + Copy + Send + Sync,
-    L: ObjectiveFunction,
-    O,
-    T,
->(
+pub fn ego_profile_likelihood_core<S, L, O, T>(
     problem: &Problem<S, L>,
     initial_guess: T,
     parameter: &ProfileParameter,
@@ -325,7 +320,7 @@ where
 ///   optimizer that can handle the specific problem at hand.
 
 #[bon::builder]
-pub fn profile_likelihood<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction, O, T>(
+pub fn profile_likelihood<S, L, O, T>(
     problem: &Problem<S, L>,
     initial_guess: T,
     parameters: Vec<impl Into<ProfileParameter>>,
@@ -388,7 +383,7 @@ where
 ///   than EGO for complex likelihood surfaces.
 /// - The `n_steps` parameter controls the number of points to evaluate within the parameter
 ///   range. A higher value will result in more accurate profiles but will take longer to compute.
-fn profile_likelihood_core<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction, O, T>(
+fn profile_likelihood_core<S, L, O, T>(
     problem: &Problem<S, L>,
     initial_guess: T,
     parameter: &ProfileParameter,
@@ -473,7 +468,7 @@ where
 ///   be used as the starting point for profile likelihood analysis.
 /// - The `optimizer` parameter is used for the initial optimization. It should be a robust
 ///   optimizer that can handle the specific problem at hand.
-fn prepare_profile_problem<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction, O, T>(
+fn prepare_profile_problem<S, L, O, T>(
     problem: &Problem<S, L>,
     initial_guess: T,
     parameter: &ProfileParameter,
@@ -496,7 +491,7 @@ where
 
     // First, fit the problem to get the initial guess
     let initial_guess = initial_guess.into();
-    let report = optimizer.optimize(&problem, Some(initial_guess))?;
+    let report = optimizer.optimize(problem, Some(initial_guess))?;
     let err_min = report.error;
 
     // Use the optimized parameters as the initial guess
@@ -539,10 +534,7 @@ where
 ///   parameter list. This index is used to set the parameter value in the initial guess.
 /// - The function assumes that the parameter exists in the problem's sorted parameter list.
 ///   If the parameter does not exist, the function will panic.
-fn get_param_index<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
-    problem: &Problem<S, L>,
-    parameter: &ProfileParameter,
-) -> usize
+fn get_param_index<S, L>(problem: &Problem<S, L>, parameter: &ProfileParameter) -> usize
 where
     S: ODEIntegrator + Copy + Send + Sync,
     L: ObjectiveFunction + Send + Sync,
@@ -590,7 +582,7 @@ where
 ///   and computes the likelihood ratio relative to the best fit.
 /// - The `optimizer` parameter is used for the optimization. It should be a robust
 ///   optimizer that can handle the specific problem at hand.
-fn compute_likelihood_ratio<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction, O, T>(
+fn compute_likelihood_ratio<S, L, O, T>(
     problem: &Problem<S, L>,
     initial_guess: &T,
     parameter: &ProfileParameter,
@@ -649,6 +641,7 @@ where
 /// - The `to` field specifies the upper bound of the parameter range.
 /// - The `from` value must be less than the `to` value.
 #[derive(Debug, Clone, bon::Builder)]
+#[allow(clippy::duplicated_attributes)]
 #[builder(on(String, into), on(f64, into))]
 pub struct ProfileParameter {
     /// Name of the profiled parameter
@@ -910,6 +903,11 @@ impl ProfileResults {
         self.0.len()
     }
 
+    /// Checks if the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Returns a reference to the first profile result, if any.
     pub fn first(&self) -> Option<&ProfileResult> {
         self.0.first()
@@ -921,12 +919,13 @@ impl ProfileResults {
     }
 }
 
-impl Into<HashMap<String, ProfileResult>> for ProfileResults {
+impl From<ProfileResults> for HashMap<String, ProfileResult> {
     /// Converts the profile results into a HashMap keyed by parameter name.
     ///
     /// This allows easy lookup of profile results by parameter name.
-    fn into(self) -> HashMap<String, ProfileResult> {
-        self.0
+    fn from(results: ProfileResults) -> HashMap<String, ProfileResult> {
+        results
+            .0
             .into_iter()
             .map(|r| (r.param_name.clone(), r))
             .collect()
@@ -1068,7 +1067,7 @@ impl From<ProfileResults> for Plot {
         // There should be two columns, and the number of rows should be the number of parameters
         let n_params = results.0.len();
         let n_cols = 2;
-        let n_rows = (n_params + n_cols - 1) / n_cols;
+        let n_rows = n_params.div_ceil(n_cols);
 
         layout = layout
             .grid(
@@ -1087,7 +1086,7 @@ impl From<ProfileResults> for Plot {
 }
 
 fn interpolate_ratios(ratios: &[f64], param_values: &[f64]) -> (Vec<f64>, Vec<f64>) {
-    let cs = CubicSpline::from_nodes(&param_values, &ratios).unwrap();
+    let cs = CubicSpline::from_nodes(param_values, ratios).unwrap();
     let query_values = linspace!(param_values[0], param_values[param_values.len() - 1], 50);
     let interpolated_ratios = cs
         .eval_vec(&query_values)

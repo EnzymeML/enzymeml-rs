@@ -114,7 +114,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Problem<S, L> {
 
         if let Some(fixed_params) = fixed_params {
             for (i, param) in ode_system.get_sorted_params().iter().enumerate() {
-                if fixed_params.contains(&param) {
+                if fixed_params.contains(param) {
                     fixed_params_array[i] = 0.0;
                 }
             }
