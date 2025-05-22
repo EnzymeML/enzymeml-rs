@@ -13,14 +13,15 @@
 //! indices in the state vector, along with buffers for efficient computation.
 
 use std::{
-    cell::{Ref, RefCell},
     collections::{HashMap, HashSet},
+    sync::Mutex,
 };
 
 use evalexpr_jit::prelude::*;
 use nalgebra::{DMatrix, DMatrixView, DMatrixViewMut};
 use ndarray::Array1;
 use peroxide::fuga::{BasicODESolver, ODEIntegrator, ODEProblem, ODESolver};
+use rayon::prelude::*;
 
 use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
 
@@ -45,7 +46,6 @@ pub type StepperOutput = Vec<Vec<f64>>;
 ///
 /// It also maintains buffers for efficient computation and provides methods for
 /// parameter/species updates and gradient calculations.
-#[derive(Clone)]
 pub struct ODESystem {
     // Variable mapping
     var_map: HashMap<String, u32>,
@@ -66,19 +66,19 @@ pub struct ODESystem {
     grad_species: EquationSystem,
 
     // Buffers used for intermediate calculations
-    initial_assignment_buffer: RefCell<Vec<f64>>,
-    assignment_buffer: RefCell<Vec<f64>>,
-    species_buffer: RefCell<Vec<f64>>,
-    params_buffer: RefCell<Vec<f64>>,
-    constants_buffer: RefCell<Vec<f64>>,
+    initial_assignment_buffer: Mutex<Vec<f64>>,
+    assignment_buffer: Mutex<Vec<f64>>,
+    species_buffer: Mutex<Vec<f64>>,
+    params_buffer: Mutex<Vec<f64>>,
+    constants_buffer: Mutex<Vec<f64>>,
 
     // Mode
-    mode: RefCell<Mode>,
+    mode: Mutex<Mode>,
 
     /// Buffer for system evaluation input vector
-    input_buffer: RefCell<Vec<f64>>,
+    input_buffer: Mutex<Vec<f64>>,
     /// Buffer for assignment rule evaluations
-    assignments_result_buffer: RefCell<Vec<f64>>,
+    assignments_result_buffer: Mutex<Vec<f64>>,
 
     /// Starts and ends of the parts of the input vector
     species_range: (usize, usize),
@@ -225,14 +225,14 @@ impl ODESystem {
             sorted_vars,
             grad_params,
             grad_species,
-            initial_assignment_buffer: RefCell::new(initial_assignment_buffer),
-            assignment_buffer: RefCell::new(assignment_buffer),
-            species_buffer: RefCell::new(species_buffer),
-            params_buffer: RefCell::new(params_buffer),
-            constants_buffer: RefCell::new(constants_buffer),
-            mode: RefCell::new(mode.unwrap_or(Mode::Regular)),
-            input_buffer: RefCell::new(input_buffer),
-            assignments_result_buffer: RefCell::new(vec![0.0; assignments.len()]),
+            initial_assignment_buffer: Mutex::new(initial_assignment_buffer),
+            assignment_buffer: Mutex::new(assignment_buffer),
+            species_buffer: Mutex::new(species_buffer),
+            params_buffer: Mutex::new(params_buffer),
+            constants_buffer: Mutex::new(constants_buffer),
+            mode: Mutex::new(mode.unwrap_or(Mode::Regular)),
+            input_buffer: Mutex::new(input_buffer),
+            assignments_result_buffer: Mutex::new(vec![0.0; assignments.len()]),
             species_range,
             parameters_range,
             initial_assignments_range,
@@ -266,18 +266,23 @@ impl ODESystem {
     /// # Type Parameters
     ///
     /// * `T: OutputFormat` - The desired output format for the integration results
+    #[inline]
     pub fn integrate<T: OutputFormat>(
         &self,
         setup: &SimulationSetup,
-        initial_conditions: HashMap<String, f64>,
+        initial_conditions: &HashMap<String, f64>,
         parameters: Option<&[f64]>,
         evaluate: Option<&Vec<f64>>,
-        solver: impl ODEIntegrator + Copy,
+        solver: impl ODEIntegrator + Clone + Copy,
         mode: Option<Mode>,
     ) -> Result<T::Output, SimulationError> {
         let solver = BasicODESolver::new(solver);
         let mode = mode.unwrap_or(Mode::Regular);
-        self.mode.replace(mode.clone());
+
+        {
+            let mut mode_lock = self.mode.lock().unwrap();
+            *mode_lock = mode.clone();
+        }
 
         // Fill the constants buffer from the initial conditions
         let constants = self.arrange_constants_buffer(&initial_conditions)?;
@@ -306,7 +311,10 @@ impl ODESystem {
 
             self.initial_assignment_jit.fun()(
                 &input_vec,
-                self.initial_assignment_buffer.borrow_mut().as_mut_slice(),
+                self.initial_assignment_buffer
+                    .lock()
+                    .unwrap()
+                    .as_mut_slice(),
             );
         }
 
@@ -366,7 +374,7 @@ impl ODESystem {
         initial_conditions: &[HashMap<String, f64>],
         parameters: Option<&[f64]>,
         evaluate: Option<&[Vec<f64>]>,
-        solver: impl ODEIntegrator + Copy,
+        solver: impl ODEIntegrator + Clone + Copy + Send + Sync,
         mode: Option<Mode>,
     ) -> Result<Vec<T::Output>, SimulationError>
     where
@@ -378,7 +386,6 @@ impl ODESystem {
             vec![None; setups.len()]
         };
 
-        let systems = (0..setups.len()).map(|_| self.clone()).collect::<Vec<_>>();
         let zipped = setups
             .iter()
             .zip(initial_conditions.iter())
@@ -386,15 +393,15 @@ impl ODESystem {
             .collect::<Vec<_>>();
 
         let results = zipped
-            .into_iter()
-            .zip(systems)
-            .map(|(((setup, initial_conditions), evaluate), system)| {
+            .into_par_iter()
+            .map(|((setup, initial_conditions), evaluate)| {
+                let system = self.clone();
                 system.integrate::<T>(
                     setup,
-                    initial_conditions.clone(),
+                    initial_conditions,
                     parameters,
                     *evaluate,
-                    solver,
+                    solver.clone(),
                     mode.clone(),
                 )
             })
@@ -526,7 +533,7 @@ impl ODESystem {
         initial_assignments: &[f64],
         constants: &[f64],
     ) {
-        let mut input_vec = self.input_buffer.borrow_mut();
+        let mut input_vec = self.input_buffer.lock().unwrap();
         input_vec.clear();
         input_vec.push(t);
         input_vec.extend_from_slice(&y[..self.num_equations()]);
@@ -661,7 +668,7 @@ impl ODESystem {
     ///
     /// * `params` - A slice containing the new parameter values in the same order as sorted_vars
     pub fn set_params_buffer(&self, params: &[f64]) {
-        self.params_buffer.replace(params.to_vec());
+        *self.params_buffer.lock().unwrap() = params.to_vec();
     }
 
     /// Returns a reference to the current parameter buffer.
@@ -673,8 +680,8 @@ impl ODESystem {
     /// # Returns
     ///
     /// A slice containing the current parameter values
-    pub fn get_params_buffer(&self) -> Ref<Vec<f64>> {
-        self.params_buffer.borrow()
+    pub fn get_params_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
+        self.params_buffer.lock().unwrap()
     }
 
     /// Updates the species buffer with new values.
@@ -686,7 +693,7 @@ impl ODESystem {
     ///
     /// * `species` - A slice containing the new species values in the same order as sorted_vars
     pub fn set_species_buffer(&self, species: &[f64]) {
-        self.species_buffer.replace(species.to_vec());
+        *self.species_buffer.lock().unwrap() = species.to_vec();
     }
 
     /// Returns a reference to the current species buffer.
@@ -697,8 +704,8 @@ impl ODESystem {
     /// # Returns
     ///
     /// A slice containing the current species concentrations
-    pub fn get_species_buffer(&self) -> Ref<Vec<f64>> {
-        self.species_buffer.borrow()
+    pub fn get_species_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
+        self.species_buffer.lock().unwrap()
     }
 
     /// Returns a reference to the current assignment rules buffer.
@@ -710,8 +717,8 @@ impl ODESystem {
     /// # Returns
     ///
     /// A slice containing the current assignment rule values
-    pub fn get_assignment_buffer(&self) -> Ref<Vec<f64>> {
-        self.assignment_buffer.borrow()
+    pub fn get_assignment_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
+        self.assignment_buffer.lock().unwrap()
     }
 
     /// Updates the assignment rules buffer with new values.
@@ -723,7 +730,7 @@ impl ODESystem {
     ///
     /// * `assignments` - A slice containing the new assignment rule values in the same order as sorted_vars
     pub fn set_assignment_buffer(&self, assignments: &[f64]) {
-        self.assignment_buffer.replace(assignments.to_vec());
+        *self.assignment_buffer.lock().unwrap() = assignments.to_vec();
     }
 
     /// Returns a reference to the variable mapping.
@@ -748,8 +755,8 @@ impl ODESystem {
     /// # Returns
     ///
     /// A slice containing the initial assignment values
-    pub fn get_initial_assignment_buffer(&self) -> Ref<Vec<f64>> {
-        self.initial_assignment_buffer.borrow()
+    pub fn get_initial_assignment_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
+        self.initial_assignment_buffer.lock().unwrap()
     }
 
     /// Updates the initial assignments buffer with new values.
@@ -762,8 +769,7 @@ impl ODESystem {
     ///
     /// * `initial_assignments` - A slice containing the new initial assignment values in the same order as sorted_vars
     pub fn set_initial_assignment_buffer(&self, initial_assignments: &[f64]) {
-        self.initial_assignment_buffer
-            .replace(initial_assignments.to_vec());
+        *self.initial_assignment_buffer.lock().unwrap() = initial_assignments.to_vec();
     }
 
     /// Returns a reference to the constants buffer.
@@ -775,8 +781,8 @@ impl ODESystem {
     /// # Returns
     ///
     /// A slice containing the current constant values
-    pub fn get_constants_buffer(&self) -> Ref<Vec<f64>> {
-        self.constants_buffer.borrow()
+    pub fn get_constants_buffer(&self) -> impl std::ops::Deref<Target = Vec<f64>> + '_ {
+        self.constants_buffer.lock().unwrap()
     }
 
     /// Updates the constants buffer with new values.
@@ -788,7 +794,7 @@ impl ODESystem {
     ///
     /// * `constants` - A slice containing the new constant values in the same order as sorted_vars
     pub fn set_constants_buffer(&self, constants: &[f64]) {
-        self.constants_buffer.replace(constants.to_vec());
+        *self.constants_buffer.lock().unwrap() = constants.to_vec();
     }
 
     /// Returns a reference to the species mapping.
@@ -941,7 +947,7 @@ impl ODESystem {
     /// The total number of sensitivity equations
     pub fn get_sensitivity_dims(&self) -> usize {
         // Equations * Parameters
-        self.species_buffer.borrow().len() * self.params_buffer.borrow().len()
+        self.species_buffer.lock().unwrap().len() * self.params_buffer.lock().unwrap().len()
     }
 
     /// Returns the number of ODE equations in the system.
@@ -953,7 +959,7 @@ impl ODESystem {
     ///
     /// The number of ODE equations
     pub fn num_equations(&self) -> usize {
-        self.species_buffer.borrow().len()
+        self.species_buffer.lock().unwrap().len()
     }
 
     /// Returns the number of parameters in the system.
@@ -962,7 +968,7 @@ impl ODESystem {
     ///
     /// The total number of model parameters
     pub fn num_parameters(&self) -> usize {
-        self.params_buffer.borrow().len()
+        self.params_buffer.lock().unwrap().len()
     }
 
     /// Returns the number of assignment rules in the system.
@@ -1072,23 +1078,29 @@ impl ODEProblem for ODESystem {
     /// # Panics
     ///
     /// May panic if equation evaluation fails (which shouldn't happen with valid equations)
+    #[inline]
     fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
+        let params_guard = self.params_buffer.lock().unwrap();
+        let assignment_guard = self.assignment_buffer.lock().unwrap();
+        let initial_assignment_guard = self.initial_assignment_buffer.lock().unwrap();
+        let constants_guard = self.constants_buffer.lock().unwrap();
+
         self.set_input_vector(
             t,
             y,
-            self.get_params_buffer().as_slice(),
-            self.get_assignment_buffer().as_slice(),
-            self.get_initial_assignment_buffer().as_slice(),
-            self.get_constants_buffer().as_slice(),
+            &params_guard,
+            &assignment_guard,
+            &initial_assignment_guard,
+            &constants_guard,
         );
 
-        let mut input_vec = self.input_buffer.borrow_mut();
+        let mut input_vec = self.input_buffer.lock().unwrap();
 
         let species_len = self.num_equations();
 
         if self.has_assignments() {
             let (assignments_start, assignments_end) = self.get_assignment_ranges();
-            let mut assignments_result = self.assignments_result_buffer.borrow_mut();
+            let mut assignments_result = self.assignments_result_buffer.lock().unwrap();
 
             // Evaluate Assignment rules
             self.assignment_jit
@@ -1100,16 +1112,17 @@ impl ODEProblem for ODESystem {
 
             // Copy assignments to assignment buffer
             self.assignment_buffer
-                .borrow_mut()
+                .lock()
+                .unwrap()
                 .copy_from_slice(&assignments_result);
         }
 
         // This is where we decide if we are doing a regular simulation or a sensitivity analysis
         // - In case of a sensitivity analysis, we need to calculate the right hand side of the ODEs and the sensitivities wrt parameters
         // - In case of a regular simulation, we only need to calculate the right hand side of the ODEs
-        match *self.mode.borrow() {
+        match *self.mode.lock().unwrap() {
             Mode::Sensitivity => {
-                let params_len = self.params_buffer.borrow().len();
+                let params_len = self.params_buffer.lock().unwrap().len();
                 let (species_slice, sensitivity_slice) = dy.split_at_mut(species_len);
 
                 // Calculate species derivatives
@@ -1299,6 +1312,69 @@ pub enum Mode {
     Sensitivity,
 }
 
+impl Clone for ODESystem {
+    /// Clones the ODESystem
+    ///
+    /// We need to manually implement the clone, since we do not want to share the buffers
+    /// between the cloned ODESystem and the original ODESystem. This is sepcifically important
+    /// when we want to parallelize across multiple conditions (inits and/or parameters). Leaving
+    /// the buffers as is will lead to unexpected results.
+    ///
+    /// # Returns
+    ///
+    /// A new ODESystem with the same fields as the original
+    fn clone(&self) -> Self {
+        // Helper function to clone mutex contents with clear error messages
+        fn clone_mutex<T: Clone>(mutex: &Mutex<T>, name: &str) -> Mutex<T> {
+            Mutex::new(
+                mutex
+                    .lock()
+                    .expect(&format!("Failed to lock {} mutex", name))
+                    .clone(),
+            )
+        }
+
+        Self {
+            // Clone all the non-mutex fields
+            var_map: self.var_map.clone(),
+            species_mapping: self.species_mapping.clone(),
+            params_mapping: self.params_mapping.clone(),
+            initial_assignments_mapping: self.initial_assignments_mapping.clone(),
+            assignment_rules_mapping: self.assignment_rules_mapping.clone(),
+            constants_mapping: self.constants_mapping.clone(),
+            sorted_vars: self.sorted_vars.clone(),
+            ode_jit: self.ode_jit.clone(),
+            assignment_jit: self.assignment_jit.clone(),
+            initial_assignment_jit: self.initial_assignment_jit.clone(),
+            grad_params: self.grad_params.clone(),
+            grad_species: self.grad_species.clone(),
+
+            // Clone all mutex fields using the helper function
+            initial_assignment_buffer: clone_mutex(
+                &self.initial_assignment_buffer,
+                "initial_assignment_buffer",
+            ),
+            assignment_buffer: clone_mutex(&self.assignment_buffer, "assignment_buffer"),
+            species_buffer: clone_mutex(&self.species_buffer, "species_buffer"),
+            params_buffer: clone_mutex(&self.params_buffer, "params_buffer"),
+            constants_buffer: clone_mutex(&self.constants_buffer, "constants_buffer"),
+            mode: clone_mutex(&self.mode, "mode"),
+            input_buffer: clone_mutex(&self.input_buffer, "input_buffer"),
+            assignments_result_buffer: clone_mutex(
+                &self.assignments_result_buffer,
+                "assignments_result_buffer",
+            ),
+
+            // Copy the range tuples
+            species_range: self.species_range,
+            parameters_range: self.parameters_range,
+            initial_assignments_range: self.initial_assignments_range,
+            assignment_rules_range: self.assignment_rules_range,
+            constants_range: self.constants_range,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use output::MatrixResult;
@@ -1369,7 +1445,7 @@ mod tests {
         // Act
         let result = system.integrate::<MatrixResult>(
             &setup,
-            initial_conditions,
+            &initial_conditions,
             None,
             Some(&vec![2.0, 3.0, 4.0, 5.0]),
             solver,
@@ -1439,7 +1515,7 @@ mod tests {
 
         let result = system.integrate::<MatrixResult>(
             &setup,
-            initial_conditions,
+            &initial_conditions,
             None,
             Some(&vec![2.0, 3.0, 4.0, 5.0]),
             solver,
@@ -1484,7 +1560,7 @@ mod tests {
             HashMap::from([("no_sub".to_string(), 100.0), ("product".to_string(), 0.0)]);
 
         let result =
-            system.integrate::<MatrixResult>(&setup, initial_conditions, None, None, solver, None);
+            system.integrate::<MatrixResult>(&setup, &initial_conditions, None, None, solver, None);
 
         // Assert
         assert!(result.is_err(), "Result should be an error");
@@ -1507,7 +1583,7 @@ mod tests {
 
         // Act
         let result =
-            system.integrate::<MatrixResult>(&setup, initial_conditions, None, None, solver, None);
+            system.integrate::<MatrixResult>(&setup, &initial_conditions, None, None, solver, None);
 
         // Assert
         assert!(result.is_err(), "Result should be an error");
