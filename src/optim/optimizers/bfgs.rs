@@ -72,7 +72,7 @@ impl BFGS {
     }
 }
 
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for BFGS {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L> for BFGS {
     /// Optimizes the given problem using the BFGS algorithm.
     ///
     /// # Arguments

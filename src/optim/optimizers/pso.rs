@@ -64,7 +64,9 @@ impl ParticleSwarmOpt {
     }
 }
 
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for ParticleSwarmOpt {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L>
+    for ParticleSwarmOpt
+{
     /// Optimizes the given problem using the PSO algorithm.
     ///
     /// # Arguments

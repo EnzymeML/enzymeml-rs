@@ -8,7 +8,7 @@ use super::error::ObjectiveError;
 ///
 /// This trait provides methods to calculate both the cost/loss value and its gradient
 /// for optimization algorithms. It is typically used in parameter estimation and model fitting.
-pub trait ObjectiveFunction: Copy + Display {
+pub trait ObjectiveFunction: Copy + Display + Send + Sync {
     /// Calculates the cost/loss value for the current state
     ///
     /// # Arguments

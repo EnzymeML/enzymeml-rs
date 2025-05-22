@@ -73,7 +73,7 @@ impl LBFGS {
     }
 }
 
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for LBFGS {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L> for LBFGS {
     /// Optimizes the given problem using the L-BFGS algorithm.
     ///
     /// # Arguments

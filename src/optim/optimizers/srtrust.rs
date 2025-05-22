@@ -77,7 +77,9 @@ impl SR1TrustRegion {
     }
 }
 
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for SR1TrustRegion {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L>
+    for SR1TrustRegion
+{
     /// Optimizes the given problem using the SR1 Trust Region algorithm.
     ///
     /// # Arguments
@@ -151,7 +153,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L> for SR1Trust
 ///
 /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
 /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-fn solve_steihaug<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+fn solve_steihaug<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
     problem: &Problem<S, L>,
     initial_guess: InitialGuesses,
     max_iters: u64,
@@ -200,7 +202,7 @@ fn solve_steihaug<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
 ///
 /// * `Ok(Array1<f64>)` - The optimal parameters if optimization succeeds
 /// * `Err(OptimizeError)` - Error if optimization fails or doesn't converge
-fn solve_cauchy_point<S: ODEIntegrator + Copy, L: ObjectiveFunction>(
+fn solve_cauchy_point<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
     problem: &Problem<S, L>,
     initial_guess: InitialGuesses,
     max_iters: u64,

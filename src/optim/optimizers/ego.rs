@@ -52,7 +52,7 @@ impl EfficientGlobalOptimization {
     }
 }
 
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Optimizer<S, L>
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L>
     for EfficientGlobalOptimization
 {
     /// Optimizes the given problem using the EGO algorithm.
