@@ -15,7 +15,7 @@ use super::{problem::Problem, OptimizeError};
 
 /// Implementation of the CostFunction trait for Problem to enable parameter optimization.
 /// This allows using the Problem with optimization algorithms that minimize a cost function.
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> CostFunction for Problem<S, L> {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> CostFunction for Problem<S, L> {
     type Param = Array1<f64>;
     type Output = f64;
 
@@ -64,7 +64,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> CostFunction for Problem<S, 
 
 /// Implementation of the Gradient trait for Problem to enable gradient-based optimization.
 /// The gradient is computed using central finite differences for better accuracy.
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Gradient for Problem<S, L> {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Gradient for Problem<S, L> {
     type Param = Array1<f64>;
     type Gradient = Array1<f64>;
 
@@ -77,6 +77,8 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Gradient for Problem<S, L> {
     /// * `Result<Array1<f64>, argmin::core::Error>` - The computed gradient vector or an error
     fn gradient(&self, params: &Self::Param) -> Result<Self::Gradient, argmin::core::Error> {
         let gradient = params.central_diff(&|x| self.cost(x).expect("Failed to compute cost"));
+
+        let gradient = gradient * &self.fixed_params;
         Ok(gradient)
     }
 }
@@ -89,7 +91,7 @@ impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Gradient for Problem<S, L> {
 ///
 /// # Returns
 /// * `Result<Array2<f64>, argmin::core::Error>` - The computed Hessian matrix or an error
-impl<S: ODEIntegrator + Copy, L: ObjectiveFunction> Hessian for Problem<S, L> {
+impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Hessian for Problem<S, L> {
     type Param = Array1<f64>;
     type Hessian = Array2<f64>;
 
