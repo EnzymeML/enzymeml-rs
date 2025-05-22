@@ -45,7 +45,7 @@ sha2 = "0.10.8"
 plotly = "0.12.1"
 
 # Feature: simulation
-peroxide = { version = "0.39.2", optional = true }
+peroxide = { git = "https://github.com/JR-1991/Peroxide.git", branch = "butcher-tableau-send", optional = true }
 evalexpr-jit = { version = "0.2.1", features = ["nalgebra"], optional = true }
 splines = { version = "5.0.0", features = ["nalgebra"], optional = true }
 
@@ -73,11 +73,13 @@ tsify-next = { version = "0.5.5", optional = true }
 # Feature: llm
 mdmodels = { git = "https://github.com/FAIRChemistry/md-models.git", branch = "main", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
+bon = "3.6.3"
 
 [profile.release]
-opt-level = 2
+opt-level = 3
 lto = true
 codegen-units = 1
+debug = false
 
 [features]
 default = ["optimization", "simulation", "llm", "tabular", "plotly-kaleido"]
