@@ -6,6 +6,7 @@
 //! - Converting EnzymeML documents to different formats
 //! - Validating EnzymeML documents for schema compliance and consistency
 //! - Visualizing measurement data and simulation results
+//! - Performing profile likelihood analysis for parameter identifiability
 //!
 //! # Usage
 //!
@@ -27,6 +28,9 @@
 //!
 //! # Visualize measurement data
 //! enzymeml visualize model.json --measurement-ids meas1 meas2 --show-fit
+//!
+//! # Profile likelihood analysis for parameter identifiability
+//! enzymeml profile sr1 --path model.json --fixed k_cat --from 0.1 --to 10.0 --steps 100
 //! ```
 //!
 //! # Commands
@@ -41,6 +45,10 @@
 //!   - `bfgs`: Broyden–Fletcher–Goldfarb–Shanno algorithm
 //!   - `sr1`: Symmetric Rank 1 Trust Region algorithm
 //! - `extract`: Extract structured information from natural language using LLMs
+//! - `profile`: Perform profile likelihood analysis for parameter identifiability
+//!   - `sr1`: Using Symmetric Rank 1 Trust Region algorithm
+//!   - `lbfgs`: Using Limited-memory BFGS algorithm
+//!   - `bfgs`: Using Broyden–Fletcher–Goldfarb–Shanno algorithm
 //!
 //! # Parameter Optimization
 //!
@@ -50,6 +58,15 @@
 //! - **PSO**: Particle Swarm Optimization, a population-based stochastic algorithm
 //! - **LBFGS/BFGS**: Gradient-based optimization algorithms for smooth objective functions
 //! - **SR1**: Symmetric Rank 1 Trust Region method for constrained optimization problems
+//!
+//! # Profile Likelihood Analysis
+//!
+//! Profile likelihood analysis is used to assess parameter identifiability and confidence intervals:
+//!
+//! - Systematically varies a single parameter while re-optimizing all others
+//! - Helps identify practical and structural non-identifiability
+//! - Provides confidence intervals for parameter estimates
+//! - Visualizes the likelihood profile for each parameter
 //!
 //! # Solvers
 //!
@@ -70,16 +87,18 @@ use std::{
     str::FromStr,
 };
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use enzymeml::{
+    identifiability::profile::{ego_profile_likelihood, profile_likelihood, ProfileParameter},
     io::{load_enzmldoc, save_enzmldoc},
     llm::{query_llm, PromptInput},
     optim::{
         report::OptimizationReport, BFGSBuilder, EGOBuilder, InitialGuesses, LBFGSBuilder,
-        Optimizer, PSOBuilder, ProblemBuilder, SR1TrustRegionBuilder, SubProblem, Transformation,
+        OptimizeError, Optimizer, PSOBuilder, Problem, ProblemBuilder, SR1TrustRegionBuilder,
+        SubProblem, Transformation,
     },
-    prelude::{EnzymeMLDocument, LossFunction},
+    prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
     validation::{consistency, schema},
 };
 
@@ -92,6 +111,7 @@ use case::CaseExt;
 use log::error;
 #[cfg(not(feature = "wasm"))]
 use plotly::ImageFormat;
+use plotly::Plot;
 use rust_xlsxwriter::workbook::Workbook;
 
 // List all available transformations
@@ -184,7 +204,13 @@ enum Commands {
     /// Fit a model using optimization algorithms
     Fit {
         #[command(subcommand)]
-        algorithm: FitAlgorithm,
+        algorithm: OptimizeAlgorithm,
+    },
+
+    /// Calculate the profile likelihood for a model
+    Profile {
+        #[command(subcommand)]
+        algorithm: ProfileAlgorithm,
     },
 
     /// Extract information from an EnzymeML document
@@ -221,234 +247,266 @@ enum Commands {
 
 /// Available optimization algorithms
 #[derive(Subcommand)]
-enum FitAlgorithm {
+enum OptimizeAlgorithm {
     /// Efficient Global Optimization algorithm
     Ego {
-        /// Path to the EnzymeML document
-        #[arg(short, long)]
-        path: PathBuf,
+        #[command(flatten)]
+        params: EgoParams,
 
-        /// Maximum number of iterations before stopping
-        #[arg(long, default_value_t = 100)]
-        max_iters: usize,
-
-        /// Time step for the design points
-        #[arg(long, default_value_t = 0.1)]
-        dt: f64,
-
-        /// Bounds for the optimization
-        #[arg(short, long, value_parser = parse_key_bounds)]
-        bound: Vec<(String, (f64, f64))>,
-
-        /// Whether to use the log transformation for the initial guesses
-        #[arg(short, long, conflicts_with = "transform")]
-        log_transform: bool,
-
-        /// Transformations for the initial guesses
-        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
-        transform: Vec<Transformation>,
-
-        /// Solver to use
-        #[arg(
-            short,
-            long,
-            value_parser = Solvers::from_str,
-            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
-        )]
-        solver: Solvers,
-
-        /// Objective function to use
-        #[arg(short = 'O', long, default_value = "mse", value_enum)]
-        objective: LossFunction,
-
-        /// Output directory for the optimization report
-        #[arg(short, long, default_value = ".")]
-        output_dir: Option<PathBuf>,
+        #[command(flatten)]
+        fit_params: BaseFitParams,
     },
 
     /// Particle Swarm Optimization algorithm
     Pso {
-        /// Path to the EnzymeML document
-        #[arg(short, long)]
-        path: PathBuf,
+        #[command(flatten)]
+        params: PSOParams,
 
-        /// Maximum number of iterations before stopping
-        #[arg(long, default_value_t = 100)]
-        max_iters: u64,
-
-        /// Population size for the algorithm
-        #[arg(long, default_value_t = 50)]
-        pop_size: usize,
-
-        /// Bounds for the optimization
-        #[arg(short, long, value_parser = parse_key_bounds)]
-        bound: Vec<(String, (f64, f64))>,
-
-        /// Whether to use the log transformation for the initial guesses
-        #[arg(short, long, conflicts_with = "transform")]
-        log_transform: bool,
-
-        /// Transformations for the initial guesses
-        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
-        transform: Vec<Transformation>,
-
-        /// Solver to use
-        #[arg(
-            short,
-            long,
-            value_parser = Solvers::from_str,
-            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
-        )]
-        solver: Solvers,
-
-        /// Objective function to use
-        #[arg(short = 'O', long, default_value = "mse", value_enum)]
-        objective: LossFunction,
-
-        /// Time step for the design points
-        #[arg(long, default_value_t = 0.1)]
-        dt: f64,
-
-        /// Output directory for the optimization report
-        #[arg(short, long, default_value = ".")]
-        output_dir: Option<PathBuf>,
+        #[command(flatten)]
+        fit_params: BaseFitParams,
     },
 
     /// LBFGS algorithm
     Lbfgs {
-        /// Path to the EnzymeML document
-        #[arg(short, long)]
-        path: PathBuf,
+        #[command(flatten)]
+        params: LbfgsParams,
 
-        /// Initial guesses for the optimization
-        #[arg(short, long, value_parser = parse_initial_guesses)]
-        initial: Vec<(String, f64)>,
-
-        /// Whether to use the log transformation for the initial guesses
-        #[arg(short, long, conflicts_with = "transform")]
-        log_transform: bool,
-
-        /// Transformations for the initial guesses
-        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
-        transform: Vec<Transformation>,
-
-        /// Solver to use
-        #[arg(
-            short,
-            long,
-            value_parser = Solvers::from_str,
-            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
-        )]
-        solver: Solvers,
-
-        /// Objective function to use
-        #[arg(short = 'O', long, default_value = "mse", value_enum)]
-        objective: LossFunction,
-
-        /// Time step for the design points
-        #[arg(long, default_value_t = 0.1)]
-        dt: f64,
-
-        /// Maximum number of iterations before stopping
-        #[arg(long, default_value_t = 20)]
-        max_iters: u64,
-
-        /// Output directory for the optimization report
-        #[arg(short, long, default_value = ".")]
-        output_dir: Option<PathBuf>,
+        #[command(flatten)]
+        fit_params: BaseFitParams,
     },
 
     /// BFGS algorithm
     Bfgs {
-        /// Path to the EnzymeML document
-        #[arg(short, long)]
-        path: PathBuf,
+        #[command(flatten)]
+        params: LbfgsParams,
 
-        /// Initial guesses for the optimization
-        #[arg(short, long, value_parser = parse_initial_guesses)]
-        initial: Vec<(String, f64)>,
-
-        /// Whether to use the log transformation for the initial guesses
-        #[arg(short, long, conflicts_with = "transform")]
-        log_transform: bool,
-
-        /// Transformations for the initial guesses
-        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
-        transform: Vec<Transformation>,
-
-        /// Solver to use
-        #[arg(
-            short,
-            long,
-            value_parser = Solvers::from_str,
-            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
-        )]
-        solver: Solvers,
-
-        /// Objective function to use
-        #[arg(short = 'O', long, default_value = "mse", value_enum)]
-        objective: LossFunction,
-
-        /// Time step for the design points
-        #[arg(long, default_value_t = 0.1)]
-        dt: f64,
-
-        /// Maximum number of iterations before stopping
-        #[arg(long, default_value_t = 20)]
-        max_iters: u64,
-
-        /// Output directory for the optimization report
-        #[arg(short, long, default_value = ".")]
-        output_dir: Option<PathBuf>,
+        #[command(flatten)]
+        fit_params: BaseFitParams,
     },
 
     /// SR1TrustRegion algorithm
     SR1 {
-        /// Path to the EnzymeML document
-        #[arg(short, long)]
-        path: PathBuf,
+        #[command(flatten)]
+        params: SR1Params,
 
-        /// Initial guesses for the optimization
-        #[arg(short, long, value_parser = parse_initial_guesses)]
-        initial: Vec<(String, f64)>,
-
-        /// Whether to use the log transformation for the initial guesses
-        #[arg(short, long, conflicts_with = "transform")]
-        log_transform: bool,
-
-        /// Transformations for the initial guesses
-        #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
-        transform: Vec<Transformation>,
-
-        /// Solver to use
-        #[arg(
-            short,
-            long,
-            value_parser = Solvers::from_str,
-            help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
-        )]
-        solver: Solvers,
-
-        /// Subproblem solver to use
-        #[arg(short = 'S', long, default_value = "steihaug", value_enum)]
-        subproblem: SubProblem,
-
-        /// Objective function to use
-        #[arg(short = 'O', long, default_value = "mse", value_enum)]
-        objective: LossFunction,
-
-        /// Time step for the design points
-        #[arg(long, default_value_t = 0.1)]
-        dt: f64,
-
-        /// Maximum number of iterations before stopping
-        #[arg(long, default_value_t = 40)]
-        max_iters: u64,
-
-        /// Output directory for the optimization report
-        #[arg(short, long, default_value = ".")]
-        output_dir: Option<PathBuf>,
+        #[command(flatten)]
+        fit_params: BaseFitParams,
     },
+}
+
+/// Available profile likelihood algorithms
+#[derive(Subcommand)]
+enum ProfileAlgorithm {
+    /// SR1TrustRegion algorithm for profile likelihood analysis
+    SR1 {
+        #[command(flatten)]
+        opt_params: SR1Params,
+
+        #[command(flatten)]
+        profile_params: BaseProfileParams,
+    },
+
+    /// LBFGS algorithm for profile likelihood analysis
+    Lbfgs {
+        #[command(flatten)]
+        params: LbfgsParams,
+
+        #[command(flatten)]
+        profile_params: BaseProfileParams,
+    },
+
+    /// BFGS algorithm for profile likelihood analysis
+    Bfgs {
+        #[command(flatten)]
+        params: LbfgsParams,
+
+        #[command(flatten)]
+        profile_params: BaseProfileParams,
+    },
+}
+
+/// Base parameters for integrator configuration
+#[derive(Args)]
+struct BaseIntegratorParams {
+    /// Path to the EnzymeML document
+    #[arg(short, long)]
+    path: PathBuf,
+
+    /// Whether to use the log transformation for the initial guesses
+    #[arg(short, long, conflicts_with = "transform")]
+    log_transform: bool,
+
+    /// Transformations for the initial guesses
+    #[arg(short, long, help = format!("Transformations for the initial guesses. Available transformations: [{}]", AVAILABLE_TRANSFORMATIONS.join(", ")), conflicts_with = "log_transform")]
+    transform: Vec<Transformation>,
+
+    /// Solver to use
+    #[arg(
+        short,
+        long,
+        value_parser = Solvers::from_str,
+        help = "Solver to use. Available solvers: [rk5, rk4, rkf45, tsit45, dp45, bs23, rals3, rals4]"
+    )]
+    solver: Solvers,
+
+    /// Time step for the design points
+    #[arg(long, default_value_t = 0.1)]
+    dt: f64,
+
+    /// Maximum number of iterations before stopping
+    #[arg(long, default_value_t = 40)]
+    max_iters: u64,
+}
+
+impl BaseIntegratorParams {
+    /// Creates a Problem instance from the parameters
+    ///
+    /// # Arguments
+    ///
+    /// * `objective` - The objective function to use for optimization
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Problem<Solvers, LossFunction>, OptimizeError>` - The problem instance or an error
+    pub fn to_problem(
+        &self,
+        objective: impl Into<LossFunction>,
+    ) -> Result<Problem<Solvers, LossFunction>, OptimizeError> {
+        let mut enzmldoc = load_enzmldoc(&self.path).expect("Failed to load EnzymeML document");
+        enzmldoc.derive_system().expect("Failed to derive system");
+
+        let transformations = if self.log_transform {
+            create_log_transformations(&enzmldoc)
+        } else {
+            self.transform.clone()
+        };
+
+        // Build problem
+        ProblemBuilder::new(&enzmldoc, self.solver, objective.into())
+            .dt(self.dt)
+            .transformations(transformations)
+            .build()
+    }
+}
+
+/// Base parameters for fitting operations
+#[derive(Args)]
+struct BaseFitParams {
+    /// Fixed parameters
+    #[arg(short, long, help = "Fixed parameters", default_value = "")]
+    fix: Vec<String>,
+
+    /// Output directory for the optimization report
+    #[arg(short, long, default_value = ".")]
+    output_dir: Option<PathBuf>,
+
+    /// Objective function to use
+    #[arg(
+        short = 'O',
+        long,
+        default_value = "mse",
+        value_parser = LossFunction::from_str,
+        help = "Objective function to use. Available objective functions: [mse, sse, rmse, logcosh, mae, nll(sigma)]"
+    )]
+    objective: LossFunction,
+}
+
+/// Base parameters for profile likelihood analysis
+#[derive(Args)]
+struct BaseProfileParams {
+    /// Parameters to profile
+    #[arg(short = 'P', long = "parameter", help = "Parameters to profile. Format: <name>=<from>:<to>", value_parser = ProfileParameter::from_str)]
+    parameters: Vec<ProfileParameter>,
+
+    /// Number of steps for the profile likelihood calculation
+    #[arg(
+        long,
+        help = "Number of steps for the profile likelihood calculation",
+        default_value_t = 10,
+        conflicts_with = "ego"
+    )]
+    steps: usize,
+
+    /// Sigma value for the negative log likelihood function
+    #[arg(
+        long,
+        help = "Sigma value for the negative log likelihood function",
+        default_value = "1.0"
+    )]
+    sigma: f64,
+
+    /// Output directory for the profile likelihood plot
+    #[arg(short, long, help = "Output directory for the profile likelihood plot")]
+    out: Option<PathBuf>,
+
+    /// Whether to use EGO-based profile likelihood
+    #[arg(
+        long,
+        help = "Whether to use EGO-based profile likelihood",
+        conflicts_with = "steps"
+    )]
+    ego: bool,
+
+    /// Maximum number of iterations for the profile likelihood calculation
+    #[arg(
+        long = "ego-iters",
+        help = "Maximum number of iterations for the profile likelihood calculation",
+        conflicts_with = "steps",
+        default_value_t = 10
+    )]
+    ego_iters: usize,
+}
+
+/// Parameters for SR1 Trust Region optimization
+#[derive(Args)]
+struct SR1Params {
+    #[command(flatten)]
+    params: BaseIntegratorParams,
+
+    /// Initial guesses for the optimization
+    #[arg(short, long, value_parser = parse_initial_guesses)]
+    initial: Vec<(String, f64)>,
+
+    /// Subproblem solver to use
+    #[arg(short = 'S', long, default_value = "steihaug", value_enum)]
+    subproblem: SubProblem,
+}
+
+/// Parameters for LBFGS/BFGS optimization
+#[derive(Args)]
+struct LbfgsParams {
+    #[command(flatten)]
+    params: BaseIntegratorParams,
+
+    /// Initial guesses for the optimization
+    #[arg(short, long, value_parser = parse_initial_guesses)]
+    initial: Vec<(String, f64)>,
+}
+
+/// Parameters for Particle Swarm Optimization
+#[derive(Args)]
+struct PSOParams {
+    #[command(flatten)]
+    params: BaseIntegratorParams,
+
+    /// Population size for the algorithm
+    #[arg(long, default_value_t = 50)]
+    pop_size: usize,
+
+    /// Bounds for the optimization
+    #[arg(short, long, value_parser = parse_key_bounds)]
+    bound: Vec<(String, (f64, f64))>,
+}
+
+/// Parameters for Efficient Global Optimization
+#[derive(Args)]
+struct EgoParams {
+    #[command(flatten)]
+    params: BaseIntegratorParams,
+
+    /// Bounds for the optimization
+    #[arg(short, long, value_parser = parse_key_bounds)]
+    bound: Vec<(String, (f64, f64))>,
 }
 
 /// Main entry point for the CLI application
@@ -614,44 +672,24 @@ pub fn main() {
         }
 
         Commands::Fit { algorithm } => match algorithm {
-            FitAlgorithm::Lbfgs {
-                path,
-                initial,
-                transform,
-                solver,
-                objective,
-                dt,
-                max_iters,
-                output_dir,
-                log_transform,
-            } => {
-                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                enzmldoc.derive_system().expect("Failed to derive system");
-
-                let transformations = if *log_transform {
-                    create_log_transformations(&enzmldoc)
-                } else {
-                    transform.clone()
-                };
-
-                // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
-                    .dt(*dt)
-                    .transformations(transformations)
-                    .build()
+            OptimizeAlgorithm::Lbfgs { params, fit_params } => {
+                let mut problem = params
+                    .params
+                    .to_problem(fit_params.objective)
                     .expect("Failed to build problem");
 
                 // Override initial guesses
-                override_initial_guesses(&mut enzmldoc, initial);
+                override_initial_guesses(problem.enzmldoc_mut(), &params.initial);
 
-                let initial_guesses: InitialGuesses = (&enzmldoc)
+                let enzmldoc = problem.enzmldoc();
+                let initial_guesses: InitialGuesses = (enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to initial guesses");
 
                 // Build optimizer
                 let lbfgs = LBFGSBuilder::default()
                     .linesearch(1e-4, 0.9)
-                    .max_iters(*max_iters)
+                    .max_iters(params.params.max_iters)
                     .target_cost(1e-6)
                     .build();
 
@@ -664,50 +702,36 @@ pub fn main() {
                 println!("{}", report);
 
                 // Save the fitted EnzymeML document
-                if let Some(output_dir) = output_dir {
-                    save_results(path, &report, &report.doc, output_dir, "lbfgs");
+                if let Some(output_dir) = &fit_params.output_dir {
+                    save_results(
+                        &params.params.path,
+                        &report,
+                        &report.doc,
+                        &output_dir,
+                        "lbfgs",
+                    );
                 }
             }
 
-            FitAlgorithm::Bfgs {
-                path,
-                initial,
-                transform,
-                solver,
-                objective,
-                dt,
-                max_iters,
-                output_dir,
-                log_transform,
-            } => {
-                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                enzmldoc.derive_system().expect("Failed to derive system");
-
-                let transformations = if *log_transform {
-                    create_log_transformations(&enzmldoc)
-                } else {
-                    transform.clone()
-                };
-
-                // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
-                    .dt(*dt)
-                    .transformations(transformations)
-                    .build()
+            OptimizeAlgorithm::Bfgs { params, fit_params } => {
+                let mut problem = params
+                    .params
+                    .to_problem(fit_params.objective)
                     .expect("Failed to build problem");
 
                 // Override initial guesses
-                override_initial_guesses(&mut enzmldoc, initial);
+                override_initial_guesses(problem.enzmldoc_mut(), &params.initial);
 
+                let enzmldoc = problem.enzmldoc();
                 // Convert EnzymeML document to initial guesses
-                let initial_guesses: InitialGuesses = (&enzmldoc)
+                let initial_guesses: InitialGuesses = (enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to initial guesses");
 
                 // Build optimizer
                 let bfgs = BFGSBuilder::default()
                     .linesearch(1e-4, 0.9)
-                    .max_iters(*max_iters)
+                    .max_iters(params.params.max_iters)
                     .target_cost(1e-6)
                     .build();
 
@@ -720,51 +744,37 @@ pub fn main() {
                 println!("{}", report);
 
                 // Save the fitted EnzymeML document
-                if let Some(output_dir) = output_dir {
-                    save_results(path, &report, &report.doc, output_dir, "bfgs");
+                if let Some(output_dir) = &fit_params.output_dir {
+                    save_results(
+                        &params.params.path,
+                        &report,
+                        &report.doc,
+                        &output_dir,
+                        "bfgs",
+                    );
                 }
             }
 
-            FitAlgorithm::SR1 {
-                path,
-                initial,
-                transform,
-                solver,
-                objective,
-                dt,
-                max_iters,
-                output_dir,
-                log_transform,
-                subproblem,
-            } => {
-                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                enzmldoc.derive_system().expect("Failed to derive system");
-
-                let transformations = if *log_transform {
-                    create_log_transformations(&enzmldoc)
-                } else {
-                    transform.clone()
-                };
-
-                // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
-                    .dt(*dt)
-                    .transformations(transformations)
-                    .build()
+            OptimizeAlgorithm::SR1 { params, fit_params } => {
+                let mut problem = params
+                    .params
+                    .to_problem(fit_params.objective)
                     .expect("Failed to build problem");
 
                 // Override initial guesses
-                override_initial_guesses(&mut enzmldoc, initial);
+                override_initial_guesses(problem.enzmldoc_mut(), &params.initial);
+
+                let enzmldoc = problem.enzmldoc();
 
                 // Convert EnzymeML document to initial guesses
-                let initial_guesses: InitialGuesses = (&enzmldoc)
+                let initial_guesses: InitialGuesses = (enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to initial guesses");
 
                 // Build optimizer
                 let sr1trustregion = SR1TrustRegionBuilder::default()
-                    .max_iters(*max_iters)
-                    .subproblem(*subproblem)
+                    .max_iters(params.params.max_iters)
+                    .subproblem(params.subproblem)
                     .build();
 
                 // Optimize
@@ -776,48 +786,36 @@ pub fn main() {
                 println!("{}", report);
 
                 // Save the fitted EnzymeML document
-                if let Some(output_dir) = output_dir {
-                    save_results(path, &report, &report.doc, output_dir, "sr1trustregion");
+                if let Some(output_dir) = &fit_params.output_dir {
+                    save_results(
+                        &params.params.path,
+                        &report,
+                        &report.doc,
+                        &output_dir,
+                        "sr1trustregion",
+                    );
                 }
             }
-            FitAlgorithm::Ego {
-                path,
-                max_iters,
-                output_dir,
-                dt,
-                bound,
-                solver,
-                objective,
-                log_transform,
-                transform,
-            } => {
-                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                enzmldoc.derive_system().expect("Failed to derive system");
-
-                let transformations = if *log_transform {
-                    create_log_transformations(&enzmldoc)
-                } else {
-                    transform.clone()
-                };
-
-                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
-                    .dt(*dt)
-                    .transformations(transformations)
-                    .build()
+            OptimizeAlgorithm::Ego { params, fit_params } => {
+                let mut problem = params
+                    .params
+                    .to_problem(fit_params.objective)
                     .expect("Failed to build problem");
 
                 // Add CLI bounds
-                add_cli_bounds(&mut enzmldoc, bound);
+                add_cli_bounds(problem.enzmldoc_mut(), &params.bound);
+
+                let enzmldoc = problem.enzmldoc();
 
                 // Convert EnzymeML document to bounds
-                let bounds = (&enzmldoc)
+                let bounds = (enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to bounds");
 
                 // Build optimizer
                 let optimizer = EGOBuilder::default()
                     .bounds(bounds)
-                    .max_iters(*max_iters)
+                    .max_iters(params.params.max_iters as usize)
                     .build();
 
                 // Optimize
@@ -829,53 +827,38 @@ pub fn main() {
                 println!("{}", report);
 
                 // Save the fitted EnzymeML document
-                if let Some(output_dir) = output_dir {
-                    save_results(path, &report, &report.doc, output_dir, "ego");
+                if let Some(output_dir) = &fit_params.output_dir {
+                    save_results(
+                        &params.params.path,
+                        &report,
+                        &report.doc,
+                        &output_dir,
+                        "ego",
+                    );
                 }
             }
 
-            FitAlgorithm::Pso {
-                path,
-                max_iters,
-                pop_size,
-                output_dir,
-                dt,
-                bound,
-                solver,
-                objective,
-                log_transform,
-                transform,
-            } => {
-                // Load EnzymeML document
-                let mut enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
-                enzmldoc.derive_system().expect("Failed to derive system");
-
-                let transformations = if *log_transform {
-                    create_log_transformations(&enzmldoc)
-                } else {
-                    transform.clone()
-                };
-
-                // Build problem
-                let problem = ProblemBuilder::new(&enzmldoc, *solver, *objective)
-                    .dt(*dt)
-                    .transformations(transformations)
-                    .build()
+            OptimizeAlgorithm::Pso { params, fit_params } => {
+                let mut problem = params
+                    .params
+                    .to_problem(fit_params.objective)
                     .expect("Failed to build problem");
 
                 // Add CLI bounds
-                add_cli_bounds(&mut enzmldoc, bound);
+                add_cli_bounds(problem.enzmldoc_mut(), &params.bound);
+
+                let enzmldoc = problem.enzmldoc();
 
                 // Convert EnzymeML document to bounds
-                let bounds = (&enzmldoc)
+                let bounds = (enzmldoc)
                     .try_into()
                     .expect("Failed to convert EnzymeML document to bounds");
 
                 // Build optimizer
                 let optimizer = PSOBuilder::default()
                     .bounds(bounds)
-                    .max_iters(*max_iters)
-                    .pop_size(*pop_size)
+                    .max_iters(params.params.max_iters)
+                    .pop_size(params.pop_size)
                     .build();
 
                 // Optimize
@@ -887,11 +870,88 @@ pub fn main() {
                 println!("{}", report);
 
                 // Save the fitted EnzymeML document
-                if let Some(output_dir) = output_dir {
-                    save_results(path, &report, &report.doc, output_dir, "pso");
+                if let Some(output_dir) = &fit_params.output_dir {
+                    save_results(
+                        &params.params.path,
+                        &report,
+                        &report.doc,
+                        &output_dir,
+                        "pso",
+                    );
                 }
             }
         },
+        Commands::Profile { algorithm } => {
+            match algorithm {
+                ProfileAlgorithm::SR1 {
+                    opt_params,
+                    profile_params,
+                } => {
+                    let mut problem = opt_params
+                        .params
+                        .to_problem(NegativeLogLikelihood::new(profile_params.sigma))
+                        .expect("Failed to build problem");
+
+                    // Override initial guesses
+                    override_initial_guesses(problem.enzmldoc_mut(), &opt_params.initial);
+
+                    let enzmldoc = problem.enzmldoc();
+
+                    // Convert EnzymeML document to initial guesses
+                    let initial_guesses: InitialGuesses = (enzmldoc)
+                        .try_into()
+                        .expect("Failed to convert EnzymeML document to initial guesses");
+
+                    // Build optimizer
+                    let sr1trustregion = SR1TrustRegionBuilder::default()
+                        .max_iters(opt_params.params.max_iters)
+                        .subproblem(opt_params.subproblem)
+                        .build();
+
+                    let profile_result = if profile_params.ego {
+                        ego_profile_likelihood()
+                            .problem(&problem)
+                            .optimizer(&sr1trustregion)
+                            .initial_guess(initial_guesses)
+                            .parameters(profile_params.parameters.clone())
+                            .max_iters(profile_params.ego_iters)
+                            .call()
+                            .expect("Failed to profile likelihood")
+                    } else {
+                        profile_likelihood()
+                            .problem(&problem)
+                            .optimizer(&sr1trustregion)
+                            .initial_guess(initial_guesses)
+                            .parameters(profile_params.parameters.clone())
+                            .n_steps(profile_params.steps)
+                            .call()
+                            .expect("Failed to profile likelihood")
+                    };
+
+                    let plot: Plot = profile_result.into();
+
+                    if let Some(out) = &profile_params.out {
+                        let fname = opt_params
+                            .params
+                            .path
+                            .file_name()
+                            .expect("Failed to get file name")
+                            .to_str()
+                            .expect("Failed to get file name as string")
+                            .split('.')
+                            .next()
+                            .expect("Failed to get file name without extension");
+
+                        plot.write_html(out.join(format!("{}_profile.html", fname)));
+                    } else {
+                        plot.show();
+                    }
+                }
+                _ => {
+                    unimplemented!()
+                }
+            };
+        }
     }
 }
 
