@@ -25,6 +25,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         )
         .to_parameters(
             ParameterBuilder::default()
+                .name("v_max")
                 .id("v_max")
                 .symbol("v_max")
                 .value(2.0)
@@ -33,6 +34,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         )
         .to_parameters(
             ParameterBuilder::default()
+                .name("K_M")
                 .id("K_M")
                 .symbol("K_M")
                 .value(100.0)
@@ -41,6 +43,7 @@ fn main() -> Result<(), EnzymeMLDocumentBuilderError> {
         )
         .to_measurements(
             MeasurementBuilder::default()
+                .name("measurement")
                 .id("measurement")
                 .to_species_data(
                     MeasurementDataBuilder::default()
