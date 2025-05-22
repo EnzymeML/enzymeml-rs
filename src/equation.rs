@@ -136,7 +136,7 @@ fn filter_variables(variables: &[String], symbols: &[String]) -> Vec<Variable> {
 fn filter_params(variables: &[String], symbols: &[String]) -> Vec<Parameter> {
     symbols
         .iter()
-        .filter(|s| !variables.contains(s))
+        .filter(|s| !variables.contains(s) && s != &"t")
         .map(|s| {
             ParameterBuilder::default()
                 .id(s.clone())
