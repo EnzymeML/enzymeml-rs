@@ -90,7 +90,10 @@ use std::{
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use enzymeml::{
-    identifiability::profile::{ego_profile_likelihood, profile_likelihood, ProfileParameter},
+    identifiability::{
+        egoprofile::ego_profile_likelihood, parameter::ProfileParameter,
+        profile::profile_likelihood, results::plot_pair_contour,
+    },
     io::{load_enzmldoc, save_enzmldoc},
     llm::{query_llm, PromptInput},
     optim::{
@@ -105,13 +108,6 @@ use enzymeml::{
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
 // TODO: This is very ugly, we should extract the WASM feature into a separate crate
-#[cfg(not(feature = "wasm"))]
-use case::CaseExt;
-#[cfg(not(feature = "wasm"))]
-use log::error;
-#[cfg(not(feature = "wasm"))]
-use plotly::ImageFormat;
-use plotly::Plot;
 use rust_xlsxwriter::workbook::Workbook;
 
 // List all available transformations
@@ -143,31 +139,23 @@ enum Commands {
         path: PathBuf,
 
         /// Measurement IDs to visualize
-        #[arg(short, long, help = "Measurement IDs to visualize")]
-        measurement_ids: Vec<String>,
+        #[arg(
+            short,
+            long,
+            help = "Measurement IDs to visualize. Default is all measurements."
+        )]
+        measurement: Option<Vec<String>>,
 
         /// Output directory for the visualization
-        #[arg(
-            short,
-            long,
-            help = "Output directory for the visualization",
-            conflicts_with = "show",
-            default_value = "."
-        )]
-        output_dir: Option<PathBuf>,
+        #[arg(short, long, help = "Path to the file to save the visualization to.")]
+        output: Option<PathBuf>,
 
         /// Show fit or not
-        #[arg(short = 'F', long, help = "Show fit or not", default_value_t = true)]
-        show_fit: bool,
+        #[arg(short = 'F', long, help = "Show fit or not")]
+        fit: bool,
 
         /// Show in browser or not
-        #[arg(
-            short,
-            long,
-            help = "Show in browser or not",
-            default_value_t = false,
-            conflicts_with = "output_dir"
-        )]
+        #[arg(short, long, help = "Show in browser or not", default_value_t = true)]
         show: bool,
     },
 
@@ -333,7 +321,7 @@ struct BaseIntegratorParams {
     path: PathBuf,
 
     /// Whether to use the log transformation for the initial guesses
-    #[arg(short, long, conflicts_with = "transform")]
+    #[arg(short, long, conflicts_with = "transform", default_value_t = true)]
     log_transform: bool,
 
     /// Transformations for the initial guesses
@@ -455,6 +443,10 @@ struct BaseProfileParams {
         default_value_t = 10
     )]
     ego_iters: usize,
+
+    /// Show the profile likelihood plot
+    #[arg(long, help = "Show the profile likelihood plot")]
+    show: bool,
 }
 
 /// Parameters for SR1 Trust Region optimization
@@ -531,54 +523,44 @@ pub fn main() {
         #[cfg(not(feature = "wasm"))]
         Commands::Visualize {
             path,
-            measurement_ids,
-            output_dir,
-            show_fit,
+            measurement,
+            output,
+            fit,
             show,
         } => {
             // Load the enzymeml document
             validate_by_schema(path).expect("Failed to validate EnzymeML document");
             let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
 
-            // Get the measurement ids
-            let measurement_ids = if !measurement_ids.is_empty() {
-                measurement_ids.clone()
-            } else {
-                enzmldoc.measurements.iter().map(|m| m.id.clone()).collect()
-            };
-
-            if let Some(output_dir) = output_dir {
-                let output_dir = output_dir.to_owned();
-                if output_dir.exists() && !output_dir.is_dir() {
-                    panic!(
-                        "Output directory is not a directory: {}",
-                        output_dir.display()
-                    );
+            // Create the output directory if it doesn't exist
+            if let Some(output) = output {
+                let parent = output.parent().unwrap();
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent).expect("Failed to create output directory");
                 }
-                std::fs::create_dir_all(&output_dir).expect("Failed to create output directory");
             }
 
-            for meas_id in &measurement_ids {
-                let plot = enzmldoc.plot_measurement(meas_id, *show, *show_fit, None, None);
+            // Plot the measurements
+            let plot = enzmldoc
+                .plot_measurements()
+                .measurement_ids(measurement.clone())
+                .show_fit(*fit)
+                .call()
+                .expect("Failed to plot measurements");
 
-                match plot {
-                    Ok(plot) => {
-                        if let Some(output_dir) = output_dir {
-                            let fname = format!("{}.png", meas_id.to_snake());
-                            let output_path = output_dir.join(fname);
-                            plot.write_image(&output_path, ImageFormat::PNG, 800, 600, 1.0);
+            // Save the plot to the output file
+            if let Some(output) = output {
+                // Replace the extension with .html if there is already an extension
+                let output = output.with_extension("html");
+                plot.write_html(&output);
+                println!(
+                    "Saved measurements plot to {}",
+                    output.display().to_string().bold().green()
+                );
+            }
 
-                            println!(
-                                "Saved measurement {} plot to {}",
-                                meas_id.cyan().bold(),
-                                output_path.to_str().unwrap().to_string().cyan().bold()
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to plot measurement {}: {}", meas_id, e);
-                    }
-                }
+            if *show {
+                plot.show();
             }
         }
         Commands::Convert {
@@ -916,7 +898,15 @@ pub fn main() {
                             .expect("Failed to profile likelihood")
                     };
 
-                    let plot: Plot = profile_result.into();
+                    let plot = if profile_result.len() > 1 {
+                        plot_pair_contour(&profile_result)
+                    } else {
+                        profile_result.into()
+                    };
+
+                    if profile_params.show {
+                        plot.show();
+                    }
 
                     if let Some(out) = &profile_params.out {
                         let fname = opt_params
@@ -931,8 +921,6 @@ pub fn main() {
                             .expect("Failed to get file name without extension");
 
                         plot.write_html(out.join(format!("{}_profile.html", fname)));
-                    } else {
-                        plot.show();
                     }
                 }
                 _ => {
