@@ -181,14 +181,13 @@ Enable specific features in your `Cargo.toml`:
 enzymeml = { version = "0.1.0", features = ["optimization", "simulation"] }
 ```
 
-| Feature          | Description                              |
-| ---------------- | ---------------------------------------- |
-| `simulation`     | 🧮 ODE simulation capabilities            |
-| `optimization`   | 📊 Parameter estimation and model fitting |
-| `tabular`        | 📋 Reading/writing tabular data           |
-| `llm`            | 🤖 Large language model integration       |
-| `wasm`           | 🌐 WebAssembly support                    |
-| `plotly-kaleido` | 📈 Static plot generation                 |
+| Feature        | Description                              |
+| -------------- | ---------------------------------------- |
+| `simulation`   | 🧮 ODE simulation capabilities            |
+| `optimization` | 📊 Parameter estimation and model fitting |
+| `tabular`      | 📋 Reading/writing tabular data           |
+| `llm`          | 🤖 Large language model integration       |
+| `wasm`         | 🌐 WebAssembly support                    |
 
 ## 📚 Documentation
 
