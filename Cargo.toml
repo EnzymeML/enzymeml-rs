@@ -1,9 +1,11 @@
 [package]
 name = "enzymeml"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "The EnzymeML Rust library"
 license = "MIT"
+repository = "https://github.com/enzymeml/enzymeml-rs"
+documentation = "https://enzymeml.org/docs/rust"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -77,12 +79,12 @@ bon = "3.6.3"
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "fat"
 codegen-units = 1
 debug = false
 
 [features]
-default = ["optimization", "simulation", "llm", "tabular", "plotly-kaleido"]
+default = ["optimization", "simulation", "llm", "tabular"]
 tabular = ["polars", "calamine", "rust_xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
@@ -97,10 +99,10 @@ optimization = [
 serde-wasm-bindgen = ["dep:serde-wasm-bindgen"]
 tsify-next = ["dep:tsify-next"]
 mdmodels = ["dep:mdmodels"]
-plotly-kaleido = ["plotly/kaleido", "plotly/kaleido_download"]
 
 [dev-dependencies]
 approx = "0.5.1"
+criterion = "0.6.0"
 wasm-bindgen-test = "0.3.50"
 
 [build-dependencies]
@@ -109,3 +111,8 @@ md5 = "0.7.0"
 prettyplease = "0.2.31"
 syn = { version = "2.0.100", features = ["full", "parsing"] }
 mdmodels = "0.2.4"
+
+[[bench]]
+name = "simulation"
+harness = false
+path = "benches/simulation.rs"
