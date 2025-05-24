@@ -113,6 +113,7 @@ impl<'a> ODEProblemWithContext<'a> {
 }
 
 impl ODEProblem for ODEProblemWithContext<'_> {
+    #[inline(always)]
     fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
         // This is safe because we know ODEProblemWithContext has exclusive access to the context
         // during the ODE solver's execution, and the solver won't call rhs concurrently
@@ -127,11 +128,13 @@ impl ODEProblem for ODEProblemWithContext<'_> {
                 .resize(self.system.sorted_vars.len() + 1, 0.0);
         }
 
+        // Time
         context.input_buffer[0] = t;
 
         // Copy species values
         context.input_buffer[1..(species_len + 1)].copy_from_slice(&y[..species_len]);
 
+        // Copy parameters
         let params_start = self.system.species_range.1;
         let params_len = context.params_buffer.len();
         for i in 0..params_len {
