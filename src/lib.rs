@@ -115,7 +115,16 @@ pub mod objective {
 
 #[cfg(feature = "optimization")]
 pub mod identifiability {
+    pub use crate::identifiability::egoprofile::*;
+    pub use crate::identifiability::parameter::*;
+    pub use crate::identifiability::profile::*;
+
+    pub mod egoprofile;
+    pub mod grid;
+    pub mod parameter;
     pub mod profile;
+    pub mod results;
+    pub mod utils;
 }
 
 #[cfg(feature = "llm")]
