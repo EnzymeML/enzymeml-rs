@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use plotly::{
-    common::{Line, Marker, Mode},
-    layout::Axis,
+    common::{Anchor, DashType, Line, Marker, Mode},
+    layout::{Annotation, GridPattern, LayoutGrid},
     Layout, Plot, Scatter,
 };
 use thiserror::Error;
@@ -24,6 +24,10 @@ const COLORS: &[&str] = &[
     "green", "blue", "red", "purple", "orange", "yellow", "brown", "pink", "gray", "cyan",
 ];
 
+const COLUMNS: usize = 3;
+const DEFAULT_HEIGHT: usize = 300;
+
+#[bon::bon]
 impl EnzymeMLDocument {
     /// Creates a plot visualization of an EnzymeML document's measurement data.
     ///
@@ -36,69 +40,96 @@ impl EnzymeMLDocument {
     /// # Returns
     ///
     /// A Plot object containing the measurement data visualization in a grid layout.
-    pub fn plot_measurement(
+    #[builder]
+    pub fn plot_measurements(
         &self,
-        measurement_id: &str,
-        show: bool,
+        measurement_ids: impl Into<Option<Vec<String>>>,
         show_fit: bool,
-        width: Option<usize>,
-        height: Option<usize>,
     ) -> Result<Plot, PlotError> {
-        // Filter measurements if measurement_ids are provided
-        let measurement: &Measurement = self
-            .measurements
-            .iter()
-            .find(|meas| meas.id == measurement_id)
-            .ok_or(PlotError::MeasurementNotFound(measurement_id.to_string()))?;
+        // Extract measurements from the document
+        let measurements: Vec<&Measurement> = match measurement_ids.into() {
+            Some(ids) => self
+                .measurements
+                .iter()
+                .filter(|meas| ids.contains(&meas.id) && measurement_not_empty(meas))
+                .collect(),
+            None => self
+                .measurements
+                .iter()
+                .filter(|meas| measurement_not_empty(meas))
+                .collect(),
+        };
 
-        if !measurement_not_empty(measurement) {
-            return Err(PlotError::MeasurementEmpty(measurement_id.to_string()));
+        if measurements.is_empty() {
+            return Err(PlotError::NoMeasurements);
         }
 
         // Create a plot
+        let n_measurements = measurements.len();
         let mut plot = Plot::new();
-
-        let traces: Vec<Box<Scatter<f64, f64>>> = measurement.into();
-        for (i, trace) in traces.into_iter().enumerate() {
-            plot.add_trace(
-                trace
-                    .clone()
-                    .marker(Marker::new().color(COLORS[i % COLORS.len()]).size(10)),
+        let columns = if n_measurements < COLUMNS { 1 } else { COLUMNS };
+        let rows = n_measurements.div_ceil(columns);
+        let mut layout = Layout::new()
+            .title(self.name.clone())
+            .show_legend(true)
+            .height(DEFAULT_HEIGHT * rows)
+            .grid(
+                LayoutGrid::new()
+                    .rows(rows)
+                    .columns(columns)
+                    .pattern(GridPattern::Independent),
             );
-        }
 
-        #[cfg(feature = "simulation")]
-        if show_fit {
-            let traces =
-                get_simulation_traces(self, measurement).map_err(|_| PlotError::SimulationError)?;
-            for (i, trace) in traces.into_iter().enumerate() {
-                plot.add_trace(
-                    trace
+        for (i, measurement) in measurements.into_iter().enumerate() {
+            let traces: Vec<Box<Scatter<f64, f64>>> = measurement.into();
+            let x_axis = format!("x{}", i + 1);
+            let y_axis = format!("y{}", i + 1);
+
+            for (j, trace) in traces.into_iter().enumerate() {
+                let trace = trace
+                    .clone()
+                    .x_axis(&x_axis)
+                    .y_axis(&y_axis)
+                    .marker(Marker::new().color(COLORS[j % COLORS.len()]).size(7))
+                    .show_legend(i == 0);
+
+                plot.add_trace(trace);
+            }
+
+            layout.add_annotation(
+                Annotation::new()
+                    .y_ref(format!("y{} domain", i + 1))
+                    .y_anchor(Anchor::Bottom)
+                    .y(1)
+                    .text(format!("<b>{}</b>", measurement.name))
+                    .x_ref(format!("x{} domain", i + 1))
+                    .x_anchor(Anchor::Center)
+                    .x(0.5)
+                    .show_arrow(false),
+            );
+
+            #[cfg(feature = "simulation")]
+            if show_fit {
+                let mut sim_traces = get_simulation_traces(self, measurement)
+                    .map_err(|_| PlotError::SimulationError)?;
+                for (j, trace) in sim_traces.iter_mut().enumerate() {
+                    let trace = trace
                         .clone()
-                        .line(Line::new().color(COLORS[i % COLORS.len()]).width(2.0)),
-                );
+                        .x_axis(&x_axis)
+                        .y_axis(&y_axis)
+                        .show_legend(i == 0)
+                        .line(
+                            Line::new()
+                                .width(1.5)
+                                .dash(DashType::DashDot)
+                                .color(COLORS[j % COLORS.len()]),
+                        );
+                    plot.add_trace(trace);
+                }
             }
         }
 
-        // Create a layout
-        let layout = Layout::new()
-            .title(self.name.clone())
-            .show_legend(true) // Always show the legend
-            .width(width.unwrap_or(800))
-            .height(height.unwrap_or(600))
-            .x_axis(Axis::new().range(vec![0.0]).auto_range(true).title("Time"))
-            .y_axis(
-                Axis::new()
-                    .range(vec![0.0])
-                    .auto_range(true)
-                    .title("Concentration"),
-            );
-
         plot.set_layout(layout);
-
-        if show {
-            plot.show();
-        }
 
         Ok(plot)
     }
@@ -128,9 +159,7 @@ impl From<&Measurement> for Vec<Box<Scatter<f64, f64>>> {
         {
             let plot = Scatter::new(meas_data.time.clone(), meas_data.data.clone())
                 .name(&meas_data.species_id)
-                .mode(Mode::Markers)
-                .x_axis("Time")
-                .y_axis("Concentration");
+                .mode(Mode::Markers);
             plots.push(plot);
         }
 
@@ -194,6 +223,7 @@ fn get_simulation_traces(
 /// # Returns
 ///
 /// * `bool` - True if the model has valid equations and parameters, false otherwise   
+#[cfg(feature = "simulation")]
 fn has_valid_model(doc: &EnzymeMLDocument) -> Result<(), PlotError> {
     // Check if model has equations, parameters, and all parameters have values
     if doc.equations.is_empty() || doc.parameters.is_empty() {
@@ -215,6 +245,8 @@ fn has_valid_model(doc: &EnzymeMLDocument) -> Result<(), PlotError> {
 
 #[derive(Error, Debug)]
 pub enum PlotError {
+    #[error("No measurements found")]
+    NoMeasurements,
     #[error("Measurement with id {0} not found")]
     MeasurementNotFound(String),
     #[error("Simulation failed")]
@@ -236,9 +268,13 @@ mod tests {
     #[test]
     fn test_plot() {
         let enzmldoc = load_enzmldoc("tests/data/enzmldoc.json").unwrap();
-        enzmldoc
-            .plot_measurement("measurement0", true, true, Some(800), Some(600))
-            .unwrap();
+        let plot = enzmldoc
+            .plot_measurements()
+            .measurement_ids(vec!["measurement0".to_string()])
+            .show_fit(true)
+            .call();
+
+        assert!(plot.is_ok());
     }
 
     #[test]
@@ -254,7 +290,11 @@ mod tests {
     fn test_plot_measurement_missing_model() {
         let enzmldoc = load_enzmldoc("tests/data/enzmldoc_no_model.json").unwrap();
 
-        let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
+        let result = enzmldoc
+            .plot_measurements()
+            .measurement_ids(vec!["measurement0".to_string()])
+            .show_fit(true)
+            .call();
         assert!(result.is_err());
     }
 
@@ -262,7 +302,11 @@ mod tests {
     fn test_plot_measurement_missing_parameter_values() {
         let enzmldoc = load_enzmldoc("tests/data/enzmldoc_missing_param_value.json").unwrap();
 
-        let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
+        let result = enzmldoc
+            .plot_measurements()
+            .measurement_ids(vec!["measurement0".to_string()])
+            .show_fit(true)
+            .call();
         assert!(result.is_err());
     }
 
@@ -278,7 +322,11 @@ mod tests {
             }
         }
 
-        let result = enzmldoc.plot_measurement("measurement0", true, true, Some(800), Some(600));
+        let result = enzmldoc
+            .plot_measurements()
+            .measurement_ids(vec!["measurement0".to_string()])
+            .show_fit(true)
+            .call();
 
         assert!(result.is_err());
     }
