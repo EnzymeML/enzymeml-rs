@@ -5,7 +5,7 @@ use peroxide::{
     linspace, seq,
 };
 use plotly::{
-    common::{Anchor, Font, Line, Mode, Title},
+    common::{Anchor, ColorScale, ColorScalePalette, Font, Line, Mode, Title},
     layout::{Annotation, Axis, GridPattern, LayoutGrid},
     Contour, Layout, Plot, Scatter,
 };
@@ -191,7 +191,8 @@ pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
             )
             .name(&combined_name)
             .x_axis(&format!("x{}", n_plots))
-            .y_axis(&format!("y{}", n_plots));
+            .y_axis(&format!("y{}", n_plots))
+            .color_scale(ColorScale::Palette(ColorScalePalette::Viridis));
 
             layout.add_annotation(
                 Annotation::new()
