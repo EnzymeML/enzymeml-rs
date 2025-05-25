@@ -60,8 +60,13 @@ pub mod simulation {
     pub mod result;
     /// Simulation setup and configuration
     pub mod setup;
+    /// Derivation of the stoichiometry matrix
+    pub mod stoich;
     /// Core ODE system implementation
     pub mod system;
+    /// Macros for creating JIT functions
+    #[macro_use]
+    pub mod macros;
 }
 
 #[cfg(feature = "optimization")]
@@ -81,6 +86,7 @@ pub mod optim {
     pub mod bound;
     pub mod error;
     pub mod metrics;
+    pub mod observer;
     pub mod problem;
     pub mod report;
     pub mod system;
@@ -182,7 +188,6 @@ pub mod tabular {
 }
 
 /// Plotting and visualization functionality
-#[cfg(not(feature = "wasm"))]
 pub mod plotting;
 
 /// IO functionality
