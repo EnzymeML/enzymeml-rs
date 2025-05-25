@@ -231,8 +231,7 @@ mod tests {
     #[test]
     fn test_ego_profile_likelihood() {
         // ARRANGE
-        let mut doc = get_doc();
-        doc.derive_system().expect("Failed to derive system");
+        let doc = get_doc();
 
         let problem = ProblemBuilder::new(
             &doc,
