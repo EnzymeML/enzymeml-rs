@@ -190,14 +190,37 @@ impl Transformation {
 
         for equation in doc.equations.iter_mut() {
             if equation.species_id != self.transform_symbol() {
-                equation.equation = equation
-                    .equation
-                    .replace(&self.symbol(), &self.transform_symbol());
+                replace_in_equation(
+                    &mut equation.equation,
+                    &self.symbol(),
+                    &self.transform_symbol(),
+                );
+            }
+        }
+
+        for reaction in doc.reactions.iter_mut() {
+            if reaction.kinetic_law.is_some() {
+                replace_in_equation(
+                    &mut reaction.kinetic_law.as_mut().unwrap().equation,
+                    &self.symbol(),
+                    &self.transform_symbol(),
+                );
             }
         }
 
         Ok(())
     }
+}
+
+fn replace_in_equation(equation: &mut String, symbol: &str, transform_symbol: &str) {
+    use regex::Regex;
+
+    // Create a regex pattern that matches the symbol as a whole word
+    // \b ensures word boundaries, and we escape the symbol in case it contains special regex characters
+    let pattern = format!(r"\b{}\b", regex::escape(symbol));
+    let re = Regex::new(&pattern).unwrap();
+
+    *equation = re.replace_all(equation, transform_symbol).to_string();
 }
 
 impl FromStr for Transformation {
@@ -300,5 +323,78 @@ mod tests {
         let transformation = Transformation::from_str("k_cat=log1p")
             .expect("Failed to parse transformation for k_cat=log1p");
         assert_eq!(transformation, Transformation::Log1P("k_cat".to_string()));
+    }
+
+    #[test]
+    fn test_replace_in_equation_surgical() {
+        // Test that replacement only affects exact word matches, not partial matches
+        let mut equation = "k * k_cat + k1 + substrate_k + k_m".to_string();
+        replace_in_equation(&mut equation, "k", "k_transformed");
+
+        // Only the standalone "k" should be replaced, not "k_cat", "k1", "substrate_k", or "k_m"
+        assert_eq!(equation, "k_transformed * k_cat + k1 + substrate_k + k_m");
+    }
+
+    #[test]
+    fn test_replace_in_equation_multiple_occurrences() {
+        // Test that all standalone occurrences are replaced
+        let mut equation = "k + 2*k - k/3 + k_cat".to_string();
+        replace_in_equation(&mut equation, "k", "k_transformed");
+
+        // All standalone "k" should be replaced, but not "k_cat"
+        assert_eq!(
+            equation,
+            "k_transformed + 2*k_transformed - k_transformed/3 + k_cat"
+        );
+    }
+
+    #[test]
+    fn test_replace_in_equation_with_special_chars() {
+        // Test replacement with parameters that might contain regex special characters
+        let mut equation = "k_m * substrate / (k_m + substrate)".to_string();
+        replace_in_equation(&mut equation, "k_m", "k_m_transformed");
+
+        // Both occurrences of "k_m" should be replaced
+        assert_eq!(
+            equation,
+            "k_m_transformed * substrate / (k_m_transformed + substrate)"
+        );
+    }
+
+    #[test]
+    fn test_replace_in_equation_parentheses_and_operators() {
+        // Test replacement in complex expressions with various operators
+        let mut equation = "(k + k_cat) * exp(-k * t) + log(k)".to_string();
+        replace_in_equation(&mut equation, "k", "k_transformed");
+
+        // Only standalone "k" should be replaced, not "k_cat"
+        assert_eq!(
+            equation,
+            "(k_transformed + k_cat) * exp(-k_transformed * t) + log(k_transformed)"
+        );
+    }
+
+    #[test]
+    fn test_replace_in_equation_no_match() {
+        // Test that nothing changes when the symbol is not found
+        let mut equation = "k_cat * substrate + k_m".to_string();
+        let original = equation.clone();
+        replace_in_equation(&mut equation, "k", "k_transformed");
+
+        // Equation should remain unchanged
+        assert_eq!(equation, original);
+    }
+
+    #[test]
+    fn test_replace_in_equation_underscore_parameters() {
+        // Test with parameters that have underscores to ensure word boundaries work correctly
+        let mut equation = "k_cat_max * substrate / (k_m + substrate) + k_cat".to_string();
+        replace_in_equation(&mut equation, "k_cat", "k_cat_transformed");
+
+        // Only "k_cat" should be replaced, not "k_cat_max"
+        assert_eq!(
+            equation,
+            "k_cat_max * substrate / (k_m + substrate) + k_cat_transformed"
+        );
     }
 }
