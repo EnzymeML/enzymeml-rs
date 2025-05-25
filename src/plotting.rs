@@ -111,7 +111,7 @@ impl EnzymeMLDocument {
             #[cfg(feature = "simulation")]
             if show_fit {
                 let mut sim_traces = get_simulation_traces(self, measurement)
-                    .map_err(|_| PlotError::SimulationError)?;
+                    .map_err(|e| PlotError::SimulationError(e.to_string()))?;
                 for (j, trace) in sim_traces.iter_mut().enumerate() {
                     let trace = trace
                         .clone()
@@ -226,7 +226,11 @@ fn get_simulation_traces(
 #[cfg(feature = "simulation")]
 fn has_valid_model(doc: &EnzymeMLDocument) -> Result<(), PlotError> {
     // Check if model has equations, parameters, and all parameters have values
-    if doc.equations.is_empty() || doc.parameters.is_empty() {
+    let has_kinetic_laws = doc.reactions.iter().any(|r| r.kinetic_law.is_some());
+    let has_equations = !doc.equations.is_empty();
+    let has_model = has_kinetic_laws || has_equations;
+
+    if !has_model {
         return Err(PlotError::MissingModel);
     }
 
@@ -249,8 +253,8 @@ pub enum PlotError {
     NoMeasurements,
     #[error("Measurement with id {0} not found")]
     MeasurementNotFound(String),
-    #[error("Simulation failed")]
-    SimulationError,
+    #[error("Simulation failed: {0}")]
+    SimulationError(String),
     #[error("Cannot plot fit: Not all parameters have values: {0:?}")]
     MissingParameterValues(Vec<String>),
     #[error("Cannot plot fit: Model has no equations or parameters")]
