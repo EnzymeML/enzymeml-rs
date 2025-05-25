@@ -15,6 +15,7 @@
 use std::{
     cell::UnsafeCell,
     collections::{HashMap, HashSet},
+    sync::Arc,
 };
 
 use evalexpr_jit::prelude::*;
@@ -23,11 +24,18 @@ use ndarray::Array1;
 use peroxide::fuga::{BasicODESolver, ODEIntegrator, ODEProblem, ODESolver};
 use rayon::prelude::*;
 
-use crate::prelude::{EnzymeMLDocument, Equation, EquationType};
+use crate::{
+    create_stoich_eq_jit,
+    prelude::{EnzymeMLDocument, Equation, EquationType, Reaction},
+};
 
 use super::{
-    error::SimulationError, interpolation::interpolate, output::OutputFormat, SimulationSetup,
+    error::SimulationError, interpolation::interpolate, output::OutputFormat,
+    stoich::derive_stoichiometry_matrix, SimulationSetup,
 };
+
+/// Type alias for a function that evaluates an equation system.
+pub type EvalFunction = Arc<dyn Fn(&[f64], &mut [f64]) + Send + Sync + 'static>;
 
 /// Type alias for the output of the ODE system.
 /// Uses a vector of DMatrix<f64> to represent the output.
@@ -55,11 +63,12 @@ pub struct ODESystem {
     assignment_rules_mapping: HashMap<String, u32>,
     constants_mapping: HashMap<String, u32>,
     sorted_vars: Vec<String>,
+    stoich: bool,
 
     // Equation systems for all three types of equations
-    ode_jit: EquationSystem,
-    assignment_jit: EquationSystem,
-    initial_assignment_jit: EquationSystem,
+    ode_jit: EvalFunction,
+    assignment_jit: EvalFunction,
+    initial_assignment_jit: EvalFunction,
 
     // Gradient functions
     grad_params: EquationSystem,
@@ -116,66 +125,27 @@ impl ODEProblem for ODEProblemWithContext<'_> {
     #[inline(always)]
     fn rhs(&self, t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
         // This is safe because we know ODEProblemWithContext has exclusive access to the context
-        // during the ODE solver's execution, and the solver won't call rhs concurrently
         let context = unsafe { &mut *self.context.get() };
 
-        // Build the input vector (reuse the existing buffer instead of clearing and refilling)
         let species_len = self.system.num_equations();
 
-        if context.input_buffer.len() < self.system.sorted_vars.len() + 1 {
-            context
-                .input_buffer
-                .resize(self.system.sorted_vars.len() + 1, 0.0);
-        }
-
-        // Time
-        context.input_buffer[0] = t;
-
-        // Copy species values
-        context.input_buffer[1..(species_len + 1)].copy_from_slice(&y[..species_len]);
-
-        // Copy parameters
-        let params_start = self.system.species_range.1;
-        let params_len = context.params_buffer.len();
-        for i in 0..params_len {
-            context.input_buffer[params_start + i] = context.params_buffer[i];
-        }
-
-        // Copy assignment values
-        let assignments_start = self.system.parameters_range.1;
-        let assignments_len = context.assignment_buffer.len();
-        for i in 0..assignments_len {
-            context.input_buffer[assignments_start + i] = context.assignment_buffer[i];
-        }
-
-        // Copy initial assignment values
-        let initial_assignments_start = self.system.assignment_rules_range.1;
-        let initial_assignments_len = context.initial_assignment_buffer.len();
-        for i in 0..initial_assignments_len {
-            context.input_buffer[initial_assignments_start + i] =
-                context.initial_assignment_buffer[i];
-        }
-
-        // Copy constants
-        let constants_start = self.system.initial_assignments_range.1;
-        let constants_len = context.constants_buffer.len();
-        for i in 0..constants_len {
-            context.input_buffer[constants_start + i] = context.constants_buffer[i];
-        }
+        self.system
+            .populate_input_buffer(context, t, &y[..species_len]);
 
         if self.system.has_assignments() {
             // Evaluate Assignment rules
-            self.system.assignment_jit.fun()(
+            (self.system.assignment_jit)(
                 &context.input_buffer,
                 &mut context.assignments_result_buffer,
             );
 
-            // Update assignments in input buffer
             let (assignments_start, _) = self.system.get_assignment_ranges();
-            for i in 0..context.assignments_result_buffer.len() {
-                context.input_buffer[*assignments_start + i] = context.assignments_result_buffer[i];
-                context.assignment_buffer[i] = context.assignments_result_buffer[i];
-            }
+            let assignments_end = *assignments_start + context.assignments_result_buffer.len();
+            context.input_buffer[*assignments_start..assignments_end]
+                .copy_from_slice(&context.assignments_result_buffer);
+            context
+                .assignment_buffer
+                .copy_from_slice(&context.assignments_result_buffer);
         }
 
         // Compute based on mode
@@ -185,7 +155,7 @@ impl ODEProblem for ODEProblemWithContext<'_> {
                 let (species_slice, sensitivity_slice) = dy.split_at_mut(species_len);
 
                 // Calculate species derivatives
-                self.system.ode_jit.fun()(&context.input_buffer, species_slice);
+                (self.system.ode_jit)(&context.input_buffer, species_slice);
 
                 // Calculate sensitivity
                 let s = DMatrixView::from_slice(&y[species_len..], species_len, params_len);
@@ -197,15 +167,38 @@ impl ODEProblem for ODEProblemWithContext<'_> {
                     &self.system.grad_params,
                     s,
                     &mut ds,
+                    self.system.stoich,
                 );
             }
             Mode::Regular => {
-                self.system.ode_jit.fun()(&context.input_buffer, dy);
+                (self.system.ode_jit)(&context.input_buffer, dy);
             }
         }
 
         Ok(())
     }
+}
+
+/// Intermediate struct to hold all components of the system state during initialization.
+///
+/// This struct contains all the mappings, vectors, and ranges needed to create an ODE system,
+/// making the code more maintainable and self-documenting than using large tuples.
+struct SystemState {
+    species: Vec<String>,
+    parameters: Vec<String>,
+    sorted_vars: Vec<String>,
+    var_map: HashMap<String, u32>,
+    species_mapping: HashMap<String, u32>,
+    params_mapping: HashMap<String, u32>,
+    initial_assignments_mapping: HashMap<String, u32>,
+    assignment_rules_mapping: HashMap<String, u32>,
+    constants_mapping: HashMap<String, u32>,
+    default_params: Vec<f64>,
+    species_range: (usize, usize),
+    parameters_range: (usize, usize),
+    assignment_rules_range: (usize, usize),
+    initial_assignments_range: (usize, usize),
+    constants_range: (usize, usize),
 }
 
 impl ODESystem {
@@ -234,29 +227,201 @@ impl ODESystem {
     /// - Invalid equation syntax
     /// - Failed equation compilation
     /// - Failed gradient calculation
-    pub(crate) fn new(
+    pub(crate) fn from_odes(
         odes: HashMap<String, String>,
         initial_assignments: HashMap<String, String>,
         assignments: HashMap<String, String>,
         params: HashMap<String, f64>,
-        mut constants: Vec<String>,
+        constants: Vec<String>,
         _mode: Option<Mode>,
     ) -> Result<Self, SimulationError> {
-        // We need to create an index mapping for all variables
-        // 0. Time
-        // 1. Species
-        // 2. Parameters
-        // 3. Initial assignments
-        // 4. Assignment rules
-        //
-        // These are then used as the var_map for all the EquationSystem instances
+        // First, set up the common system state
+        let state = Self::prepare_system_state(
+            odes.keys().map(|x| x.to_string()).collect(),
+            params,
+            initial_assignments.keys().map(|x| x.to_string()).collect(),
+            assignments.keys().map(|x| x.to_string()).collect(),
+            constants,
+        )?;
 
+        // Parse equations into EquationSystem instances
+        let ode_jit = Self::parse_equations_to_systems(&odes, &state.var_map)?;
+        let assignment_jit = Self::parse_equations_to_systems(&assignments, &state.var_map)?;
+        let initial_assignment_jit =
+            Self::parse_equations_to_systems(&initial_assignments, &state.var_map)?;
+
+        // Get the gradient wrt to parameters and species
+        let grad_params = ode_jit
+            .jacobian_wrt(
+                &state
+                    .parameters
+                    .iter()
+                    .map(|x| x.as_str())
+                    .collect::<Vec<&str>>(),
+            )
+            .map_err(SimulationError::EquationError)?;
+        let grad_species = ode_jit
+            .jacobian_wrt(
+                &state
+                    .species
+                    .iter()
+                    .map(|x| x.as_str())
+                    .collect::<Vec<&str>>(),
+            )
+            .map_err(SimulationError::EquationError)?;
+
+        let system = Self {
+            ode_jit: Arc::clone(ode_jit.fun()),
+            assignment_jit: Arc::clone(assignment_jit.fun()),
+            initial_assignment_jit: Arc::clone(initial_assignment_jit.fun()),
+            var_map: state.var_map,
+            species_mapping: state.species_mapping,
+            params_mapping: state.params_mapping,
+            constants_mapping: state.constants_mapping,
+            initial_assignments_mapping: state.initial_assignments_mapping,
+            assignment_rules_mapping: state.assignment_rules_mapping,
+            sorted_vars: state.sorted_vars,
+            grad_params,
+            grad_species,
+            default_params: state.default_params,
+            species_range: state.species_range,
+            parameters_range: state.parameters_range,
+            initial_assignments_range: state.initial_assignments_range,
+            assignment_rules_range: state.assignment_rules_range,
+            constants_range: state.constants_range,
+            stoich: false,
+        };
+
+        Ok(system)
+    }
+
+    pub fn from_reactions(
+        reactions: &[Reaction],
+        initial_assignments: HashMap<String, String>,
+        assignments: HashMap<String, String>,
+        params: HashMap<String, f64>,
+        constants: Vec<String>,
+    ) -> Result<Self, SimulationError> {
+        // Derive the stoichiometry matrix
+        let (stoich, species) = derive_stoichiometry_matrix(reactions)?;
+
+        // Sort the reactions by id
+        let mut kinetic_laws = HashMap::new();
+        for reaction in reactions {
+            let id = reaction.id.clone();
+            if let Some(kinetic_law) = reaction.kinetic_law.clone() {
+                kinetic_laws.insert(id, kinetic_law.equation);
+            }
+        }
+
+        // Prepare the system state
+        let state = Self::prepare_system_state(
+            species,
+            params,
+            initial_assignments.keys().map(|x| x.to_string()).collect(),
+            assignments.keys().map(|x| x.to_string()).collect(),
+            constants,
+        )?;
+
+        // Create the ODESystem
+        let laws_jit = Self::parse_equations_to_systems(&kinetic_laws, &state.var_map)?;
+        let assignment_jit = Self::parse_equations_to_systems(&assignments, &state.var_map)?;
+        let initial_assignment_jit =
+            Self::parse_equations_to_systems(&initial_assignments, &state.var_map)?;
+
+        // Get the gradient wrt to parameters and species
+        let grad_params = laws_jit
+            .jacobian_wrt(
+                &state
+                    .parameters
+                    .iter()
+                    .map(|x| x.as_str())
+                    .collect::<Vec<&str>>(),
+            )
+            .map_err(SimulationError::EquationError)?;
+        let grad_species = laws_jit
+            .jacobian_wrt(
+                &state
+                    .species
+                    .iter()
+                    .map(|x| x.as_str())
+                    .collect::<Vec<&str>>(),
+            )
+            .map_err(SimulationError::EquationError)?;
+
+        // Get the non-zero indices of the stoichiometry matrix
+        let non_zero_indices = {
+            let mut indices = Vec::new();
+            for i in 0..stoich.nrows() {
+                for j in 0..stoich.ncols() {
+                    if stoich[(i, j)] != 0.0 {
+                        indices.push((i, j));
+                    }
+                }
+            }
+
+            indices
+        };
+
+        // Create an anonymous function which takes the stoichiometry matrix and the input vector
+        // and returns the derivatives
+        let law_output_size = stoich.ncols();
+        let ode_jit: EvalFunction =
+            create_stoich_eq_jit!(laws_jit, stoich, non_zero_indices, law_output_size);
+
+        let system = Self {
+            ode_jit,
+            assignment_jit: Arc::clone(assignment_jit.fun()),
+            initial_assignment_jit: Arc::clone(initial_assignment_jit.fun()),
+            var_map: state.var_map,
+            species_mapping: state.species_mapping,
+            params_mapping: state.params_mapping,
+            constants_mapping: state.constants_mapping,
+            initial_assignments_mapping: state.initial_assignments_mapping,
+            assignment_rules_mapping: state.assignment_rules_mapping,
+            sorted_vars: state.sorted_vars,
+            grad_params,
+            grad_species,
+            default_params: state.default_params,
+            species_range: state.species_range,
+            parameters_range: state.parameters_range,
+            initial_assignments_range: state.initial_assignments_range,
+            assignment_rules_range: state.assignment_rules_range,
+            constants_range: state.constants_range,
+            stoich: true,
+        };
+
+        Ok(system)
+    }
+
+    /// Prepares the common system state used by both `from_odes` and `from_reactions`.
+    ///
+    /// This function handles the housekeeping steps of setting up all the mappings and
+    /// data structures needed for the ODE system.
+    ///
+    /// # Arguments
+    ///
+    /// * `species_ids` - A vector of species IDs
+    /// * `params` - A hashmap of parameter IDs to values
+    /// * `initial_assignment_ids` - A vector of initial assignment IDs
+    /// * `assignment_ids` - A vector of assignment rule IDs
+    /// * `constants` - A vector of constant IDs
+    ///
+    /// # Returns
+    ///
+    /// A Result containing a SystemState struct with all the prepared system state components
+    fn prepare_system_state(
+        species_ids: Vec<String>,
+        params: HashMap<String, f64>,
+        initial_assignment_ids: Vec<String>,
+        assignment_ids: Vec<String>,
+        mut constants: Vec<String>,
+    ) -> Result<SystemState, SimulationError> {
         // Extract all variables and sort them
-        let mut species: Vec<String> = odes.keys().map(|x| x.to_string()).collect();
+        let mut species: Vec<String> = species_ids;
         let mut parameters: Vec<String> = params.keys().map(|x| x.to_string()).collect();
-        let mut initial_assignment_rules: Vec<String> =
-            initial_assignments.keys().map(|x| x.to_string()).collect();
-        let mut assignment_rules: Vec<String> = assignments.keys().map(|x| x.to_string()).collect();
+        let mut initial_assignment_rules: Vec<String> = initial_assignment_ids;
+        let mut assignment_rules: Vec<String> = assignment_ids;
 
         species.sort();
         parameters.sort();
@@ -289,20 +454,6 @@ impl ODESystem {
         let assignment_rules_mapping = Self::derive_mapping(&var_map, &assignment_rules)?;
         let constants_mapping = Self::derive_mapping(&var_map, &constants)?;
 
-        // Parse equations into EquationSystem instances
-        let ode_jit = Self::parse_equations_to_systems(&odes, &var_map)?;
-        let assignment_jit = Self::parse_equations_to_systems(&assignments, &var_map)?;
-        let initial_assignment_jit =
-            Self::parse_equations_to_systems(&initial_assignments, &var_map)?;
-
-        // Get the gradient wrt to parameters and species
-        let grad_params = ode_jit
-            .jacobian_wrt(&parameters.iter().map(|x| x.as_str()).collect::<Vec<&str>>())
-            .map_err(SimulationError::EquationError)?;
-        let grad_species = ode_jit
-            .jacobian_wrt(&species.iter().map(|x| x.as_str()).collect::<Vec<&str>>())
-            .map_err(SimulationError::EquationError)?;
-
         // Create default parameter values
         let mut default_params = vec![0.0; parameters.len()];
         for (idx, param) in parameters.iter().enumerate() {
@@ -318,35 +469,30 @@ impl ODESystem {
         );
         let initial_assignments_range = (
             assignment_rules_range.1,
-            assignment_rules_range.1 + initial_assignments.len(),
+            assignment_rules_range.1 + initial_assignment_rules.len(),
         );
         let constants_range = (
             initial_assignments_range.1,
             initial_assignments_range.1 + constants.len(),
         );
 
-        let system = Self {
-            ode_jit,
-            assignment_jit,
-            initial_assignment_jit,
+        Ok(SystemState {
+            species,
+            parameters,
+            sorted_vars,
             var_map,
             species_mapping,
             params_mapping,
-            constants_mapping,
             initial_assignments_mapping,
             assignment_rules_mapping,
-            sorted_vars,
-            grad_params,
-            grad_species,
+            constants_mapping,
             default_params,
             species_range,
             parameters_range,
-            initial_assignments_range,
             assignment_rules_range,
+            initial_assignments_range,
             constants_range,
-        };
-
-        Ok(system)
+        })
     }
 
     /// Integrates the ODE system over a specified time period.
@@ -531,7 +677,7 @@ impl ODESystem {
             }
 
             // Compute results directly into the context buffer
-            self.initial_assignment_jit.fun()(
+            (self.initial_assignment_jit)(
                 &context.input_buffer,
                 &mut context.initial_assignment_buffer,
             );
@@ -685,7 +831,7 @@ impl ODESystem {
 
             // Evaluate and push results
             let mut result = vec![0.0; n_assignments];
-            self.assignment_jit.fun()(&input_buffer, &mut result);
+            (self.assignment_jit)(&input_buffer, &mut result);
             assignments.push(result);
         }
 
@@ -859,6 +1005,7 @@ impl ODESystem {
     /// # Returns
     ///
     /// Returns a Vec<f64> containing all variables arranged in the correct order
+    #[inline(always)]
     pub fn arrange_input_vector(
         &self,
         t: f64,
@@ -1317,7 +1464,7 @@ impl ODESystem {
         let constants_len = self.constants_mapping.len();
 
         // Add extra space for temporary buffers to avoid reallocations
-        let max_buffer_size = max_size.unwrap_or(1000);
+        let max_buffer_size = max_size.unwrap_or(20);
 
         // Resize input buffer to hold all variables plus some extra space
         let min_input_size = self.sorted_vars.len() + 1;
@@ -1358,6 +1505,58 @@ impl ODESystem {
             context.constants_buffer.resize(constants_len, 0.0);
         }
     }
+
+    /// Optimized method to populate the input buffer with all system variables
+    /// This method minimizes memory operations and improves cache locality
+    #[inline(always)]
+    fn populate_input_buffer(&self, context: &mut ODESystemContext, t: f64, species: &[f64]) {
+        let total_size = self.sorted_vars.len() + 1;
+        if context.input_buffer.len() < total_size {
+            context.input_buffer.resize(total_size, 0.0);
+        }
+
+        // Time
+        context.input_buffer[0] = t;
+
+        // Species
+        let species_end = 1 + species.len();
+        context.input_buffer[1..species_end].copy_from_slice(species);
+
+        // OPTIMIZATION: Batch copy all remaining buffers in order
+        // This creates better memory access patterns and reduces function call overhead
+
+        // Parameters
+        let params_start = self.species_range.1;
+        let params_end = params_start + context.params_buffer.len();
+        if !context.params_buffer.is_empty() {
+            context.input_buffer[params_start..params_end].copy_from_slice(&context.params_buffer);
+        }
+
+        // Assignments
+        let assignments_start = self.parameters_range.1;
+        let assignments_end = assignments_start + context.assignment_buffer.len();
+        if !context.assignment_buffer.is_empty() {
+            context.input_buffer[assignments_start..assignments_end]
+                .copy_from_slice(&context.assignment_buffer);
+        }
+
+        // Initial assignments
+        let initial_assignments_start = self.assignment_rules_range.1;
+        let initial_assignments_end =
+            initial_assignments_start + context.initial_assignment_buffer.len();
+        if !context.initial_assignment_buffer.is_empty() {
+            context.input_buffer[initial_assignments_start..initial_assignments_end]
+                .copy_from_slice(&context.initial_assignment_buffer);
+        }
+
+        // Constants
+        let constants_start = self.initial_assignments_range.1;
+        let constants_end = constants_start + context.constants_buffer.len();
+        if !context.constants_buffer.is_empty() {
+            context.input_buffer[constants_start..constants_end]
+                .copy_from_slice(&context.constants_buffer);
+        }
+    }
 }
 
 /// Calculates sensitivity matrix for parameter optimization.
@@ -1384,10 +1583,15 @@ fn calculate_sensitivity(
     dfdp: &EquationSystem,
     s: DMatrixView<f64>,
     ds: &mut DMatrixViewMut<f64>,
+    stoich: bool,
 ) {
     // We need to use to_vec here as the eval_matrix method requires owned data
     // But we only create these copies once instead of twice
     let input_copy = input_vec.to_vec();
+
+    if stoich {
+        unimplemented!("Sensitivity analysis with stoichiometry matrix is not supported yet");
+    }
 
     // Evaluate both Jacobians with a single copy of the input
     let dfdx: DMatrix<f64> = dfdx.eval_matrix(&input_copy).unwrap();
@@ -1410,8 +1614,18 @@ impl TryFrom<&EnzymeMLDocument> for ODESystem {
     type Error = SimulationError;
 
     fn try_from(doc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
-        // Extract equations by type
-        let odes = extract_equation_by_type(&doc.equations, EquationType::Ode);
+        let has_kinetic_laws = doc.reactions.iter().any(|r| r.kinetic_law.is_some());
+        let has_odes = doc
+            .equations
+            .iter()
+            .any(|e| e.equation_type == EquationType::Ode);
+
+        if has_kinetic_laws && has_odes {
+            return Err(SimulationError::InvalidInput(
+                "Cannot have both kinetic laws and ODEs in the same model".to_string(),
+            ));
+        }
+
         let assignments = extract_equation_by_type(&doc.equations, EquationType::Assignment);
         let initial_assignments =
             extract_equation_by_type(&doc.equations, EquationType::InitialAssignment);
@@ -1423,14 +1637,24 @@ impl TryFrom<&EnzymeMLDocument> for ODESystem {
             .map(|p| (p.id.clone(), p.value.unwrap_or(0.0)))
             .collect::<HashMap<String, f64>>();
 
-        Self::new(
-            odes,
-            initial_assignments,
-            assignments,
-            params,
-            constants,
-            None,
-        )
+        if has_kinetic_laws {
+            Self::from_reactions(
+                &doc.reactions,
+                initial_assignments,
+                assignments,
+                params,
+                constants,
+            )
+        } else {
+            Self::from_odes(
+                extract_equation_by_type(&doc.equations, EquationType::Ode),
+                initial_assignments,
+                assignments,
+                params,
+                constants,
+                None,
+            )
+        }
     }
 }
 
@@ -1547,12 +1771,13 @@ impl Clone for ODESystem {
             assignment_rules_mapping: self.assignment_rules_mapping.clone(),
             constants_mapping: self.constants_mapping.clone(),
             sorted_vars: self.sorted_vars.clone(),
-            ode_jit: self.ode_jit.clone(),
-            assignment_jit: self.assignment_jit.clone(),
-            initial_assignment_jit: self.initial_assignment_jit.clone(),
+            ode_jit: Arc::clone(&self.ode_jit),
+            assignment_jit: Arc::clone(&self.assignment_jit),
+            initial_assignment_jit: Arc::clone(&self.initial_assignment_jit),
             grad_params: self.grad_params.clone(),
             grad_species: self.grad_species.clone(),
             default_params: self.default_params.clone(),
+            stoich: self.stoich,
 
             // Copy the range tuples
             species_range: self.species_range,
@@ -1776,5 +2001,36 @@ mod tests {
 
         // Assert
         assert!(result.is_err(), "Result should be an error");
+    }
+
+    #[test]
+    fn test_from_reactions() {
+        // Arrange
+        let doc = load_enzmldoc("tests/data/enzmldoc_reaction.json").unwrap();
+        let system: ODESystem = (&doc).try_into().unwrap();
+        let setup = SimulationSetupBuilder::default()
+            .dt(1.0)
+            .t0(0.0)
+            .t1(2.0)
+            .build()
+            .expect("Failed to build simulation setup");
+
+        let first_measurement = doc.measurements.first().unwrap();
+        let initial_conditions: InitialCondition = first_measurement.into();
+
+        let result = system
+            .integrate::<SimulationResult>(
+                &setup,
+                &initial_conditions,
+                None,                // We could also dynamically set new parameters
+                None,                // We could also provide specific time points to extract
+                RK4,                 // We could also use a different solver
+                Some(Mode::Regular), // We could also use a different mode (e.g. Sensitivity)
+            )
+            .expect("Simulation failed");
+
+        // Assert
+        assert_eq!(result.time.len(), 3, "Times length is incorrect");
+        assert_eq!(result.species.len(), 4, "Species length is incorrect");
     }
 }
