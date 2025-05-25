@@ -13,6 +13,7 @@
 //! and employs a trust region strategy to determine step sizes. This approach is particularly effective
 //! for nonlinear optimization problems where line search methods might struggle with convergence.
 
+use crate::optim::observer::ProgressObserver;
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 use crate::prelude::ObjectiveFunction;
@@ -168,7 +169,10 @@ fn solve_steihaug<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
                 .hessian(init_hessian)
                 .max_iters(max_iters)
         })
-        .add_observer(SlogLogger::term(), ObserverMode::Always)
+        .add_observer(
+            ProgressObserver::new(max_iters, "SR1 Trust Region (Steihaug)"),
+            ObserverMode::Always,
+        )
         .run()
         .map_err(OptimizeError::ArgMinError)?;
 
@@ -217,7 +221,10 @@ fn solve_cauchy_point<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunctio
                 .hessian(init_hessian)
                 .max_iters(max_iters)
         })
-        .add_observer(SlogLogger::term(), ObserverMode::Always)
+        .add_observer(
+            ProgressObserver::new(max_iters, "SR1 Trust Region (Cauchy Point)"),
+            ObserverMode::Always,
+        )
         .run()
         .map_err(OptimizeError::ArgMinError)?;
 

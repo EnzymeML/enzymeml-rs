@@ -18,6 +18,7 @@ use argmin_observer_slog::SlogLogger;
 use ndarray::s;
 use peroxide::fuga::ODEIntegrator;
 
+use crate::optim::observer::ProgressObserver;
 use crate::{
     optim::{
         bounds_to_array2, report::OptimizationReport, Bound, InitialGuesses, OptimizeError,
@@ -103,7 +104,10 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         let mut res: argmin::core::OptimizationResult<Problem<S, L>, _, _> =
             Executor::new(problem.clone(), solver)
                 .configure(|state| state.max_iters(self.max_iters))
-                .add_observer(SlogLogger::term(), ObserverMode::Always)
+                .add_observer(
+                    ProgressObserver::new(self.max_iters, "Particle Swarm Optimization"),
+                    ObserverMode::Always,
+                )
                 .run()
                 .unwrap();
 

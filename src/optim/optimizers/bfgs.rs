@@ -24,6 +24,7 @@ use ndarray::Array2;
 use peroxide::fuga::ODEIntegrator;
 use serde::Serialize;
 
+use crate::optim::observer::ProgressObserver;
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
 use crate::prelude::ObjectiveFunction;
@@ -122,7 +123,10 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
                     .max_iters(self.max_iters)
                     .target_cost(self.target_cost)
             })
-            .add_observer(SlogLogger::term(), ObserverMode::Always)
+            .add_observer(
+                ProgressObserver::new(self.max_iters, "BFGS"),
+                ObserverMode::Always,
+            )
             .run()
             .unwrap();
 
