@@ -360,8 +360,7 @@ impl BaseIntegratorParams {
         &self,
         objective: impl Into<LossFunction>,
     ) -> Result<Problem<Solvers, LossFunction>, OptimizeError> {
-        let mut enzmldoc = load_enzmldoc(&self.path).expect("Failed to load EnzymeML document");
-        enzmldoc.derive_system().expect("Failed to derive system");
+        let enzmldoc = load_enzmldoc(&self.path).expect("Failed to load EnzymeML document");
 
         let transformations = if self.log_transform {
             create_log_transformations(&enzmldoc)
@@ -397,6 +396,10 @@ struct BaseFitParams {
         help = "Objective function to use. Available objective functions: [mse, sse, rmse, logcosh, mae, nll(sigma)]"
     )]
     objective: LossFunction,
+
+    /// Show the fit
+    #[arg(long, help = "Show the fit")]
+    show: bool,
 }
 
 /// Base parameters for profile likelihood analysis
@@ -514,13 +517,6 @@ pub fn main() {
             println!("{}", enzmldoc);
         }
 
-        // TODO: This is very ugly, we should extract the WASM feature into a separate crate
-        #[cfg(feature = "wasm")]
-        Commands::Visualize { .. } => {
-            eprintln!("Visualization is not supported in WASM mode");
-        }
-
-        #[cfg(not(feature = "wasm"))]
         Commands::Visualize {
             path,
             measurement,
@@ -683,6 +679,17 @@ pub fn main() {
                 // Display the results
                 println!("{}", report);
 
+                if fit_params.show {
+                    let plot = report
+                        .doc
+                        .plot_measurements()
+                        .measurement_ids(None)
+                        .show_fit(true)
+                        .call()
+                        .expect("Failed to plot measurements");
+                    plot.show();
+                }
+
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
                     save_results(
@@ -724,6 +731,17 @@ pub fn main() {
 
                 // Display the results
                 println!("{}", report);
+
+                if fit_params.show {
+                    let plot = report
+                        .doc
+                        .plot_measurements()
+                        .measurement_ids(None)
+                        .show_fit(true)
+                        .call()
+                        .expect("Failed to plot measurements");
+                    plot.show();
+                }
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
@@ -767,6 +785,17 @@ pub fn main() {
                 // Display the results
                 println!("{}", report);
 
+                if fit_params.show {
+                    let plot = report
+                        .doc
+                        .plot_measurements()
+                        .measurement_ids(None)
+                        .show_fit(true)
+                        .call()
+                        .expect("Failed to plot measurements");
+                    plot.show();
+                }
+
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
                     save_results(
@@ -808,6 +837,17 @@ pub fn main() {
                 // Display the results
                 println!("{}", report);
 
+                if fit_params.show {
+                    let plot = report
+                        .doc
+                        .plot_measurements()
+                        .measurement_ids(None)
+                        .show_fit(true)
+                        .call()
+                        .expect("Failed to plot measurements");
+                    plot.show();
+                }
+
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
                     save_results(&params.params.path, &report, &report.doc, output_dir, "ego");
@@ -844,6 +884,17 @@ pub fn main() {
 
                 // Display the results
                 println!("{}", report);
+
+                if fit_params.show {
+                    let plot = report
+                        .doc
+                        .plot_measurements()
+                        .measurement_ids(None)
+                        .show_fit(true)
+                        .call()
+                        .expect("Failed to plot measurements");
+                    plot.show();
+                }
 
                 // Save the fitted EnzymeML document
                 if let Some(output_dir) = &fit_params.output_dir {
