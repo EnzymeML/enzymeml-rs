@@ -19,7 +19,6 @@ use argmin::core::TerminationReason;
 use argmin::core::TerminationStatus;
 use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::BFGS as ArgminBFGS;
-use argmin_observer_slog::SlogLogger;
 use ndarray::Array2;
 use peroxide::fuga::ODEIntegrator;
 use serde::Serialize;

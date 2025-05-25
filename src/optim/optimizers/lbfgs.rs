@@ -19,7 +19,6 @@ use argmin::core::TerminationReason;
 use argmin::core::TerminationStatus;
 use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin::solver::quasinewton::LBFGS as ArgminLBFGS;
-use argmin_observer_slog::SlogLogger;
 use peroxide::fuga::ODEIntegrator;
 
 use crate::optim::observer::ProgressObserver;

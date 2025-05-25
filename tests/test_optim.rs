@@ -9,7 +9,6 @@
 //! Each test verifies that the optimizer can find the correct parameters
 //! for a simple enzyme kinetics model with known parameters.
 
-#[cfg(not(feature = "wasm"))]
 #[cfg(test)]
 mod test_optim {
     use approx::assert_relative_eq;

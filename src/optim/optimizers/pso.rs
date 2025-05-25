@@ -14,7 +14,6 @@
 use argmin::core::{observers::ObserverMode, TerminationStatus};
 use argmin::core::{Executor, TerminationReason};
 use argmin::solver::particleswarm::ParticleSwarm;
-use argmin_observer_slog::SlogLogger;
 use ndarray::s;
 use peroxide::fuga::ODEIntegrator;
 

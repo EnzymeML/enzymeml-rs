@@ -24,7 +24,6 @@ use argmin::core::TerminationStatus;
 use argmin::solver::quasinewton::SR1TrustRegion as ArgminSR1TrustRegion;
 use argmin::solver::trustregion::CauchyPoint;
 use argmin::solver::trustregion::Steihaug;
-use argmin_observer_slog::SlogLogger;
 use clap::ValueEnum;
 use ndarray::Array1;
 use ndarray::Array2;
