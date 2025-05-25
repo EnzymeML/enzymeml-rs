@@ -22,7 +22,6 @@
 use evalexpr_jit::errors::EquationError;
 use thiserror::Error;
 
-#[cfg(not(feature = "wasm"))]
 use crate::plotting::PlotError;
 
 #[derive(Error, Debug)]
@@ -49,9 +48,12 @@ pub enum SimulationError {
     ArgMinMathError(#[from] argmin_math::Error),
     #[error("No data provided for interpolation")]
     NoDataForInterpolation,
-    #[cfg(not(feature = "wasm"))]
     #[error("Failed to plot")]
     PlotError(#[from] PlotError),
     #[error("Missing constants in initial conditions: {0:?}")]
     MissingConstants(Vec<String>),
+    #[error("Cannot derive stoichiometry matrix: No reactions provided")]
+    NoReactions,
+    #[error("Cannot have both kinetic laws and ODEs in the same model")]
+    InvalidInput(String),
 }
