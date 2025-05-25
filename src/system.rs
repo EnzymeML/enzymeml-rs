@@ -118,6 +118,11 @@ pub fn derive_system(enzmldoc: &mut EnzymeMLDocument) -> Result<(), ODEError> {
         create_species_ode(species_id, equations, &species_ids, enzmldoc)?;
     }
 
+    // Remove all kinetic laws
+    for reaction in enzmldoc.reactions.iter_mut() {
+        reaction.kinetic_law = None;
+    }
+
     Ok(())
 }
 
