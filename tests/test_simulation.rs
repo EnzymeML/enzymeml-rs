@@ -1,4 +1,3 @@
-#[cfg(not(feature = "wasm"))]
 #[cfg(test)]
 mod test_simulation {
     use std::collections::HashMap;
@@ -216,26 +215,36 @@ mod test_simulation {
 
         // ASSERT
         // Compare sensitivity analysis results between both implementations
-        if let Ok(MatrixResult {
-            species: _,
-            parameter_sensitivities: Some(parameter_sensitivities),
-            times: _,
-            assignments: _,
-        }) = result
-        {
-            // Iterate over each timepoint and compare sensitivities
-            for (subview, menten_value) in parameter_sensitivities
-                .axis_iter(Axis(0))
-                .zip(menten_result)
-            {
-                let enzmldoc_km = subview.get((0, 0)).unwrap(); // Sensitivity w.r.t. KM
-                let enzmldoc_vmax = subview.get((0, 1)).unwrap(); // Sensitivity w.r.t. Vmax
-                let menten_km = menten_value[1];
-                let menten_vmax = menten_value[2];
+        match result {
+            Ok(MatrixResult {
+                species: _,
+                parameter_sensitivities: Some(parameter_sensitivities),
+                times: _,
+                assignments: _,
+            }) => {
+                // Iterate over each timepoint and compare sensitivities
+                for (subview, menten_value) in parameter_sensitivities
+                    .axis_iter(Axis(0))
+                    .zip(menten_result)
+                {
+                    let enzmldoc_km = subview.get((0, 0)).unwrap(); // Sensitivity w.r.t. KM
+                    let enzmldoc_vmax = subview.get((0, 1)).unwrap(); // Sensitivity w.r.t. Vmax
+                    let menten_km = menten_value[1];
+                    let menten_vmax = menten_value[2];
 
-                // Verify that sensitivities match within tolerance
-                assert_relative_eq!(*enzmldoc_km, menten_km, epsilon = 1e-10);
-                assert_relative_eq!(*enzmldoc_vmax, menten_vmax, epsilon = 1e-10);
+                    // Verify that sensitivities match within tolerance
+                    assert_relative_eq!(*enzmldoc_km, menten_km, epsilon = 1e-10);
+                    assert_relative_eq!(*enzmldoc_vmax, menten_vmax, epsilon = 1e-10);
+                }
+            }
+            Ok(MatrixResult {
+                parameter_sensitivities: None,
+                ..
+            }) => {
+                panic!("Expected parameter sensitivities, but none were computed");
+            }
+            Err(e) => {
+                panic!("Simulation failed: {:?}", e);
             }
         }
     }
