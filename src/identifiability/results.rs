@@ -156,6 +156,18 @@ impl IntoIterator for ProfileResults {
     }
 }
 
+/// Plots a pair of parameters against each other using a contour plot.
+///
+/// This function creates a contour plot showing the likelihood ratio between two parameters.
+/// The plot is created using the `plotly` crate.
+///
+/// # Arguments
+///
+/// * `results` - The profile results to plot
+///
+/// # Returns
+///
+/// A `Plot` object containing the contour plot
 pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
     let mut plot = Plot::new();
     let mut layout = Layout::new();
@@ -166,7 +178,11 @@ pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
         for j in i + 1..results.len() {
             let result1 = results.get(i).unwrap();
             let result2 = results.get(j).unwrap();
-            let combined_name = format!("{} vs {}", result1.param_name, result2.param_name);
+            let combined_name = format!(
+                "{} vs {}",
+                to_html_sub(&result1.param_name),
+                to_html_sub(&result2.param_name)
+            );
 
             let trace = Contour::new(
                 result1.param_values.clone(),
@@ -188,9 +204,6 @@ pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
                     .x(0.5)
                     .show_arrow(false),
             );
-
-            println!("{}", combined_name);
-            println!("{}", n_plots);
 
             plot.add_trace(trace);
             n_plots += 1;
