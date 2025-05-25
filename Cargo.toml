@@ -28,6 +28,8 @@ itertools = "0.14.0"
 regex = "1.11.1"
 case = "1.0.0"
 getrandom = { version = "0.2.16", features = ["js"] }
+bon = "3.6.3"
+indicatif = "0.17.11"
 
 # CLI and logging
 clap = { version = "4.5.31", features = ["derive"] }
@@ -75,7 +77,6 @@ tsify-next = { version = "0.5.5", optional = true }
 # Feature: llm
 mdmodels = { version = "0.2.4", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
-bon = "3.6.3"
 
 [profile.release]
 opt-level = 3
@@ -103,6 +104,7 @@ mdmodels = ["dep:mdmodels"]
 [dev-dependencies]
 approx = "0.5.1"
 criterion = "0.6.0"
+matrixcompare = "0.3.0"
 wasm-bindgen-test = "0.3.50"
 
 [build-dependencies]
