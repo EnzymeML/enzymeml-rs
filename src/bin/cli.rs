@@ -102,7 +102,7 @@ use enzymeml::{
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
-    validation::{consistency, schema},
+    validation::consistency,
 };
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
@@ -157,6 +157,10 @@ enum Commands {
         /// Show in browser or not
         #[arg(short, long, help = "Show in browser or not", default_value_t = true)]
         show: bool,
+
+        /// Show lines or not
+        #[arg(short, long, help = "Show lines or not", conflicts_with = "fit")]
+        lines: bool,
     },
 
     /// Convert an EnzymeML document to a target
@@ -523,9 +527,9 @@ pub fn main() {
             output,
             fit,
             show,
+            lines,
         } => {
             // Load the enzymeml document
-            validate_by_schema(path).expect("Failed to validate EnzymeML document");
             let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
 
             // Create the output directory if it doesn't exist
@@ -541,6 +545,7 @@ pub fn main() {
                 .plot_measurements()
                 .measurement_ids(measurement.clone())
                 .show_fit(*fit)
+                .with_lines(lines.clone())
                 .call()
                 .expect("Failed to plot measurements");
 
@@ -1002,7 +1007,6 @@ enum ConversionTarget {
 /// * `Ok(EnzymeMLDocument)` - Valid document
 /// * `Err(String)` - Error message if validation fails
 fn complete_check(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
-    validate_by_schema(path)?;
     check_consistency(path)
 }
 
@@ -1020,32 +1024,6 @@ fn check_consistency(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
     }
 
     Ok(enzmldoc)
-}
-
-/// Validates the EnzymeML document by the JSON schema
-///
-/// # Arguments
-///
-/// * `path` - Path to the EnzymeML document
-///
-/// # Returns
-///
-/// * `Ok(())` - Valid document
-/// * `Err(String)` - Error message if validation fails
-fn validate_by_schema(path: &PathBuf) -> Result<(), String> {
-    // Check if the file is a valid EnzymeML document
-    let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
-    let report = schema::validate_json(&content).expect("Failed to validate EnzymeML document");
-
-    if !report.valid {
-        println!("{}", "EnzymeML document is invalid".bold().red());
-        for error in report.errors {
-            println!("   {}", error);
-        }
-        return Err("EnzymeML document is invalid".to_string());
-    }
-
-    Ok(())
 }
 
 /// Override the initial guesses with the ones from the CLI
