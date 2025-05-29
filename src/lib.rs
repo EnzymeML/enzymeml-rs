@@ -119,6 +119,21 @@ pub mod objective {
     pub mod objfun;
 }
 
+pub mod sbml {
+    pub mod error;
+    pub mod read;
+    pub(super) mod speciestype;
+    pub(super) mod units;
+    pub(super) mod v1 {
+        pub(crate) mod parser;
+        pub(super) mod schema;
+    }
+    pub(super) mod v2 {
+        pub(super) mod parser;
+        pub(super) mod schema;
+    }
+}
+
 #[cfg(feature = "optimization")]
 pub mod identifiability {
     pub use crate::identifiability::egoprofile::*;

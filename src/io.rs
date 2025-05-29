@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
+use colored::Colorize;
 use thiserror::Error;
 
-use crate::prelude::EnzymeMLDocument;
+use crate::{prelude::EnzymeMLDocument, sbml::read::from_omex, validation::validate_json};
 
 /// Loads and parses an EnzymeML document from a JSON file.
 ///
@@ -27,6 +28,12 @@ use crate::prelude::EnzymeMLDocument;
 /// * The JSON structure does not match the expected EnzymeML document format
 pub fn load_enzmldoc(path: impl Into<PathBuf>) -> Result<EnzymeMLDocument, IOError> {
     let path = path.into();
+
+    if let Ok(enzmldoc) = from_omex(&path) {
+        return Ok(enzmldoc);
+    }
+
+    validate_by_schema(&path).map_err(IOError::InvalidEnzymeMLDocument)?;
     let file = std::fs::File::open(path).map_err(IOError::FileNotFound)?;
     serde_json::from_reader(file).map_err(IOError::JsonParseError)
 }
@@ -52,6 +59,29 @@ pub fn save_enzmldoc(path: impl Into<PathBuf>, doc: &EnzymeMLDocument) -> Result
     serde_json::to_writer_pretty(file, doc).map_err(IOError::JsonParseError)
 }
 
+/// Validates the EnzymeML document by the JSON schema
+///
+/// # Arguments
+///
+/// * `path` - Path to the EnzymeML document
+///
+/// # Returns
+fn validate_by_schema(path: &PathBuf) -> Result<(), String> {
+    // Check if the file is a valid EnzymeML document
+    let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
+    let report = validate_json(&content).expect("Failed to validate EnzymeML document");
+
+    if !report.valid {
+        println!("{}", "EnzymeML document is invalid".bold().red());
+        for error in report.errors {
+            println!("   {}", error);
+        }
+        return Err("EnzymeML document is invalid".to_string());
+    }
+
+    Ok(())
+}
+
 /// Represents errors that can occur during EnzymeML document I/O operations.
 ///
 /// This enum encapsulates the various error conditions that may arise when reading
@@ -71,4 +101,8 @@ pub enum IOError {
     /// about the specific JSON parsing error that occurred.
     #[error("Failed to parse JSON: {0}")]
     JsonParseError(#[from] serde_json::Error),
+
+    /// Indicates that the EnzymeML document is invalid.
+    #[error("EnzymeML document is invalid: {0}")]
+    InvalidEnzymeMLDocument(String),
 }
