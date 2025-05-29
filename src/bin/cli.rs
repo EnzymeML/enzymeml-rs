@@ -545,7 +545,7 @@ pub fn main() {
                 .plot_measurements()
                 .measurement_ids(measurement.clone())
                 .show_fit(*fit)
-                .with_lines(lines.clone())
+                .with_lines(*lines)
                 .call()
                 .expect("Failed to plot measurements");
 

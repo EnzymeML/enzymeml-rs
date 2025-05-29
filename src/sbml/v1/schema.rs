@@ -400,7 +400,7 @@ where
 
     struct BoolVisitor;
 
-    impl<'de> Visitor<'de> for BoolVisitor {
+    impl Visitor<'_> for BoolVisitor {
         type Value = bool;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -693,7 +693,7 @@ mod tests {
         let annotation = parse_v1_annotation(xml_true).unwrap();
         assert!(annotation.data.is_some());
         let data = annotation.data.unwrap();
-        assert_eq!(data.formats.format[0].columns[0].is_calculated, true);
+        assert!(data.formats.format[0].columns[0].is_calculated);
 
         // Test with "False" string
         let xml_false = r#"
@@ -718,7 +718,7 @@ mod tests {
         let annotation = parse_v1_annotation(xml_false).unwrap();
         assert!(annotation.data.is_some());
         let data = annotation.data.unwrap();
-        assert_eq!(data.formats.format[0].columns[0].is_calculated, false);
+        assert!(!data.formats.format[0].columns[0].is_calculated);
 
         // Test with regular boolean
         let xml_bool = r#"
@@ -743,6 +743,6 @@ mod tests {
         let annotation = parse_v1_annotation(xml_bool).unwrap();
         assert!(annotation.data.is_some());
         let data = annotation.data.unwrap();
-        assert_eq!(data.formats.format[0].columns[0].is_calculated, true);
+        assert!(data.formats.format[0].columns[0].is_calculated);
     }
 }

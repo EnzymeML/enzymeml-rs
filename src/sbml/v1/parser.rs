@@ -328,7 +328,7 @@ fn convert_column_to_vec(column: &Series) -> Vec<f64> {
 fn extract_unit(sbml: &SBMLDocument, unit: &str) -> Result<UnitDefinition, SBMLError> {
     if let Some(model) = sbml.model() {
         if let Some(unit_def) = model.get_unit_definition(unit) {
-            return Ok(UnitDefinition::try_from(unit_def.as_ref())?);
+            return UnitDefinition::try_from(unit_def.as_ref());
         }
     }
     Err(SBMLError::MissingUnit(unit.to_string()))
