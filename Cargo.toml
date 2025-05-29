@@ -77,6 +77,9 @@ tsify-next = { version = "0.5.5", optional = true }
 # Feature: llm
 mdmodels = { version = "0.2.4", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
+libsbml = { git = "https://github.com/EnzymeML/libsbml-rs.git", branch = "combine-archive", version = "0.1.0" }
+quick-xml = { version = "0.37.5", features = ["serialize"] }
+variantly = "0.4.0"
 
 [profile.release]
 opt-level = 3
