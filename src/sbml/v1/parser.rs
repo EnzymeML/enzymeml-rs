@@ -28,7 +28,7 @@ use sbml::{
 
 use crate::{
     prelude::{
-        Complex, EnzymeMLDocument, Equation, EquationType, Measurement, MeasurementData,
+        Complex, DataTypes, EnzymeMLDocument, Equation, EquationType, Measurement, MeasurementData,
         ModifierElement, ModifierRole, Parameter, Protein, Reaction, ReactionElement,
         SmallMolecule, UnitDefinition, Vessel,
     },
@@ -58,7 +58,7 @@ use super::schema::{
 /// - The SBML document cannot be converted to EnzymeML format
 /// - Measurements cannot be extracted from the data files
 /// - The resulting EnzymeML document cannot be saved
-pub fn parse_v1_sbml_document(mut archive: CombineArchive) -> Result<EnzymeMLDocument, SBMLError> {
+pub fn parse_v1_omex(mut archive: CombineArchive) -> Result<EnzymeMLDocument, SBMLError> {
     let sbml = read_sbml_file(&mut archive).expect("Could not parse SBML document");
     let data_annotations = extract_data_annotations(&sbml)
         .expect("Could not extract data annotations from SBML document");
@@ -210,7 +210,7 @@ fn extract_time_information(
     let time_col = format_annot
         .columns
         .iter()
-        .find(|col| col.column_type == "time")
+        .find(|col| col.column_type.is_time())
         .ok_or(SBMLError::MissingTimeColumn(format_annot.id.clone()))?;
 
     let time_col_index = time_col.index;
@@ -252,18 +252,29 @@ fn create_measurement_data(
         .or(init_conc.reactant.as_ref())
         .ok_or(SBMLError::MissingSpeciesId(format_annot.id.clone()))?;
 
+    let data_type = if let Some(column) = get_column(format_annot, species_id) {
+        (&column.column_type).into()
+    } else {
+        Some(DataTypes::Concentration)
+    };
+
     let initial = init_conc.value;
-    let data_unit = extract_unit(sbml, &init_conc.unit)?;
+    let data_unit = if let Some(unit) = &init_conc.unit {
+        Some(extract_unit(sbml, unit)?)
+    } else {
+        None
+    };
 
     let mut meas_data = MeasurementData {
         species_id: species_id.clone(),
         prepared: None,
         initial: Some(initial),
-        data_unit: Some(data_unit),
+        data_unit,
         time_unit: Some(time_unit.clone()),
         data: vec![],
         time: vec![],
-        ..Default::default()
+        data_type,
+        is_simulated: None,
     };
 
     // Extract time-series data if available
@@ -544,7 +555,9 @@ impl TryFrom<&Species<'_>> for SmallMolecule {
             return Err(SBMLError::InvalidSpeciesType(species_type));
         }
 
-        let annotation = species.get_annotation_serde::<ReactantAnnot>()?;
+        let annotation = species
+            .get_annotation_serde::<ReactantAnnot>()
+            .unwrap_or_default();
 
         Ok(SmallMolecule {
             id: species.id(),
@@ -572,7 +585,9 @@ impl TryFrom<&Species<'_>> for Protein {
             return Err(SBMLError::InvalidSpeciesType(species_type));
         }
 
-        let annotation = species.get_annotation_serde::<ProteinAnnot>()?;
+        let annotation = species
+            .get_annotation_serde::<ProteinAnnot>()
+            .unwrap_or_default();
 
         Ok(Protein {
             id: species.id(),
@@ -600,7 +615,9 @@ impl TryFrom<&Species<'_>> for Complex {
             return Err(SBMLError::InvalidSpeciesType(species_type));
         }
 
-        let annotation = species.get_annotation_serde::<ComplexAnnot>()?;
+        let annotation = species
+            .get_annotation_serde::<ComplexAnnot>()
+            .unwrap_or_default();
 
         Ok(Complex {
             id: species.id(),
@@ -814,6 +831,6 @@ mod tests {
     fn test_sbml_to_enzymeml() {
         let path = PathBuf::from("tests/data/enzymeml_v1.omex");
         let archive = read_omex_file(&path).unwrap();
-        parse_v1_sbml_document(archive).unwrap();
+        parse_v1_omex(archive).unwrap();
     }
 }

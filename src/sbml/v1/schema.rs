@@ -4,13 +4,18 @@
 //! for parsing SBML v1 format EnzymeML annotations using quick-xml with serde.
 
 use serde::{Deserialize, Deserializer, Serialize};
+use variantly::Variantly;
 
-use crate::sbml::v2::schema::VariableAnnot;
+use crate::{prelude::DataTypes, sbml::v2::schema::VariableAnnot};
 
-const ENZYMEML_V1_NS: &str = "http://sbml.org/enzymeml/version1";
+pub(super) const ENZYMEML_V1_NS: &str = "http://sbml.org/enzymeml/version1";
 
 fn default_xmlns() -> String {
     ENZYMEML_V1_NS.to_string()
+}
+
+pub(crate) trait IsEmpty {
+    fn is_empty(&self) -> bool;
 }
 
 /// Represents the top-level annotation in the EnzymeML v1 format.
@@ -113,6 +118,13 @@ pub struct ParameterAnnot {
     pub lower: Option<f64>,
 }
 
+// Implement IsEmpty for ParameterAnnot
+impl IsEmpty for ParameterAnnot {
+    fn is_empty(&self) -> bool {
+        self.initial.is_none() && self.upper.is_none() && self.lower.is_none()
+    }
+}
+
 /// Represents the annotation for a complex in the EnzymeML format.
 ///
 /// A complex is formed by multiple participants (species) that interact
@@ -126,6 +138,13 @@ pub struct ComplexAnnot {
     /// A list of participants in the complex.
     #[serde(rename = "participant", alias = "enzymeml:participant", default)]
     pub participants: Vec<String>,
+}
+
+// Implement IsEmpty for ComplexAnnot
+impl IsEmpty for ComplexAnnot {
+    fn is_empty(&self) -> bool {
+        self.participants.is_empty()
+    }
 }
 
 /// Represents the annotation for a reactant in the EnzymeML format.
@@ -164,6 +183,13 @@ pub struct ReactantAnnot {
         skip_serializing_if = "Option::is_none"
     )]
     pub chebi_id: Option<String>,
+}
+
+// Implement IsEmpty for ReactantAnnot
+impl IsEmpty for ReactantAnnot {
+    fn is_empty(&self) -> bool {
+        self.inchi.is_none() && self.smiles.is_none() && self.chebi_id.is_none()
+    }
 }
 
 /// Represents the annotation for a protein in the EnzymeML format.
@@ -222,6 +248,17 @@ pub struct ProteinAnnot {
     pub organism_tax_id: Option<String>,
 }
 
+// Implement IsEmpty for ProteinAnnot
+impl IsEmpty for ProteinAnnot {
+    fn is_empty(&self) -> bool {
+        self.sequence.is_none()
+            && self.ecnumber.is_none()
+            && self.uniprotid.is_none()
+            && self.organism.is_none()
+            && self.organism_tax_id.is_none()
+    }
+}
+
 /// Represents the annotation for experimental data in the EnzymeML format.
 ///
 /// This struct contains information about experimental measurements, including
@@ -243,6 +280,15 @@ pub struct DataAnnot {
     /// A list of file annotations.
     #[serde(rename = "files", alias = "enzymeml:files")]
     pub files: FilesWrapper,
+}
+
+// Implement IsEmpty for DataAnnot
+impl IsEmpty for DataAnnot {
+    fn is_empty(&self) -> bool {
+        self.formats.format.is_empty()
+            && self.measurements.measurement.is_empty()
+            && self.files.file.is_empty()
+    }
 }
 
 /// Wrapper for formats to handle the wrapped XML structure.
@@ -295,7 +341,7 @@ pub struct ColumnAnnot {
 
     /// The type of the column.
     #[serde(rename = "@type")]
-    pub column_type: String,
+    pub column_type: ColumnType,
 
     /// The unit of the column.
     #[serde(rename = "@unit")]
@@ -316,6 +362,58 @@ pub struct ColumnAnnot {
         deserialize_with = "deserialize_python_bool"
     )]
     pub is_calculated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, Variantly)]
+pub enum ColumnType {
+    #[default]
+    #[serde(rename = "conc")]
+    Concentration,
+    #[serde(rename = "abs")]
+    Absorption,
+    #[serde(rename = "feed")]
+    Feed,
+    #[serde(rename = "biomass")]
+    Biomass,
+    #[serde(rename = "conversion")]
+    Conversion,
+    #[serde(rename = "peak-area")]
+    PeakArea,
+    #[serde(rename = "time")]
+    Time,
+}
+
+impl From<ColumnType> for Option<DataTypes> {
+    fn from(column_type: ColumnType) -> Self {
+        (&column_type).into()
+    }
+}
+
+impl From<&ColumnType> for Option<DataTypes> {
+    fn from(column_type: &ColumnType) -> Self {
+        match column_type {
+            ColumnType::Concentration => Some(DataTypes::Concentration),
+            ColumnType::Absorption => Some(DataTypes::Absorbance),
+            ColumnType::Biomass => Some(DataTypes::Amount),
+            ColumnType::Conversion => Some(DataTypes::Conversion),
+            ColumnType::PeakArea => Some(DataTypes::PeakArea),
+            ColumnType::Feed => Some(DataTypes::Concentration),
+            _ => None,
+        }
+    }
+}
+
+impl From<&DataTypes> for ColumnType {
+    fn from(data_type: &DataTypes) -> Self {
+        match data_type {
+            DataTypes::Concentration => ColumnType::Concentration,
+            DataTypes::Absorbance => ColumnType::Absorption,
+            DataTypes::Amount => ColumnType::Biomass,
+            DataTypes::Conversion => ColumnType::Conversion,
+            DataTypes::PeakArea => ColumnType::PeakArea,
+            _ => ColumnType::Concentration,
+        }
+    }
 }
 
 /// Represents the measurement annotation in the EnzymeML format.
@@ -363,7 +461,7 @@ pub struct InitConcAnnot {
 
     /// The unit of the initial concentration.
     #[serde(rename = "@unit")]
-    pub unit: String,
+    pub unit: Option<String>,
 }
 
 /// Represents the file annotation in the EnzymeML format.
