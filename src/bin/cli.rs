@@ -102,12 +102,13 @@ use enzymeml::{
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
+    sbml::to_v1_omex,
     validation::consistency,
 };
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
-// TODO: This is very ugly, we should extract the WASM feature into a separate crate
+use polars::{frame::DataFrame, io::SerWriter, prelude::CsvWriter};
 use rust_xlsxwriter::workbook::Workbook;
 
 // List all available transformations
@@ -431,7 +432,11 @@ struct BaseProfileParams {
     sigma: f64,
 
     /// Output directory for the profile likelihood plot
-    #[arg(short, long, help = "Output directory for the profile likelihood plot")]
+    #[arg(
+        short,
+        long,
+        help = "Output directory for the profile likelihood plot and TSV file"
+    )]
     out: Option<PathBuf>,
 
     /// Whether to use EGO-based profile likelihood
@@ -592,6 +597,12 @@ pub fn main() {
                     let mut workbook = Workbook::try_from(enzmldoc)
                         .expect("Failed to convert EnzymeML document to XLSX");
                     workbook.save(output).expect("Failed to save XLSX file");
+                }
+                ConversionTarget::SBMLV1 => {
+                    // Convert the document to OMEX
+                    let mut omex =
+                        to_v1_omex(&enzmldoc).expect("Failed to convert EnzymeML document to OMEX");
+                    omex.save(output).expect("Failed to save OMEX file");
                 }
             }
         }
@@ -957,7 +968,7 @@ pub fn main() {
                     let plot = if profile_result.len() > 1 {
                         plot_pair_contour(&profile_result)
                     } else {
-                        profile_result.into()
+                        (&profile_result).into()
                     };
 
                     if profile_params.show {
@@ -977,6 +988,19 @@ pub fn main() {
                             .expect("Failed to get file name without extension");
 
                         plot.write_html(out.join(format!("{}_profile.html", fname)));
+
+                        let mut df: DataFrame = (&profile_result)
+                            .try_into()
+                            .expect("Failed to convert profile results to DataFrame");
+
+                        let mut file = File::create(out.join(format!("{}_profile.tsv", fname)))
+                            .expect("could not create file");
+
+                        CsvWriter::new(&mut file)
+                            .include_header(true)
+                            .with_separator(b'\t')
+                            .finish(&mut df)
+                            .expect("Failed to write profile results to TSV file");
                     }
                 }
                 _ => {
@@ -988,8 +1012,13 @@ pub fn main() {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+#[allow(clippy::upper_case_acronyms)]
 enum ConversionTarget {
+    /// Convert to XLSX
     Xlsx,
+
+    /// Convert to SBML OMEX (v1) - The first published version of the EnzymeML format
+    SBMLV1,
 }
 
 /// Performs comprehensive validation of an EnzymeML document
