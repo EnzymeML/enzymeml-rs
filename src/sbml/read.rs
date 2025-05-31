@@ -10,11 +10,11 @@ use sbml::{combine::KnownFormats, prelude::CombineArchive, reader::SBMLReader, S
 
 use crate::prelude::EnzymeMLDocument;
 
-use super::{error::SBMLError, v1::parser::parse_v1_sbml_document};
+use super::{error::SBMLError, v1::parser::parse_v1_omex};
 
 pub fn from_omex(path: &PathBuf) -> Result<EnzymeMLDocument, SBMLError> {
     let archive = read_omex_file(path)?;
-    parse_v1_sbml_document(archive)
+    parse_v1_omex(archive)
 }
 
 /// Reads a COMBINE archive from a file path.
