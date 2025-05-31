@@ -120,6 +120,7 @@ pub mod objective {
 }
 
 pub mod sbml {
+    pub use crate::sbml::v1::serializer::to_v1_omex;
     pub mod error;
     pub mod read;
     pub(super) mod speciestype;
@@ -127,6 +128,7 @@ pub mod sbml {
     pub(super) mod v1 {
         pub(crate) mod parser;
         pub(super) mod schema;
+        pub mod serializer;
     }
     pub(super) mod v2 {
         pub(super) mod parser;
