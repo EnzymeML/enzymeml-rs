@@ -9,15 +9,70 @@
 //! - SBML UnitKind to EnzymeML UnitType
 //!
 //! These conversions ensure proper handling of units when parsing SBML models into EnzymeML format.
+//!
+//! The module also provides utility functions for handling unit definitions in SBML models,
+//! such as `map_unit_definition` for creating or referencing unit definitions in an SBML model,
+//! and `replace_slashes` for converting unit identifiers between formats.
 
+use regex::Regex;
 use sbml::prelude::{
-    Unit as SBMLUnit, UnitDefinition as SBMLUnitDefinition, UnitKind as SBMLUnitKind,
+    Model as SBMLModel, Unit as SBMLUnit, UnitDefinition as SBMLUnitDefinition,
+    UnitKind as SBMLUnitKind,
 };
 
 use crate::{
     prelude::{BaseUnit, UnitDefinition, UnitType},
     sbml::error::SBMLError,
 };
+
+/// Creates or references a unit definition in an SBML model
+///
+/// This function either creates a new unit definition in the SBML model based on the provided
+/// EnzymeML UnitDefinition, or returns the ID of an existing unit definition if one with the
+/// same ID already exists.
+///
+/// # Arguments
+///
+/// * `model` - The SBML model to create the unit definition in
+/// * `unit_definition` - The EnzymeML UnitDefinition to convert
+///
+/// # Returns
+///
+/// The ID of the created or referenced unit definition
+///
+/// # Errors
+///
+/// Returns an `SBMLError::MissingUnitDefinitionId` if the UnitDefinition has no ID
+pub(crate) fn map_unit_definition(
+    model: &SBMLModel,
+    unit_definition: &UnitDefinition,
+) -> Result<String, SBMLError> {
+    if unit_definition.id.is_none() {
+        return Err(SBMLError::MissingUnitDefinitionId(
+            serde_json::to_string(unit_definition).unwrap(),
+        ));
+    }
+
+    let id = replace_slashes(unit_definition.id.as_ref().unwrap());
+    let name = unit_definition.name.clone().unwrap_or(id.clone());
+
+    if model.get_unit_definition(&id).is_some() {
+        // Unit definition already exists, do nothing
+        return Ok(id.clone());
+    }
+
+    let unit_def = model.create_unit_definition(&id, &name);
+
+    for base_unit in unit_definition.base_units.iter() {
+        unit_def
+            .build_unit((&base_unit.kind).into())
+            .exponent(base_unit.exponent as i32)
+            .multiplier(base_unit.multiplier.unwrap_or(1.0))
+            .scale(base_unit.scale.unwrap_or(1.0) as i32);
+    }
+
+    Ok(id.clone())
+}
 
 /// Converts an SBML UnitDefinition to our EnzymeML UnitDefinition
 ///
@@ -43,6 +98,23 @@ impl TryFrom<&SBMLUnitDefinition<'_>> for UnitDefinition {
             base_units,
         })
     }
+}
+
+/// Replaces slashes in unit identifiers with double underscores
+///
+/// This function is used to transform unit identifiers that may contain slashes (e.g., "mol/L")
+/// into valid SBML identifiers by replacing slashes with double underscores (e.g., "mol__L").
+///
+/// # Arguments
+///
+/// * `id` - The identifier string to transform
+///
+/// # Returns
+///
+/// A new string with slashes replaced by double underscores
+pub(crate) fn replace_slashes(id: &str) -> String {
+    let pattern = Regex::new(r"[ ]*\/[ ]*").unwrap();
+    pattern.replace(id, "__").to_string()
 }
 
 /// Converts an SBML Unit to our EnzymeML BaseUnit
@@ -136,6 +208,61 @@ impl TryFrom<SBMLUnitKind> for UnitType {
         };
 
         Ok(unit_type)
+    }
+}
+
+/// Converts an EnzymeML UnitType to an SBML UnitKind
+///
+/// This implementation provides a reference-based conversion from EnzymeML UnitType to SBML UnitKind.
+/// It delegates to the implementation for owned UnitType.
+impl From<&UnitType> for SBMLUnitKind {
+    fn from(unit_type: &UnitType) -> Self {
+        unit_type.clone().into()
+    }
+}
+
+/// Converts an EnzymeML UnitType to an SBML UnitKind
+///
+/// This implementation maps each EnzymeML UnitType variant to the appropriate SBML UnitKind.
+/// Note that EnzymeML "Litre" is mapped to SBML "Litre", and EnzymeML "Metre" is mapped to SBML "Metre".
+impl From<UnitType> for SBMLUnitKind {
+    fn from(unit_type: UnitType) -> Self {
+        match unit_type {
+            UnitType::Hertz => SBMLUnitKind::Hertz,
+            UnitType::Item => SBMLUnitKind::Item,
+            UnitType::Joule => SBMLUnitKind::Joule,
+            UnitType::Katal => SBMLUnitKind::Katal,
+            UnitType::Kelvin => SBMLUnitKind::Kelvin,
+            UnitType::Kilogram => SBMLUnitKind::Kilogram,
+            UnitType::Litre => SBMLUnitKind::Litre,
+            UnitType::Lumen => SBMLUnitKind::Lumen,
+            UnitType::Lux => SBMLUnitKind::Lux,
+            UnitType::Metre => SBMLUnitKind::Metre,
+            UnitType::Mole => SBMLUnitKind::Mole,
+            UnitType::Newton => SBMLUnitKind::Newton,
+            UnitType::Ohm => SBMLUnitKind::Ohm,
+            UnitType::Pascal => SBMLUnitKind::Pascal,
+            UnitType::Radian => SBMLUnitKind::Radian,
+            UnitType::Second => SBMLUnitKind::Second,
+            UnitType::Siemens => SBMLUnitKind::Siemens,
+            UnitType::Sievert => SBMLUnitKind::Sievert,
+            UnitType::Steradian => SBMLUnitKind::Steradian,
+            UnitType::Tesla => SBMLUnitKind::Tesla,
+            UnitType::Volt => SBMLUnitKind::Volt,
+            UnitType::Watt => SBMLUnitKind::Watt,
+            UnitType::Weber => SBMLUnitKind::Weber,
+            UnitType::Ampere => SBMLUnitKind::Ampere,
+            UnitType::Avogadro => SBMLUnitKind::Avogadro,
+            UnitType::Becquerel => SBMLUnitKind::Becquerel,
+            UnitType::Candela => SBMLUnitKind::Candela,
+            UnitType::Celsius => SBMLUnitKind::Celsius,
+            UnitType::Coulomb => SBMLUnitKind::Coulomb,
+            UnitType::Dimensionless => SBMLUnitKind::Dimensionless,
+            UnitType::Farad => SBMLUnitKind::Farad,
+            UnitType::Gram => SBMLUnitKind::Gram,
+            UnitType::Gray => SBMLUnitKind::Gray,
+            UnitType::Henry => SBMLUnitKind::Henry,
+        }
     }
 }
 
