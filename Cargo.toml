@@ -108,6 +108,7 @@ mdmodels = ["dep:mdmodels"]
 approx = "0.5.1"
 criterion = "0.6.0"
 matrixcompare = "0.3.0"
+tempfile = "3.20.0"
 wasm-bindgen-test = "0.3.50"
 
 [build-dependencies]
