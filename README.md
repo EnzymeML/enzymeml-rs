@@ -196,3 +196,9 @@ For complete documentation, check out the [API docs](https://docs.rs/enzymeml).
 ## 📜 License
 
 This project is licensed under the MIT License.
+
+---
+
+<div align="center">
+<strong>Made with ❤️ by the EnzymeML Team</strong>
+</div>
