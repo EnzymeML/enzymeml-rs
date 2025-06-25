@@ -118,3 +118,6 @@ mdmodels = "0.2.4"
 name = "simulation"
 harness = false
 path = "benches/simulation.rs"
+
+[lints.clippy]
+result_large_err = "allow"
