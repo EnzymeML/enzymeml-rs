@@ -1,25 +1,58 @@
 //! Tabular Data Writing Module
 //!
 //! This module provides functionality for writing tabular data to spreadsheet files,
-//! supporting conversion of `EnzymeMLDocument` and `Measurement` objects to spreadsheets.
+//! supporting conversion of `EnzymeMLDocument` and `Measurement` objects to Excel spreadsheets.
 //!
 //! # Key Features
 //!
-//! - Convert `EnzymeMLDocument` to Excel spreadsheets
-//! - Convert individual `Measurement` objects to Excel files
-//! - Support for creating templates and full data export
+//! - Convert `EnzymeMLDocument` to Excel spreadsheets with multiple measurement worksheets
+//! - Convert individual `Measurement` objects to standalone Excel files
+//! - Generate measurement templates for data collection
+//! - Apply cell formatting and data validation for professional spreadsheets
+//! - Support for empty documents (creates templates) and populated documents
 //!
 //! # Usage
 //!
-//! The module enables:
-//! - Exporting complete enzyme kinetics documents
-//! - Generating measurement templates
-//! - Flexible spreadsheet generation with validation options
+//! ## Converting EnzymeML Documents
 //!
-//! # Methods
+//! ```rust,no_run
+//! use enzymeml::prelude::*;
 //!
-//! - `to_excel()` on `EnzymeMLDocument` and `Measurement`
-//! - Conversion of data with optional template creation
+//! // Convert a document to Excel
+//! let doc = EnzymeMLDocument::default();
+//! doc.to_excel("output.xlsx")?;
+//!
+//! // Or use the TryFrom trait
+//! let workbook = Workbook::try_from(doc)?;
+//! workbook.save("output.xlsx")?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ## Converting Individual Measurements
+//!
+//! ```rust,no_run
+//! use enzymeml::prelude::*;
+//!
+//! let measurement = Measurement::default();
+//! let workbook = Workbook::try_from(measurement)?;
+//! workbook.save("measurement.xlsx")?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Spreadsheet Structure
+//!
+//! Each measurement becomes a separate worksheet containing:
+//! - Time column (first column)
+//! - Species concentration columns
+//! - Formatted headers with green background
+//! - Data validation ensuring positive numbers only
+//! - Consistent cell formatting with borders and alignment
+//!
+//! # Template Generation
+//!
+//! When an `EnzymeMLDocument` contains no measurements, the module automatically
+//! generates a template worksheet with all species from the document's reactions,
+//! allowing users to input experimental data.
 
 use std::error::Error;
 
@@ -32,35 +65,72 @@ use rust_xlsxwriter::{
 use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementDataBuilder};
 use crate::validation::consistency::get_species_ids;
 
-/// Error message for data validation
+/// Error message displayed when users enter invalid data in validated cells
 const ERROR_MESSAGE: &str = "Only positive numbers are allowed in this cell.";
 
-/// Default number of rows to set up in worksheet
+/// Default number of rows to set up in worksheets for data entry
 const DEFAULT_ROW_COUNT: u32 = 99;
 
-/// Default column width
+/// Default column width in Excel units for optimal readability
 const DEFAULT_COLUMN_WIDTH: f64 = 20.0;
 
-/// Default row height
+/// Default row height in Excel units for consistent appearance
 const DEFAULT_ROW_HEIGHT: f64 = 15.0;
 
-/// Border color for cells
+/// Border color for all cell borders (light gray)
 const BORDER_COLOR: u32 = 0xB0B0B0;
 
-/// Header background color
+/// Header background color (light green)
 const HEADER_BG_COLOR: u32 = 0xD9EAD3;
 
-impl TryFrom<EnzymeMLDocument> for Workbook {
+impl EnzymeMLDocument {
+    /// Converts the EnzymeMLDocument to an Excel file
+    ///
+    /// Creates a multi-worksheet Excel file where each measurement becomes a separate worksheet.
+    /// If the document contains no measurements, generates a template worksheet instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `output` - The file path where the Excel file will be saved
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(())` if the conversion and file save were successful
+    /// * `Err(...)` if an error occurred during conversion or file writing
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use enzymeml::prelude::*;
+    ///
+    /// let doc = EnzymeMLDocument::default();
+    /// doc.to_excel("enzyme_data.xlsx")?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn to_excel(&self, output: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let mut workbook = Workbook::try_from(self)?;
+        workbook.save(output)?;
+        Ok(())
+    }
+}
+
+impl TryFrom<&EnzymeMLDocument> for Workbook {
     type Error = Box<dyn std::error::Error>;
 
-    /// Converts an EnzymeMLDocument into a Workbook
+    /// Converts an EnzymeMLDocument reference into a Workbook
     ///
-    /// Creates a template if the document has no measurements,
-    /// otherwise adds each measurement as a separate worksheet.
-    fn try_from(enzmldoc: EnzymeMLDocument) -> Result<Self, Self::Error> {
+    /// This implementation handles both populated documents (with measurements) and
+    /// empty documents (creates templates). Each measurement becomes a separate worksheet
+    /// with proper formatting and data validation.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Workbook)` containing the converted data
+    /// * `Err(...)` if the conversion fails
+    fn try_from(enzmldoc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
         let mut workbook = Workbook::new();
         if enzmldoc.measurements.is_empty() {
-            create_meas_template(&enzmldoc, &mut workbook)?;
+            create_meas_template(enzmldoc, &mut workbook)?;
         } else {
             for measurement in &enzmldoc.measurements {
                 add_meas_sheet(measurement, &mut workbook)?;
@@ -71,10 +141,36 @@ impl TryFrom<EnzymeMLDocument> for Workbook {
     }
 }
 
+impl TryFrom<EnzymeMLDocument> for Workbook {
+    type Error = Box<dyn std::error::Error>;
+
+    /// Converts an owned EnzymeMLDocument into a Workbook
+    ///
+    /// This is a convenience implementation that delegates to the reference version.
+    /// Creates a template if the document has no measurements,
+    /// otherwise adds each measurement as a separate worksheet.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Workbook)` containing the converted data
+    /// * `Err(...)` if the conversion fails
+    fn try_from(enzmldoc: EnzymeMLDocument) -> Result<Self, Self::Error> {
+        Workbook::try_from(&enzmldoc)
+    }
+}
+
 impl TryFrom<Measurement> for Workbook {
     type Error = Box<dyn std::error::Error>;
 
     /// Converts a single Measurement into a Workbook
+    ///
+    /// Creates a single-worksheet Excel file containing the measurement data
+    /// with proper formatting and validation.
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(Workbook)` containing the measurement as a single worksheet
+    /// * `Err(...)` if the conversion fails
     fn try_from(measurement: Measurement) -> Result<Self, Self::Error> {
         let mut workbook = Workbook::new();
         add_meas_sheet(&measurement, &mut workbook)?;
@@ -84,10 +180,19 @@ impl TryFrom<Measurement> for Workbook {
 
 /// Creates a measurement template and adds it to the workbook
 ///
+/// Generates a template worksheet containing all species found in the document's reactions.
+/// The template includes empty time and data columns for each species, allowing users
+/// to input experimental data in the correct format.
+///
 /// # Arguments
 ///
-/// * `enzmldoc` - The EnzymeMLDocument to use as template basis
-/// * `workbook` - The Workbook to add the template sheet to
+/// * `enzmldoc` - The EnzymeMLDocument to extract species information from
+/// * `workbook` - The Workbook to add the template worksheet to
+///
+/// # Returns
+///
+/// * `Ok(())` if the template was successfully created and added
+/// * `Err(...)` if an error occurred during template creation
 fn create_meas_template(
     enzmldoc: &EnzymeMLDocument,
     workbook: &mut Workbook,
@@ -115,6 +220,12 @@ fn create_meas_template(
 
 /// Adds a measurement as a worksheet to the workbook
 ///
+/// Creates a fully formatted worksheet containing the measurement data with:
+/// - Professional header formatting (bold, colored background)
+/// - Data validation for positive numbers only
+/// - Consistent cell borders and alignment
+/// - Optimal column widths and row heights
+///
 /// # Arguments
 ///
 /// * `measurement` - The Measurement to add as a worksheet
@@ -123,7 +234,14 @@ fn create_meas_template(
 /// # Returns
 ///
 /// * `Ok(())` if the worksheet was successfully added
-/// * `Err(...)` if an error occurred during the process
+/// * `Err(...)` if an error occurred during worksheet creation
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The measurement name is empty
+/// - Data writing or formatting operations fail
+/// - Worksheet configuration fails
 fn add_meas_sheet(
     measurement: &Measurement,
     workbook: &mut Workbook,
@@ -188,10 +306,19 @@ fn add_meas_sheet(
 
 /// Adds positive number validation to the data cells in the worksheet
 ///
+/// Applies data validation rules to ensure users can only enter positive numbers
+/// or leave cells blank. Invalid entries trigger an error dialog with helpful
+/// guidance.
+///
 /// # Arguments
 ///
 /// * `sheet` - The worksheet to add validation to
 /// * `column_count` - The number of columns in the worksheet
+///
+/// # Returns
+///
+/// * `Ok(())` if validation was successfully applied
+/// * `Err(...)` if the validation setup failed
 fn add_data_validation(
     sheet: &mut rust_xlsxwriter::Worksheet,
     column_count: u16,
@@ -208,6 +335,15 @@ fn add_data_validation(
 }
 
 /// Returns a format for non-header cells
+///
+/// Creates a consistent format for data cells featuring:
+/// - 14pt font size for readability
+/// - Center alignment (horizontal and vertical)
+/// - Thin borders on all sides in light gray
+///
+/// # Returns
+///
+/// A `Format` object configured for data cells
 fn get_non_header_format() -> Format {
     Format::new()
         .set_font_size(14f64)
@@ -224,6 +360,16 @@ fn get_non_header_format() -> Format {
 }
 
 /// Returns a format for header cells
+///
+/// Creates a distinctive header format featuring:
+/// - Light green background color
+/// - Bold, 18pt font for prominence
+/// - Center alignment (horizontal and vertical)
+/// - Thin borders with double bottom border for separation
+///
+/// # Returns
+///
+/// A `Format` object configured for header cells
 fn get_header_format() -> Format {
     Format::new()
         .set_background_color(HEADER_BG_COLOR)
