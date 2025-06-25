@@ -11,34 +11,6 @@
 //! - Apply cell formatting and data validation for professional spreadsheets
 //! - Support for empty documents (creates templates) and populated documents
 //!
-//! # Usage
-//!
-//! ## Converting EnzymeML Documents
-//!
-//! ```rust,no_run
-//! use enzymeml::prelude::*;
-//!
-//! // Convert a document to Excel
-//! let doc = EnzymeMLDocument::default();
-//! doc.to_excel("output.xlsx")?;
-//!
-//! // Or use the TryFrom trait
-//! let workbook = Workbook::try_from(doc)?;
-//! workbook.save("output.xlsx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-//!
-//! ## Converting Individual Measurements
-//!
-//! ```rust,no_run
-//! use enzymeml::prelude::*;
-//!
-//! let measurement = Measurement::default();
-//! let workbook = Workbook::try_from(measurement)?;
-//! workbook.save("measurement.xlsx")?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-//!
 //! # Spreadsheet Structure
 //!
 //! Each measurement becomes a separate worksheet containing:
