@@ -55,6 +55,7 @@
 //! allowing users to input experimental data.
 
 use std::error::Error;
+use std::path::{Path, PathBuf};
 
 use polars::prelude::{AnyValue, DataFrame};
 use rust_xlsxwriter::workbook::Workbook;
@@ -92,24 +93,24 @@ impl EnzymeMLDocument {
     /// # Arguments
     ///
     /// * `output` - The file path where the Excel file will be saved
+    /// * `template` - Whether to create a template worksheet
     ///
     /// # Returns
     ///
     /// * `Ok(())` if the conversion and file save were successful
     /// * `Err(...)` if an error occurred during conversion or file writing
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use enzymeml::prelude::*;
-    ///
-    /// let doc = EnzymeMLDocument::default();
-    /// doc.to_excel("enzyme_data.xlsx")?;
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn to_excel(&self, output: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let mut workbook = Workbook::try_from(self)?;
-        workbook.save(output)?;
+    pub fn to_excel(
+        &self,
+        output: impl Into<PathBuf>,
+        template: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut enzmldoc = self.clone();
+        if template {
+            enzmldoc.measurements.clear();
+        }
+
+        let mut workbook = Workbook::try_from(&enzmldoc)?;
+        workbook.save(output.into())?;
         Ok(())
     }
 }
