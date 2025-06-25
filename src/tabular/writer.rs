@@ -55,7 +55,7 @@
 //! allowing users to input experimental data.
 
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use polars::prelude::{AnyValue, DataFrame};
 use rust_xlsxwriter::workbook::Workbook;
