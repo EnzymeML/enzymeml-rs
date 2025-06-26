@@ -53,8 +53,11 @@ const DEFAULT_ROW_HEIGHT: f64 = 15.0;
 /// Border color for all cell borders (light gray)
 const BORDER_COLOR: u32 = 0xB0B0B0;
 
-/// Header background color (light green)
-const HEADER_BG_COLOR: u32 = 0xD9EAD3;
+/// Header background color (blue)
+const HEADER_BG_COLOR: u32 = 0x3F51B5;
+
+/// Header text color (white)
+const HEADER_TEXT_COLOR: u32 = 0xFFFFFF;
 
 impl EnzymeMLDocument {
     /// Converts the EnzymeMLDocument to an Excel file
@@ -348,6 +351,7 @@ fn get_non_header_format() -> Format {
 fn get_header_format() -> Format {
     Format::new()
         .set_background_color(HEADER_BG_COLOR)
+        .set_font_color(HEADER_TEXT_COLOR)
         .set_bold()
         .set_font_size(18f64)
         .set_border_left(FormatBorder::Thin)
