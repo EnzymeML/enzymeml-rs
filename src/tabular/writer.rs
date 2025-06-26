@@ -35,7 +35,9 @@ use rust_xlsxwriter::{
     DataValidation, DataValidationErrorStyle, DataValidationRule, Format, FormatAlign, FormatBorder,
 };
 
-use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementDataBuilder};
+use crate::prelude::{
+    EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementData, MeasurementDataBuilder,
+};
 use crate::validation::consistency::get_species_ids;
 
 /// Error message displayed when users enter invalid data in validated cells
@@ -172,19 +174,20 @@ fn create_meas_template(
 ) -> Result<(), Box<dyn Error>> {
     let all_species = get_species_ids(enzmldoc);
 
-    let mut measurement_template = MeasurementBuilder::default()
-        .id(String::from("Measurement"))
-        .name(String::from("EnzymeML Measurement Template"))
-        .build()?;
+    let mut measurement_template = Measurement {
+        id: String::from("Measurement"),
+        name: String::from("EnzymeML Measurement Template"),
+        ..Default::default()
+    };
 
     for species in all_species {
-        let data = MeasurementDataBuilder::default()
-            .species_id(species)
-            .initial(0.0)
-            .time(Vec::new())
-            .data(Vec::new())
-            .build()
-            .map_err(|e| format!("Failed to create measurement data: {}", e))?;
+        let data = MeasurementData {
+            species_id: species,
+            initial: Some(0.0),
+            time: Vec::new(),
+            data: Vec::new(),
+            ..Default::default()
+        };
 
         measurement_template.species_data.push(data);
     }
