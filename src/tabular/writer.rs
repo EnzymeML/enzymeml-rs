@@ -173,6 +173,7 @@ fn create_meas_template(
     let all_species = get_species_ids(enzmldoc);
 
     let mut measurement_template = MeasurementBuilder::default()
+        .id(String::from("Measurement"))
         .name(String::from("EnzymeML Measurement Template"))
         .build()?;
 
