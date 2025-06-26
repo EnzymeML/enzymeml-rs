@@ -35,9 +35,7 @@ use rust_xlsxwriter::{
     DataValidation, DataValidationErrorStyle, DataValidationRule, Format, FormatAlign, FormatBorder,
 };
 
-use crate::prelude::{
-    EnzymeMLDocument, Measurement, MeasurementBuilder, MeasurementData, MeasurementDataBuilder,
-};
+use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementData};
 use crate::validation::consistency::get_species_ids;
 
 /// Error message displayed when users enter invalid data in validated cells
