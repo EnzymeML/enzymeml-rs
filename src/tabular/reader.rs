@@ -49,7 +49,7 @@ impl EnzymeMLDocument {
     ///
     /// Returns a `Result` indicating success or failure.
     pub fn add_from_excel(&mut self, path: PathBuf, overwrite: bool) -> Result<(), Box<dyn Error>> {
-        let name_to_id_map: HashMap<String, String> = get_name_map(&self)
+        let name_to_id_map: HashMap<String, String> = get_name_map(self)
             .into_iter()
             .map(|(id, name)| (name, id))
             .collect();
@@ -196,7 +196,7 @@ pub fn read_excel(
 
     // Iterate through the sheets in the workbook
     for sheet in workbook.sheet_names() {
-        let species_data = process_sheet(&mut workbook, &sheet, &name_to_id_map)?;
+        let species_data = process_sheet(&mut workbook, &sheet, name_to_id_map)?;
 
         // Convert the HashMap to a DataFrame
         dfs.insert(sheet, DataFrame::new(species_data.into_values().collect())?);
