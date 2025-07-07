@@ -59,22 +59,19 @@ impl EnzymeMLDocument {
             let meas = self.create_new_measurement(&name, &df)?;
 
             if !overwrite {
+                // Case 1: Not overwriting - just add the measurement
                 self.measurements.push(meas);
                 continue;
             }
 
-            // Check if either name or id already exists
+            // Case 2: Overwriting and measurement found - update existing measurement
             if let Some(same_meas) = self.find_measurement(name) {
                 same_meas.species_data = meas.species_data;
                 continue;
-            } else {
-                self.measurements.push(meas);
             }
 
-            let mut meas = MeasurementBuilder::from_dataframe(&df)?;
-            meas.id(self.generate_id());
-            meas.name(self.generate_name());
-            self.measurements.push(meas.build()?);
+            // Case 3: Overwriting but no existing measurement found - add new measurement
+            self.measurements.push(meas);
         }
 
         Ok(())
