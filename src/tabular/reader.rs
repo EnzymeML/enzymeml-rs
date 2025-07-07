@@ -113,42 +113,6 @@ impl EnzymeMLDocument {
 
         Ok(meas.build()?)
     }
-
-    /// Generates a unique id for a new measurement.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `String` containing the unique id.
-    fn generate_id(&self) -> String {
-        let mut index = 1;
-        let prefix = "m";
-        while self
-            .measurements
-            .iter()
-            .any(|m| m.id == format!("{}{}", prefix, index))
-        {
-            index += 1;
-        }
-        format!("{}{}", prefix, index)
-    }
-
-    /// Generates a unique name for a new measurement.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `String` containing the unique name.
-    fn generate_name(&self) -> String {
-        let mut index = 1;
-        let prefix = "Measurement";
-        while self
-            .measurements
-            .iter()
-            .any(|m| m.name == format!("{} {}", prefix, index))
-        {
-            index += 1;
-        }
-        format!("{} {}", prefix, index)
-    }
 }
 
 impl EnzymeMLDocumentBuilder {
