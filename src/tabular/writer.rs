@@ -32,15 +32,10 @@ use std::path::PathBuf;
 
 use polars::prelude::{AnyValue, DataFrame};
 use rust_xlsxwriter::workbook::Workbook;
-use rust_xlsxwriter::{
-    DataValidation, DataValidationErrorStyle, DataValidationRule, Format, FormatAlign, FormatBorder,
-};
+use rust_xlsxwriter::{Format, FormatAlign, FormatBorder};
 
 use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementData};
 use crate::validation::consistency::get_species_ids;
-
-/// Error message displayed when users enter invalid data in validated cells
-const ERROR_MESSAGE: &str = "Only positive numbers are allowed in this cell.";
 
 /// Default number of rows to set up in worksheets for data entry
 const DEFAULT_ROW_COUNT: u32 = 99;
@@ -304,39 +299,6 @@ fn add_meas_sheet(
         sheet.set_row_height(i, DEFAULT_ROW_HEIGHT)?;
     }
 
-    // Add data validation
-    add_data_validation(sheet, column_count as u16)?;
-
-    Ok(())
-}
-
-/// Adds positive number validation to the data cells in the worksheet
-///
-/// Applies data validation rules to ensure users can only enter positive numbers
-/// or leave cells blank. Invalid entries trigger an error dialog with helpful
-/// guidance.
-///
-/// # Arguments
-///
-/// * `sheet` - The worksheet to add validation to
-/// * `column_count` - The number of columns in the worksheet
-///
-/// # Returns
-///
-/// * `Ok(())` if validation was successfully applied
-/// * `Err(...)` if the validation setup failed
-fn add_data_validation(
-    sheet: &mut rust_xlsxwriter::Worksheet,
-    column_count: u16,
-) -> Result<(), Box<dyn Error>> {
-    let validation = DataValidation::new()
-        .allow_decimal_number(DataValidationRule::GreaterThanOrEqualTo(0.0))
-        .ignore_blank(true)
-        .set_error_style(DataValidationErrorStyle::Stop)
-        .set_error_title("Invalid input")?
-        .set_error_message(ERROR_MESSAGE)?;
-
-    sheet.add_data_validation(1, 0, DEFAULT_ROW_COUNT, column_count - 1, &validation)?;
     Ok(())
 }
 
@@ -378,10 +340,11 @@ fn get_non_header_format() -> Format {
 /// A `Format` object configured for header cells
 fn get_header_format() -> Format {
     Format::new()
+        .set_text_wrap()
         .set_background_color(HEADER_BG_COLOR)
         .set_font_color(HEADER_TEXT_COLOR)
         .set_bold()
-        .set_font_size(18f64)
+        .set_font_size(15f64)
         .set_border_left(FormatBorder::Thin)
         .set_border_left_color(BORDER_COLOR)
         .set_border_right(FormatBorder::Thin)
