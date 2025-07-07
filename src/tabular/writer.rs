@@ -26,6 +26,7 @@
 //! generates a template worksheet with all species from the document's reactions,
 //! allowing users to input experimental data.
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 
@@ -78,16 +79,54 @@ impl EnzymeMLDocument {
         &self,
         output: impl Into<PathBuf>,
         template: bool,
+        use_names: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut enzmldoc = self.clone();
         if template {
             enzmldoc.measurements.clear();
         }
 
-        let mut workbook = Workbook::try_from(&enzmldoc)?;
+        let mut workbook = create_workbook(&enzmldoc, use_names)?;
         workbook.save(output.into())?;
         Ok(())
     }
+}
+
+/// Creates a workbook from an EnzymeMLDocument reference
+///
+/// This function handles both populated documents (with measurements) and
+/// empty documents (creates templates). Each measurement becomes a separate worksheet
+/// with proper formatting and data validation.
+///
+/// # Arguments
+///
+/// * `enzmldoc` - The EnzymeMLDocument reference to convert
+///
+/// # Returns
+///
+/// * `Ok(Workbook)` containing the converted data
+/// * `Err(...)` if the conversion fails
+pub fn create_workbook(
+    enzmldoc: &EnzymeMLDocument,
+    use_names: bool,
+) -> Result<Workbook, Box<dyn std::error::Error>> {
+    let mut workbook = Workbook::new();
+
+    let mut enzmldoc = enzmldoc.clone();
+
+    if use_names {
+        replace_species_ids(&mut enzmldoc);
+    }
+
+    if enzmldoc.measurements.is_empty() {
+        create_meas_template(&enzmldoc, &mut workbook)?;
+    } else {
+        for measurement in &enzmldoc.measurements {
+            add_meas_sheet(measurement, &mut workbook)?;
+        }
+    }
+
+    Ok(workbook)
 }
 
 impl TryFrom<&EnzymeMLDocument> for Workbook {
@@ -95,25 +134,14 @@ impl TryFrom<&EnzymeMLDocument> for Workbook {
 
     /// Converts an EnzymeMLDocument reference into a Workbook
     ///
-    /// This implementation handles both populated documents (with measurements) and
-    /// empty documents (creates templates). Each measurement becomes a separate worksheet
-    /// with proper formatting and data validation.
+    /// This implementation delegates to the create_workbook_from_enzmldoc function.
     ///
     /// # Returns
     ///
     /// * `Ok(Workbook)` containing the converted data
     /// * `Err(...)` if the conversion fails
     fn try_from(enzmldoc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
-        let mut workbook = Workbook::new();
-        if enzmldoc.measurements.is_empty() {
-            create_meas_template(enzmldoc, &mut workbook)?;
-        } else {
-            for measurement in &enzmldoc.measurements {
-                add_meas_sheet(measurement, &mut workbook)?;
-            }
-        }
-
-        Ok(workbook)
+        create_workbook(enzmldoc, false)
     }
 }
 
@@ -122,7 +150,7 @@ impl TryFrom<EnzymeMLDocument> for Workbook {
 
     /// Converts an owned EnzymeMLDocument into a Workbook
     ///
-    /// This is a convenience implementation that delegates to the reference version.
+    /// This is a convenience implementation that delegates to the create_workbook_from_enzmldoc function.
     /// Creates a template if the document has no measurements,
     /// otherwise adds each measurement as a separate worksheet.
     ///
@@ -131,7 +159,7 @@ impl TryFrom<EnzymeMLDocument> for Workbook {
     /// * `Ok(Workbook)` containing the converted data
     /// * `Err(...)` if the conversion fails
     fn try_from(enzmldoc: EnzymeMLDocument) -> Result<Self, Self::Error> {
-        Workbook::try_from(&enzmldoc)
+        create_workbook(&enzmldoc, false)
     }
 }
 
@@ -364,4 +392,57 @@ fn get_header_format() -> Format {
         .set_border_bottom_color(BORDER_COLOR)
         .set_align(FormatAlign::VerticalCenter)
         .set_align(FormatAlign::Center)
+}
+
+/// Replaces the species IDs with their display names
+///
+/// This function iterates through all measurements in the EnzymeML document
+/// and replaces the species IDs with their corresponding names from the name map.
+///
+/// # Arguments
+///
+/// * `enzmldoc` - Reference to the EnzymeML document containing measurements
+/// * `name_map` - HashMap mapping species IDs to their display names
+fn replace_species_ids(enzmldoc: &mut EnzymeMLDocument) {
+    let name_map = get_name_map(enzmldoc);
+    for measurement in &mut enzmldoc.measurements {
+        for meas_data in &mut measurement.species_data {
+            if let Some(name) = name_map.get(&meas_data.species_id) {
+                meas_data.species_id = name.clone();
+            }
+        }
+    }
+}
+
+/// Creates a mapping from species IDs to their display names
+///
+/// This function iterates through all species types in the EnzymeML document
+/// (small molecules, proteins, and complexes) and creates a HashMap that maps
+/// each species ID to its corresponding name for display purposes.
+///
+/// # Arguments
+///
+/// * `enzmldoc` - Reference to the EnzymeML document containing species data
+///
+/// # Returns
+///
+/// A HashMap where keys are species IDs and values are species names
+pub(super) fn get_name_map(enzmldoc: &EnzymeMLDocument) -> HashMap<String, String> {
+    enzmldoc
+        .small_molecules
+        .iter()
+        .map(|species| (species.id.clone(), species.name.clone()))
+        .chain(
+            enzmldoc
+                .proteins
+                .iter()
+                .map(|species| (species.id.clone(), species.name.clone())),
+        )
+        .chain(
+            enzmldoc
+                .complexes
+                .iter()
+                .map(|species| (species.id.clone(), species.name.clone())),
+        )
+        .collect()
 }

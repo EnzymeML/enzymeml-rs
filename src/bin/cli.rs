@@ -102,13 +102,13 @@ use enzymeml::{
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
+    tabular::writer::create_workbook,
     validation::{consistency, schema},
 };
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
 // TODO: This is very ugly, we should extract the WASM feature into a separate crate
-use rust_xlsxwriter::workbook::Workbook;
 
 // List all available transformations
 const AVAILABLE_TRANSFORMATIONS: &[&str] =
@@ -180,6 +180,10 @@ enum Commands {
         /// As template or not
         #[arg(long, help = "As template or not")]
         template: bool,
+
+        /// Use names or not
+        #[arg(long = "by-name", help = "Use names or not")]
+        by_name: bool,
     },
 
     /// Validate an EnzymeML document
@@ -564,6 +568,7 @@ pub fn main() {
             target,
             output,
             template,
+            by_name,
         } => {
             // Check if the file is a valid EnzymeML document
             let enzmldoc = complete_check(path);
@@ -584,7 +589,7 @@ pub fn main() {
                     }
 
                     // Convert the document to XLSX
-                    let mut workbook = Workbook::try_from(enzmldoc)
+                    let mut workbook = create_workbook(&enzmldoc, *by_name)
                         .expect("Failed to convert EnzymeML document to XLSX");
                     workbook.save(output).expect("Failed to save XLSX file");
                 }
