@@ -38,7 +38,7 @@ use crate::prelude::{EnzymeMLDocument, Measurement, MeasurementData};
 use crate::validation::consistency::get_species_ids;
 
 /// Default number of rows to set up in worksheets for data entry
-const DEFAULT_ROW_COUNT: u32 = 99;
+const DEFAULT_ROW_COUNT: u32 = 400;
 
 /// Default column width in Excel units for optimal readability
 const DEFAULT_COLUMN_WIDTH: f64 = 20.0;
@@ -285,7 +285,6 @@ fn add_meas_sheet(
             let col_pos = col_idx as u16;
 
             sheet.write_string(row_pos, col_pos, &value_str)?;
-            sheet.set_cell_format(row_pos, col_pos, &data_format)?;
         }
     }
 
@@ -294,9 +293,14 @@ fn add_meas_sheet(
         sheet.set_column_width(i as u16, DEFAULT_COLUMN_WIDTH)?;
     }
 
-    // Set row heights
+    // Set row heights and format
     for i in 0..DEFAULT_ROW_COUNT {
         sheet.set_row_height(i, DEFAULT_ROW_HEIGHT)?;
+        for j in 0..column_count {
+            if i > 0 {
+                sheet.set_cell_format(i, j as u16, &data_format)?;
+            }
+        }
     }
 
     Ok(())
