@@ -16,7 +16,6 @@ use peroxide::fuga::{ODEIntegrator, ThreadRng};
 use rand::distributions::Distribution;
 use rayon::prelude::*;
 
-
 use crate::{
     mcmc::{error::MCMCError, likelihood::Likelihood, output::SampleOutput, priors::DiffablePrior},
     optim::problem::Problem,
@@ -33,7 +32,7 @@ pub struct SampleMessage {
 }
 
 /// Per-chain context with pre-allocated buffers for efficient computation.
-pub struct ChainContext<S, L, P> 
+pub struct ChainContext<S, L, P>
 where
     S: ODEIntegrator + Copy + Send + Sync,
     L: ObjectiveFunction + Likelihood,
@@ -170,19 +169,19 @@ where
     ) {
         let is_tuning = draw_idx < num_tune;
         let phase = if is_tuning { "Tuning" } else { "Sampling" };
-        
+
         let step_size = info.step_size;
         let steps = info.num_steps;
-        
+
         let message = if (0.001..1000.0).contains(&step_size) {
             format!("{phase} {steps} steps of size {step_size:.3}")
         } else {
             format!("{phase} {steps} steps of size {step_size:.2e}")
         };
-        
+
         progress_bar.set_message(message);
         progress_bar.set_position(draw_idx + 1);
-        
+
         if draw_idx == num_tune && num_tune > 0 {
             let style = ProgressStyle::default_bar()
                 .template(&format!(
@@ -217,7 +216,7 @@ where
         sender: channel::Sender<SampleMessage>,
     ) -> Result<usize, MCMCError> {
         let chain_context = ChainContext::new(self.clone());
-        
+
         let initial_position = chain_context.bprob.draw_initial_position();
         let math = CpuMath::new(chain_context);
 
@@ -240,7 +239,7 @@ where
                     chain_id: chain_id_string.clone(),
                     sample: draw.into_vec(),
                 };
-                
+
                 sender.send(message).map_err(|_| MCMCError::ChannelClosed)?;
             } else if !info.tuning && info.diverging {
                 divergences += 1;
@@ -249,7 +248,11 @@ where
             Self::update_progress_bar(&progress_bar, chain_id, draw_idx, num_tune, &info);
         }
 
-        progress_bar.finish_with_message(format!("✅ Completed ({} tuning + {} sampling)", num_tune, total_draws - num_tune));
+        progress_bar.finish_with_message(format!(
+            "✅ Completed ({} tuning + {} sampling)",
+            num_tune,
+            total_draws - num_tune
+        ));
         Ok(divergences)
     }
 
@@ -291,7 +294,7 @@ where
         let num_parallel = self.determine_num_parallel(num_parallel)?;
         let num_chains = num_chains.unwrap_or(1);
 
-        let mut settings = DiagGradNutsSettings{
+        let mut settings = DiagGradNutsSettings {
             num_tune,
             num_draws,
             maxdepth: maxdepth.unwrap_or(6),
@@ -356,16 +359,16 @@ where
     /// Determines the number of parallel threads to use.
     fn determine_num_parallel(&self, num_parallel: Option<i32>) -> Result<usize, MCMCError> {
         let available_threads = std::thread::available_parallelism().unwrap().get();
-        
+
         match num_parallel.unwrap_or(-1) {
             -1 => Ok(available_threads),
             n if n <= 0 => Err(MCMCError::InvalidParallelism(n)),
             n => {
                 let n = n as usize;
                 if n > available_threads {
-                    Err(MCMCError::TooManyThreads { 
-                        requested: n, 
-                        available: available_threads 
+                    Err(MCMCError::TooManyThreads {
+                        requested: n,
+                        available: available_threads,
                     })
                 } else {
                     Ok(n)
@@ -398,7 +401,10 @@ where
     /// Computes the log-likelihood for given parameters.
     #[inline(always)]
     fn likelihood(&self, parameters: &[f64]) -> f64 {
-        let (residuals, _) = self.problem.get_residuals(parameters, Some(Mode::Regular)).unwrap();
+        let (residuals, _) = self
+            .problem
+            .get_residuals(parameters, Some(Mode::Regular))
+            .unwrap();
         self.problem.objective().log_likelihood(&residuals)
     }
 
@@ -411,7 +417,7 @@ where
     /// Draws initial parameter values from the prior distributions.
     fn draw_initial_position(&self) -> Vec<f64> {
         let mut rng = rand::thread_rng();
-        
+
         self.priors
             .iter()
             .map(|prior| prior.sample(&mut rng))
@@ -450,8 +456,8 @@ where
 
     /// Computes the log posterior probability and its gradient.
     ///
-    /// This method evaluates both the log-likelihood (from the optimization problem) 
-    /// and log-prior (from the prior distributions), then computes their sum 
+    /// This method evaluates both the log-likelihood (from the optimization problem)
+    /// and log-prior (from the prior distributions), then computes their sum
     /// (the log posterior) along with the gradient.
     ///
     /// # Arguments
@@ -465,23 +471,30 @@ where
     #[inline(always)]
     fn logp(&mut self, parameters: &[f64], grad: &mut [f64]) -> Result<f64, Self::LogpError> {
         unsafe {
-            self.param_buffer.as_slice_mut().unwrap_unchecked().copy_from_slice(parameters);
+            self.param_buffer
+                .as_slice_mut()
+                .unwrap_unchecked()
+                .copy_from_slice(parameters);
         }
-                
+
         let likelihood = self.bprob.likelihood(parameters);
         let mut prior = 0.0;
         for (prior_dist, &param) in self.bprob.priors.iter().zip(parameters.iter()) {
             prior += prior_dist.ln_pdf(param);
         }
-        
+
         let posterior = likelihood + prior;
 
-        self.likelihood_grad_buffer.assign(&self.bprob.grad_likelihood(&self.param_buffer));
+        self.likelihood_grad_buffer
+            .assign(&self.bprob.grad_likelihood(&self.param_buffer));
 
-        let likelihood_grad_slice = unsafe { self.likelihood_grad_buffer.as_slice().unwrap_unchecked() };
-        for (i, (prior_dist, &param)) in self.bprob.priors.iter().zip(parameters.iter()).enumerate() {
+        let likelihood_grad_slice =
+            unsafe { self.likelihood_grad_buffer.as_slice().unwrap_unchecked() };
+        for (i, (prior_dist, &param)) in self.bprob.priors.iter().zip(parameters.iter()).enumerate()
+        {
             unsafe {
-                *grad.get_unchecked_mut(i) = likelihood_grad_slice.get_unchecked(i) + prior_dist.ln_pdf_grad(param);
+                *grad.get_unchecked_mut(i) =
+                    likelihood_grad_slice.get_unchecked(i) + prior_dist.ln_pdf_grad(param);
             }
         }
 
@@ -517,7 +530,7 @@ mod tests {
 
         use crate::mcmc::output::CSVOutput;
         let output = CSVOutput::new("./output", problem.get_sorted_params()).unwrap();
-        
+
         problem
             .run()
             .output(output)
