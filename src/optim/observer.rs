@@ -47,6 +47,12 @@ where
     }
 }
 
+impl CallbackObserver {
+    pub fn new(callback: Box<dyn Fn(f64, f64) + UnwindSafe + Send>) -> Self {
+        Self { callback }
+    }
+}
+
 /// A progress bar observer that displays optimization progress.
 ///
 /// The `ProgressObserver` implements the `Observe` trait from the argmin library and
