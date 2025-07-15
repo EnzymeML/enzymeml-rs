@@ -42,7 +42,7 @@ fn check_reaction_species(
     for (elem_idx, reac_elem) in all_elements.enumerate() {
         if !all_species.contains(&reac_elem.species_id) {
             let result = ValidationResult::new(
-                format!("/reactions/{}/species/{}", reaction_idx, elem_idx),
+                format!("/reactions/{reaction_idx}/species/{elem_idx}"),
                 format!(
                     "Species '{}' in reaction is not defined in the document.",
                     reac_elem.species_id
@@ -71,7 +71,7 @@ fn check_reaction_stoichiometry(report: &mut Report, reaction: &Reaction, reacti
 
     if !has_reactant || !has_product {
         let result = ValidationResult::new(
-            format!("/reactions/{}", reaction_idx),
+            format!("/reactions/{reaction_idx}"),
             format!(
                 "Reaction '{}' must have at least one reactant (stoichiometry < 0) and one product (stoichiometry > 0).",
                 reaction.id

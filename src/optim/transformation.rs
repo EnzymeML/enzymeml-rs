@@ -77,13 +77,13 @@ impl Transformation {
     // Inverse transformations
     pub fn equation_string(&self) -> String {
         match self {
-            Transformation::SoftPlus(s) => format!("exp({s}) - 1", s = s),
-            Transformation::MultScale(s, scale) => format!("{s} / {scale}", s = s, scale = scale),
-            Transformation::Pow(s, power) => format!("{s}^(1/{power})", s = s, power = power),
-            Transformation::Log(s) => format!("exp({s})", s = s),
-            Transformation::Abs(s) => format!("abs({s})", s = s), // Abs is its own inverse
-            Transformation::NegExp(s) => format!("-log({s})", s = s),
-            Transformation::Log1P(s) => format!("exp({s}) - 1", s = s),
+            Transformation::SoftPlus(s) => format!("exp({s}) - 1"),
+            Transformation::MultScale(s, scale) => format!("{s} / {scale}"),
+            Transformation::Pow(s, power) => format!("{s}^(1/{power})"),
+            Transformation::Log(s) => format!("exp({s})"),
+            Transformation::Abs(s) => format!("abs({s})"), // Abs is its own inverse
+            Transformation::NegExp(s) => format!("-log({s})"),
+            Transformation::Log1P(s) => format!("exp({s}) - 1"),
         }
     }
 

@@ -88,7 +88,7 @@ impl Display for EnzymeMLDocument {
 
         let mut table = builder.build();
         table.with(Style::sharp());
-        write!(f, "{}", table)?;
+        write!(f, "{table}")?;
 
         Ok(())
     }

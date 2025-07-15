@@ -61,8 +61,7 @@ impl ProfileParameter {
     pub fn new(name: String, from: f64, to: f64) -> Result<Self, OptimizeError> {
         if from >= to {
             return Err(OptimizeError::ProfileParameterParseError(format!(
-                "From value {} must be less than to value {}",
-                from, to
+                "From value {from} must be less than to value {to}"
             )));
         }
 
@@ -133,14 +132,14 @@ mod tests {
     fn test_profile_parameter_parse_error() {
         let input = "K_M=50.0:100.0:200.0";
         let case = ProfileParameter::from_str(input);
-        assert!(case.is_err(), "Case {} should fail", input);
+        assert!(case.is_err(), "Case {input} should fail");
 
         let input = "K_M=50,0:100,0";
         let case = ProfileParameter::from_str(input);
-        assert!(case.is_err(), "Case {} should fail", input);
+        assert!(case.is_err(), "Case {input} should fail");
 
         let input = "K_M=50.0,100.0:";
         let case = ProfileParameter::from_str(input);
-        assert!(case.is_err(), "Case {} should fail", input);
+        assert!(case.is_err(), "Case {input} should fail");
     }
 }

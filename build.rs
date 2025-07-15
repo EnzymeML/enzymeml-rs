@@ -35,7 +35,7 @@ fn main() {
             + "\n";
 
         // Create a new file with the same name as the markdown file
-        let out_path: PathBuf = format!("src/versions/{}.rs", fname).into();
+        let out_path: PathBuf = format!("src/versions/{fname}.rs").into();
 
         // If the file doesn't exist, or if it exists but is different from the generated code, write the code to the file
         if !out_path.exists() {
