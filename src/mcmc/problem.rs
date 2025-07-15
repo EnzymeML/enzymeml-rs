@@ -383,14 +383,12 @@ where
         (0..num_chains)
             .map(|chain_id| {
                 let pb = multi_progress.add(ProgressBar::new(total_draws));
-                
                 let style = ProgressStyle::default_bar()
                     .template(&format!(
                         "Chain {chain_id:02}: {{spinner:.green}} [{{bar:40.cyan/blue}}] {{pos}}/{{len}} | {{elapsed}}/{{eta}} | {{msg}}"
                     ))
                     .unwrap()
                     .progress_chars("█▉▊▋▌▍▎▏ ");
-                
                 pb.set_style(style);
                 pb.set_message("Initializing...");
                 pb
