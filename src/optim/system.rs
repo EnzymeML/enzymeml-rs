@@ -62,10 +62,10 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Gradient for P
     /// * `Result<Array1<f64>, argmin::core::Error>` - The computed gradient vector or an error
     #[inline(always)]
     fn gradient(&self, params: &Self::Param) -> Result<Self::Gradient, argmin::core::Error> {
-        let gradient = params.central_diff(&|x| self.cost(x).expect("Failed to compute cost"));
-
-        let gradient = gradient * &self.fixed_params;
-        Ok(gradient)
+        Ok(
+            params.central_diff(&|x| self.cost(x).expect("Failed to compute cost"))
+                * &self.fixed_params,
+        )
     }
 }
 
