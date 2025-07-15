@@ -155,7 +155,7 @@ where
                 Ok((_, likelihood, _)) => likelihoods.push(likelihood),
                 Err(e) => {
                     // Handle error gracefully with a warning instead of panic
-                    eprintln!("Warning: Failed to compute likelihood ratio: {}", e);
+                    eprintln!("Warning: Failed to compute likelihood ratio: {e}");
                     likelihoods.push(f64::MAX); // Use worst possible value
                 }
             }

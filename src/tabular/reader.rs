@@ -130,7 +130,7 @@ impl EnzymeMLDocumentBuilder {
 
         for (i, (name, df)) in dfs.iter().enumerate() {
             let mut meas = MeasurementBuilder::from_dataframe(df)?;
-            meas.id(format!("m{}", i));
+            meas.id(format!("m{i}"));
             meas.name(name);
             self.to_measurements(meas.build()?);
         }
@@ -189,7 +189,7 @@ fn process_sheet(
     let header_mapping: HashMap<usize, String> = range
         .rows()
         .next()
-        .unwrap_or_else(|| panic!("No headers found in sheet: {}", sheet))
+        .unwrap_or_else(|| panic!("No headers found in sheet: {sheet}"))
         .iter()
         .enumerate()
         .map(|(i, cell)| {

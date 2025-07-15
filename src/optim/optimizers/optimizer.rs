@@ -125,7 +125,7 @@ impl TryInto<InitialGuesses> for &EnzymeMLDocument {
             let param = self.parameters.iter().find(|p| p.symbol == *name).ok_or(
                 OptimizeError::ParameterNotFound {
                     param: name.clone(),
-                    message: format!("Parameter {} not found", name),
+                    message: format!("Parameter {name} not found"),
                 },
             )?;
 

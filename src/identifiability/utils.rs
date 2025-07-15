@@ -247,7 +247,7 @@ where
             .iter()
             .map(|param| {
                 report.best_params.get(param).copied().unwrap_or_else(|| {
-                    panic!("Parameter {} not found in optimized parameters", param)
+                    panic!("Parameter {param} not found in optimized parameters")
                 })
             })
             .collect(),

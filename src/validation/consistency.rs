@@ -232,7 +232,7 @@ mod tests {
         if let Err(e) = load_enzmldoc(&path) {
             match e {
                 IOError::JsonParseError(_) => {}
-                _ => panic!("Unexpected error: {:?}", e),
+                _ => panic!("Unexpected error: {e:?}"),
             }
         }
     }

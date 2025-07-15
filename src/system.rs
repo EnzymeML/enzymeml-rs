@@ -208,8 +208,8 @@ fn create_species_ode(
         .iter()
         .map(|(stoichiometry, equation)| match *stoichiometry {
             1.0 => equation.clone(),
-            -1.0 => format!("-{}", equation),
-            _ => format!("({}) * ({})", stoichiometry, equation),
+            -1.0 => format!("-{equation}"),
+            _ => format!("({stoichiometry}) * ({equation})"),
         })
         .collect::<Vec<_>>()
         .join(" + ");
@@ -312,7 +312,7 @@ mod tests {
         let result = derive_system(&mut enzmldoc);
 
         if let Err(e) = result {
-            panic!("Error: {}", e);
+            panic!("Error: {e}");
         }
     }
 }

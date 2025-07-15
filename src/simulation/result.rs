@@ -213,7 +213,7 @@ impl SimulationResult {
     pub fn get_species_data(&self, species_id: &str) -> &Vec<f64> {
         self.species
             .get(species_id)
-            .unwrap_or_else(|| panic!("Species {} not found", species_id))
+            .unwrap_or_else(|| panic!("Species {species_id} not found"))
     }
 }
 
@@ -280,7 +280,7 @@ impl From<&SimulationResult> for Vec<Box<Scatter<f64, f64>>> {
         // Plot species
         for (species, values) in result.species.iter().sorted_by_key(|k| k.0) {
             let trace = plotly::Scatter::new(result.time.clone(), values.clone())
-                .name(format!("{} Fit", species))
+                .name(format!("{species} Fit"))
                 .mode(Mode::LinesText);
 
             traces.push(trace);
@@ -290,7 +290,7 @@ impl From<&SimulationResult> for Vec<Box<Scatter<f64, f64>>> {
         if let Some(assignments) = &result.assignments {
             for (assignment, values) in assignments.iter() {
                 let trace = plotly::Scatter::new(result.time.clone(), values.clone())
-                    .name(format!("{} Fit", assignment))
+                    .name(format!("{assignment} Fit"))
                     .mode(Mode::LinesText);
                 traces.push(trace);
             }
