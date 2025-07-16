@@ -75,7 +75,7 @@ where
     }
 
     // Optimize the problem
-    let report = optimizer.optimize(&problem, Some(initial_guess))?;
+    let report = optimizer.optimize(&problem, Some(initial_guess), None)?;
     let ratio = likelihood_ratio(err_min, report.error);
 
     Ok((param_values, report.error, ratio))
@@ -236,7 +236,7 @@ where
 
     // First, fit the problem to get the initial guess
     let initial_guess = initial_guess.into();
-    let report = optimizer.optimize(problem, Some(initial_guess))?;
+    let report = optimizer.optimize(problem, Some(initial_guess), None)?;
     let err_min = report.error;
 
     // Use the optimized parameters as the initial guess
@@ -247,7 +247,7 @@ where
             .iter()
             .map(|param| {
                 report.best_params.get(param).copied().unwrap_or_else(|| {
-                    panic!("Parameter {} not found in optimized parameters", param)
+                    panic!("Parameter {param} not found in optimized parameters")
                 })
             })
             .collect(),

@@ -17,6 +17,7 @@ use argmin::solver::particleswarm::ParticleSwarm;
 use ndarray::s;
 use peroxide::fuga::ODEIntegrator;
 
+use crate::optim::observer::CallbackObserver;
 use crate::optim::observer::ProgressObserver;
 use crate::{
     optim::{
@@ -82,6 +83,7 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         &self,
         problem: &Problem<S, L>,
         _: Option<T>,
+        callback: Option<CallbackObserver>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,
@@ -100,15 +102,18 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         let solver = ParticleSwarm::new(bounds, self.pop_size);
 
         // Run optimization
-        let mut res: argmin::core::OptimizationResult<Problem<S, L>, _, _> =
-            Executor::new(problem.clone(), solver)
-                .configure(|state| state.max_iters(self.max_iters))
-                .add_observer(
-                    ProgressObserver::new(self.max_iters, "Particle Swarm Optimization"),
-                    ObserverMode::Always,
-                )
-                .run()
-                .unwrap();
+        let mut res = Executor::new(problem.clone(), solver)
+            .configure(|state| state.max_iters(self.max_iters))
+            .add_observer(
+                ProgressObserver::new(self.max_iters, "Particle Swarm Optimization"),
+                ObserverMode::Always,
+            );
+
+        if let Some(cb) = callback {
+            res = res.add_observer(cb, ObserverMode::Always);
+        }
+
+        let mut res = res.run().map_err(OptimizeError::ArgMinError)?;
 
         if let TerminationStatus::Terminated(TerminationReason::SolverExit(_)) =
             res.state.termination_status

@@ -228,7 +228,7 @@ impl Display for OptimizationReport {
 
         let mut table = builder.build();
         table.with(Style::rounded());
-        write!(f, "\n{}\n", table)?;
+        write!(f, "\n{table}\n")?;
 
         // Create a table of the best parameters
         let mut builder = Builder::default();
@@ -269,7 +269,7 @@ impl Display for OptimizationReport {
 
         let mut table = builder.build();
         table.with(Style::rounded());
-        write!(f, "\n{}\n", table)?;
+        write!(f, "\n{table}\n")?;
 
         Ok(())
     }

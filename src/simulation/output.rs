@@ -47,6 +47,7 @@ pub trait OutputFormat {
 pub struct MatrixResult {
     pub times: Array1<f64>,
     pub species: Array2<f64>,
+    /// Dimensions: (time, species, parameters)
     pub parameter_sensitivities: Option<Array3<f64>>,
     pub assignments: Option<Array2<f64>>,
 }

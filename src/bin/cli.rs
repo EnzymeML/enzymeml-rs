@@ -82,6 +82,7 @@
 //! - `rals4`: 4th order Rosenbrock-Armero-Laso-Simo method
 
 use std::{
+    collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
     str::FromStr,
@@ -96,20 +97,26 @@ use enzymeml::{
     },
     io::{load_enzmldoc, save_enzmldoc},
     llm::{query_llm, PromptInput},
+    mcmc::{
+        diagnostics::Diagnostics,
+        likelihood::LikelihoodFunction,
+        output::{CSVOutput, DataFrameOutput},
+        priors::Prior,
+        problem::BayesianProblem,
+    },
     optim::{
         report::OptimizationReport, BFGSBuilder, EGOBuilder, InitialGuesses, LBFGSBuilder,
         OptimizeError, Optimizer, PSOBuilder, Problem, ProblemBuilder, SR1TrustRegionBuilder,
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
-    sbml::to_v1_omex,
-    validation::consistency,
+    tabular::writer::create_workbook,
+    validation::{consistency, schema},
 };
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
-use polars::{frame::DataFrame, io::SerWriter, prelude::CsvWriter};
-use rust_xlsxwriter::workbook::Workbook;
+// TODO: This is very ugly, we should extract the WASM feature into a separate crate
 
 // List all available transformations
 const AVAILABLE_TRANSFORMATIONS: &[&str] =
@@ -158,10 +165,6 @@ enum Commands {
         /// Show in browser or not
         #[arg(short, long, help = "Show in browser or not", default_value_t = true)]
         show: bool,
-
-        /// Show lines or not
-        #[arg(short, long, help = "Show lines or not", conflicts_with = "fit")]
-        lines: bool,
     },
 
     /// Convert an EnzymeML document to a target
@@ -185,6 +188,10 @@ enum Commands {
         /// As template or not
         #[arg(long, help = "As template or not")]
         template: bool,
+
+        /// Use names or not
+        #[arg(long = "by-name", help = "Use names or not")]
+        by_name: bool,
     },
 
     /// Validate an EnzymeML document
@@ -198,6 +205,69 @@ enum Commands {
     Fit {
         #[command(subcommand)]
         algorithm: OptimizeAlgorithm,
+    },
+
+    /// Hamiltonian Monte Carlo
+    #[allow(clippy::upper_case_acronyms)]
+    HMC {
+        #[command(flatten)]
+        params: BaseIntegratorParams,
+
+        #[arg(
+            long = "prior",
+            help = format!("Priors to use for the Hamiltonian Monte Carlo chain. Available priors: [{0}]", Prior::AVAILABLE_PRIORS.join(", ")),
+            value_parser = parse_prior
+        )]
+        priors: Vec<(String, Prior)>,
+
+        #[arg(
+            long = "likelihood",
+            help = format!("Likelihood function to use for the Hamiltonian Monte Carlo chain. When using a likelihood, provide a noise parameter in parentheses (e.g. normal(1.0)). Available functions: [{0}]", LikelihoodFunction::AVAILABLE_LIKELIHOODS.join(", ")),
+            value_parser = LikelihoodFunction::from_str,
+        )]
+        likelihood: LikelihoodFunction,
+
+        #[arg(
+            long = "tune",
+            help = "Number of tune/burn-in steps to detect the optimal step size.",
+            default_value_t = 1000
+        )]
+        num_tune: usize,
+
+        #[arg(
+            long = "draws",
+            help = "Numbers of draws/samples from the posterior distribution.",
+            default_value_t = 4000
+        )]
+        num_draws: usize,
+
+        #[arg(
+            long = "chains",
+            help = "Number of chains to run.",
+            default_value_t = 2
+        )]
+        num_chains: usize,
+
+        #[arg(
+            long = "max-depth",
+            help = "Maximum depth of the Hamiltonian Monte Carlo chain.",
+            default_value_t = 10
+        )]
+        max_depth: usize,
+
+        #[arg(
+            long = "njobs",
+            help = "Number of threads to use. -1 means use all available threads.",
+            default_value_t = -1
+        )]
+        n_jobs: isize,
+
+        #[arg(
+            short = 'o',
+            long = "outdir",
+            help = "If defined, chain samples will be written to the specified directory as CSV. Defaults to None, prints results only."
+        )]
+        dir: Option<PathBuf>,
     },
 
     /// Calculate the profile likelihood for a model
@@ -319,7 +389,7 @@ enum ProfileAlgorithm {
 }
 
 /// Base parameters for integrator configuration
-#[derive(Args)]
+#[derive(Args, Debug)]
 struct BaseIntegratorParams {
     /// Path to the EnzymeML document
     #[arg(short, long)]
@@ -432,11 +502,7 @@ struct BaseProfileParams {
     sigma: f64,
 
     /// Output directory for the profile likelihood plot
-    #[arg(
-        short,
-        long,
-        help = "Output directory for the profile likelihood plot and TSV file"
-    )]
+    #[arg(short, long, help = "Output directory for the profile likelihood plot")]
     out: Option<PathBuf>,
 
     /// Whether to use EGO-based profile likelihood
@@ -523,7 +589,7 @@ pub fn main() {
     match &cli.command {
         Commands::Info { path } => {
             let enzmldoc = complete_check(path).expect("Failed to validate EnzymeML document");
-            println!("{}", enzmldoc);
+            println!("{enzmldoc}");
         }
 
         Commands::Visualize {
@@ -532,9 +598,9 @@ pub fn main() {
             output,
             fit,
             show,
-            lines,
         } => {
             // Load the enzymeml document
+            validate_by_schema(path).expect("Failed to validate EnzymeML document");
             let enzmldoc = load_enzmldoc(path).expect("Failed to load EnzymeML document");
 
             // Create the output directory if it doesn't exist
@@ -550,7 +616,6 @@ pub fn main() {
                 .plot_measurements()
                 .measurement_ids(measurement.clone())
                 .show_fit(*fit)
-                .with_lines(*lines)
                 .call()
                 .expect("Failed to plot measurements");
 
@@ -574,13 +639,14 @@ pub fn main() {
             target,
             output,
             template,
+            by_name,
         } => {
             // Check if the file is a valid EnzymeML document
             let enzmldoc = complete_check(path);
 
             if let Err(e) = enzmldoc {
                 // If the document is invalid, print the error and return
-                println!("{}", e);
+                println!("{e}");
                 return;
             }
 
@@ -594,15 +660,9 @@ pub fn main() {
                     }
 
                     // Convert the document to XLSX
-                    let mut workbook = Workbook::try_from(enzmldoc)
+                    let mut workbook = create_workbook(&enzmldoc, *by_name)
                         .expect("Failed to convert EnzymeML document to XLSX");
                     workbook.save(output).expect("Failed to save XLSX file");
-                }
-                ConversionTarget::SBMLV1 => {
-                    // Convert the document to OMEX
-                    let mut omex =
-                        to_v1_omex(&enzmldoc).expect("Failed to convert EnzymeML document to OMEX");
-                    omex.save(output).expect("Failed to save OMEX file");
                 }
             }
         }
@@ -615,7 +675,7 @@ pub fn main() {
             }
 
             if let Err(e) = complete_check(path) {
-                println!("{}", e);
+                println!("{e}");
             }
         }
         Commands::Extract {
@@ -661,8 +721,85 @@ pub fn main() {
                     )
                     .expect("Failed to write response");
                 }
-                None => println!("{}", json_response),
+                None => println!("{json_response}"),
             }
+        }
+
+        Commands::HMC {
+            params,
+            likelihood,
+            priors,
+            num_tune,
+            num_draws,
+            num_chains,
+            max_depth,
+            n_jobs,
+            dir,
+        } => {
+            // Load the enzymeml document and init a problem
+            let doc = load_enzmldoc(&params.path).unwrap();
+            let problem = ProblemBuilder::new(&doc, params.solver, *likelihood)
+                .dt(params.dt)
+                .build()
+                .expect("Failed to build problem");
+
+            // Convert priors to HashMap
+            let priors: HashMap<String, Prior> = priors.iter().cloned().collect();
+
+            // Validate that all parameters are present in the priors
+            let mut missing_priors = Vec::new();
+            for param in problem.ode_system().get_sorted_params() {
+                if !priors.contains_key(&param) {
+                    missing_priors.push(param);
+                }
+            }
+
+            if !missing_priors.is_empty() {
+                eprintln!(
+                    "Missing priors for parameters: {}",
+                    missing_priors.join(", ")
+                );
+                return;
+            }
+
+            // Add priors to problem
+            let problem =
+                BayesianProblem::new(problem, priors).expect("Failed to build Bayesian problem");
+
+            match dir {
+                Some(dir) => {
+                    let output = CSVOutput::new(dir, problem.get_sorted_params()).unwrap();
+                    let (result, divergences) = problem
+                        .run()
+                        .output(output)
+                        .num_tune(*num_tune as u64)
+                        .num_draws(*num_draws as u64)
+                        .maxdepth(*max_depth as u64)
+                        .num_chains(*num_chains)
+                        .num_parallel(*n_jobs as i32)
+                        .seed(0)
+                        .call()
+                        .expect("Failed to run MCMC");
+                    let diagnostics = Diagnostics::from_output(&result, Some(divergences));
+                    println!("{diagnostics}");
+                }
+                None => {
+                    let output = DataFrameOutput::new(problem.get_sorted_params()).unwrap();
+                    let (result, divergences) = problem
+                        .run()
+                        .output(output)
+                        .num_tune(*num_tune as u64)
+                        .num_draws(*num_draws as u64)
+                        .maxdepth(*max_depth as u64)
+                        .num_chains(*num_chains)
+                        .num_parallel(*n_jobs as i32)
+                        .seed(0)
+                        .call()
+                        .expect("Failed to run MCMC");
+                    let diagnostics = Diagnostics::from_output(&result, Some(divergences));
+                    println!("{diagnostics}");
+                }
+            };
         }
 
         Commands::Fit { algorithm } => match algorithm {
@@ -689,11 +826,11 @@ pub fn main() {
 
                 // Optimize
                 let report = lbfgs
-                    .optimize(&problem, Some(initial_guesses))
+                    .optimize(&problem, Some(initial_guesses), None)
                     .expect("Failed to optimize");
 
                 // Display the results
-                println!("{}", report);
+                println!("{report}");
 
                 if fit_params.show {
                     let plot = report
@@ -742,11 +879,11 @@ pub fn main() {
 
                 // Optimize
                 let report = bfgs
-                    .optimize(&problem, Some(initial_guesses))
+                    .optimize(&problem, Some(initial_guesses), None)
                     .expect("Failed to optimize");
 
                 // Display the results
-                println!("{}", report);
+                println!("{report}");
 
                 if fit_params.show {
                     let plot = report
@@ -795,11 +932,11 @@ pub fn main() {
 
                 // Optimize
                 let report = sr1trustregion
-                    .optimize(&problem, Some(initial_guesses))
+                    .optimize(&problem, Some(initial_guesses), None)
                     .expect("Failed to optimize");
 
                 // Display the results
-                println!("{}", report);
+                println!("{report}");
 
                 if fit_params.show {
                     let plot = report
@@ -847,11 +984,11 @@ pub fn main() {
 
                 // Optimize
                 let report = optimizer
-                    .optimize(&problem, None::<InitialGuesses>)
+                    .optimize(&problem, None::<InitialGuesses>, None)
                     .expect("Failed to optimize");
 
                 // Display the results
-                println!("{}", report);
+                println!("{report}");
 
                 if fit_params.show {
                     let plot = report
@@ -895,11 +1032,11 @@ pub fn main() {
 
                 // Optimize
                 let report = optimizer
-                    .optimize(&problem, None::<InitialGuesses>)
+                    .optimize(&problem, None::<InitialGuesses>, None)
                     .expect("Failed to optimize");
 
                 // Display the results
-                println!("{}", report);
+                println!("{report}");
 
                 if fit_params.show {
                     let plot = report
@@ -968,7 +1105,7 @@ pub fn main() {
                     let plot = if profile_result.len() > 1 {
                         plot_pair_contour(&profile_result)
                     } else {
-                        (&profile_result).into()
+                        profile_result.into()
                     };
 
                     if profile_params.show {
@@ -987,20 +1124,7 @@ pub fn main() {
                             .next()
                             .expect("Failed to get file name without extension");
 
-                        plot.write_html(out.join(format!("{}_profile.html", fname)));
-
-                        let mut df: DataFrame = (&profile_result)
-                            .try_into()
-                            .expect("Failed to convert profile results to DataFrame");
-
-                        let mut file = File::create(out.join(format!("{}_profile.tsv", fname)))
-                            .expect("could not create file");
-
-                        CsvWriter::new(&mut file)
-                            .include_header(true)
-                            .with_separator(b'\t')
-                            .finish(&mut df)
-                            .expect("Failed to write profile results to TSV file");
+                        plot.write_html(out.join(format!("{fname}_profile.html")));
                     }
                 }
                 _ => {
@@ -1012,13 +1136,8 @@ pub fn main() {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-#[allow(clippy::upper_case_acronyms)]
 enum ConversionTarget {
-    /// Convert to XLSX
     Xlsx,
-
-    /// Convert to SBML OMEX (v1) - The first published version of the EnzymeML format
-    SBMLV1,
 }
 
 /// Performs comprehensive validation of an EnzymeML document
@@ -1036,6 +1155,7 @@ enum ConversionTarget {
 /// * `Ok(EnzymeMLDocument)` - Valid document
 /// * `Err(String)` - Error message if validation fails
 fn complete_check(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
+    validate_by_schema(path)?;
     check_consistency(path)
 }
 
@@ -1047,12 +1167,38 @@ fn check_consistency(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
     if !report.is_valid {
         println!("{}", "EnzymeML document is inconsistent".bold().red());
         for error in report.errors {
-            println!("   {}", error);
+            println!("   {error}");
         }
         return Err("EnzymeML document is inconsistent".to_string());
     }
 
     Ok(enzmldoc)
+}
+
+/// Validates the EnzymeML document by the JSON schema
+///
+/// # Arguments
+///
+/// * `path` - Path to the EnzymeML document
+///
+/// # Returns
+///
+/// * `Ok(())` - Valid document
+/// * `Err(String)` - Error message if validation fails
+fn validate_by_schema(path: &PathBuf) -> Result<(), String> {
+    // Check if the file is a valid EnzymeML document
+    let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
+    let report = schema::validate_json(&content).expect("Failed to validate EnzymeML document");
+
+    if !report.valid {
+        println!("{}", "EnzymeML document is invalid".bold().red());
+        for error in report.errors {
+            println!("   {error}");
+        }
+        return Err("EnzymeML document is invalid".to_string());
+    }
+
+    Ok(())
 }
 
 /// Override the initial guesses with the ones from the CLI
@@ -1104,6 +1250,18 @@ fn parse_initial_guesses(s: &str) -> Result<(String, f64), String> {
     let key = parts[0].to_string();
     let initial = parts[1].to_string().parse::<f64>().unwrap();
     Ok((key, initial))
+}
+
+fn parse_prior(s: &str) -> Result<(String, Prior), String> {
+    // Format: k_cat=normal(0.85,1.0)
+    let parts = s.split('=').collect::<Vec<_>>();
+    if parts.len() != 2 {
+        return Err("Invalid format. Expected parameter_name=distribution".to_string());
+    }
+    let parameter_name = parts[0].trim().to_string();
+    let distribution_str = parts[1].trim();
+    let prior = Prior::from_str(distribution_str).map_err(|e| format!("Invalid prior: {e}"))?;
+    Ok((parameter_name, prior))
 }
 
 fn parse_key_bounds(s: &str) -> Result<(String, (f64, f64)), String> {
@@ -1215,7 +1373,7 @@ impl FromStr for Solvers {
             "bs23" => Ok(Self::BS23(fuga::BS23::default())),
             "rals3" => Ok(Self::RALS3(fuga::RALS3::default())),
             "rals4" => Ok(Self::RALS4(fuga::RALS4::default())),
-            _ => Err(format!("Invalid solver: {}", s)),
+            _ => Err(format!("Invalid solver: {s}")),
         }
     }
 }

@@ -130,11 +130,9 @@ impl MeasurementBuilder {
                     data.clear();
                     time.clear();
                 } else if data.iter().all(|&x| x == -1.0) {
-                    return Err(format!(
-                        "Missing initial value at t=0 for species '{}'",
-                        species_id
-                    )
-                    .into());
+                    return Err(
+                        format!("Missing initial value at t=0 for species '{species_id}'").into(),
+                    );
                 }
 
                 species_data.push(

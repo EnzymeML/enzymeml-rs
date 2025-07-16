@@ -1,6 +1,6 @@
 [package]
 name = "enzymeml"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "The EnzymeML Rust library"
 license = "MIT"
@@ -28,6 +28,7 @@ itertools = "0.14.0"
 regex = "1.11.1"
 case = "1.0.0"
 getrandom = { version = "0.2.16", features = ["js"] }
+rand = "0.8"
 bon = "3.6.3"
 indicatif = "0.17.11"
 
@@ -50,7 +51,7 @@ plotly = "0.12.1"
 
 # Feature: simulation
 peroxide = { version = "0.39.0", optional = true }
-evalexpr-jit = { version = "0.2.1", features = ["nalgebra"], optional = true }
+evalexpr-jit = { version = "0.2.2", features = ["nalgebra"], optional = true }
 splines = { version = "5.0.0", features = ["nalgebra"], optional = true }
 
 # Feature: optimization
@@ -77,8 +78,9 @@ tsify-next = { version = "0.5.5", optional = true }
 # Feature: llm
 mdmodels = { version = "0.2.4", optional = true }
 tokio = { version = "1.44.0", features = ["full"], optional = true }
-libsbml = { git = "https://github.com/EnzymeML/libsbml-rs.git", branch = "combine-archive", version = "0.1.0" }
-quick-xml = { version = "0.37.5", features = ["serialize"] }
+statrs = { version = "0.18.0", features = ["rand"] }
+nuts-rs = "0.16.1"
+crossbeam = "0.8.4"
 variantly = "0.4.0"
 
 [profile.release]
@@ -122,3 +124,6 @@ mdmodels = "0.2.4"
 name = "simulation"
 harness = false
 path = "benches/simulation.rs"
+
+[lints.clippy]
+result_large_err = "allow"

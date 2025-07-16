@@ -3,6 +3,7 @@ mod test_simulation {
     use std::collections::HashMap;
 
     use approx::assert_relative_eq;
+    use enzymeml::io::load_enzmldoc;
     use enzymeml::prelude::{
         EnzymeMLDocument, EnzymeMLDocumentBuilder, EnzymeMLDocumentBuilderError, EquationBuilder,
         EquationType, MatrixResult, Mode, ODESystem, ParameterBuilder, PlotConfig,
@@ -244,7 +245,7 @@ mod test_simulation {
                 panic!("Expected parameter sensitivities, but none were computed");
             }
             Err(e) => {
-                panic!("Simulation failed: {:?}", e);
+                panic!("Simulation failed: {e:?}");
             }
         }
     }
@@ -352,6 +353,128 @@ mod test_simulation {
 
         let plot = result.plot(PlotConfig::default(), false);
         plot.to_html();
+    }
+
+    /// Tests sensitivity analysis using the enzmldoc.json test data to debug zero sensitivity issue.
+    /// This test demonstrates the problem where sensitivity analysis returns zeros for reaction-based systems.
+    #[test]
+    fn test_sensitivity_analysis_enzmldoc_json() {
+        // Load the test data from enzmldoc.json - this contains reactions, not direct ODEs
+        let doc = load_enzmldoc("tests/data/enzmldoc.json").expect("Failed to load enzmldoc.json");
+
+        // Create the ODE system from the document
+        let system: ODESystem = (&doc).try_into().expect("Failed to create ODE system");
+
+        // Print some debug info to understand the system
+        println!("System has {} equations", system.num_equations());
+        println!("System has {} parameters", system.num_parameters());
+        println!("System parameters: {:?}", system.get_sorted_params());
+        println!("System species: {:?}", system.get_sorted_species());
+
+        // Configure simulation parameters using the first measurement's initial conditions
+        let setup = SimulationSetupBuilder::default()
+            .t0(0.0)
+            .t1(100.0) // Use a shorter time span for faster testing
+            .dt(10.0) // Larger time step for faster testing
+            .build()
+            .unwrap();
+
+        // Extract initial conditions from the first measurement
+        let first_measurement = &doc.measurements[0];
+        let mut initial_conditions = HashMap::new();
+
+        // Get initial conditions for all species from the measurement
+        for species_data in &first_measurement.species_data {
+            if let Some(initial_value) = species_data.initial {
+                initial_conditions.insert(species_data.species_id.clone(), initial_value);
+            } else {
+                // Use a default value if initial is None
+                initial_conditions.insert(species_data.species_id.clone(), 0.0);
+            }
+        }
+
+        println!("Initial conditions: {initial_conditions:?}");
+
+        // Run simulation with sensitivity analysis
+        let result = system.integrate::<MatrixResult>(
+            &setup,
+            &initial_conditions,
+            None,
+            Some(&vec![10.0, 50.0, 100.0]), // Evaluate at specific time points
+            peroxide::fuga::RK4,            // Use a simpler solver for debugging
+            Some(Mode::Sensitivity),
+        );
+
+        // Check the result
+        match result {
+            Ok(MatrixResult {
+                species,
+                parameter_sensitivities: Some(parameter_sensitivities),
+                times,
+                assignments: _,
+            }) => {
+                println!("Species shape: {:?}", species.shape());
+                println!(
+                    "Parameter sensitivities shape: {:?}",
+                    parameter_sensitivities.shape()
+                );
+                println!("Times shape: {:?}", times.shape());
+
+                // Print actual sensitivity values to debug
+                println!("Parameter sensitivities:");
+                for (t_idx, time) in times.iter().enumerate() {
+                    println!("Time {time}: ");
+                    for species_idx in 0..parameter_sensitivities.shape()[1] {
+                        print!("  Species {species_idx}: [");
+                        for param_idx in 0..parameter_sensitivities.shape()[2] {
+                            print!(
+                                "{:.6}, ",
+                                parameter_sensitivities[[t_idx, species_idx, param_idx]]
+                            );
+                        }
+                        println!("]");
+                    }
+                }
+
+                // Check if sensitivities are all zero (the bug we're investigating)
+                let mut all_zero = true;
+                for val in parameter_sensitivities.iter() {
+                    if val.abs() > 1e-10 {
+                        all_zero = false;
+                        break;
+                    }
+                }
+
+                if all_zero {
+                    println!("ERROR: All sensitivities are zero! This indicates the bug.");
+                } else {
+                    println!("Sensitivities are non-zero, which is expected.");
+                }
+
+                // For now, we expect this test to fail until the bug is fixed
+                assert!(!all_zero, "Sensitivities should not all be zero - this indicates a bug in the sensitivity calculation for reaction-based systems");
+            }
+            Ok(MatrixResult {
+                parameter_sensitivities: None,
+                ..
+            }) => {
+                panic!("Expected parameter sensitivities, but none were computed");
+            }
+            Err(e) => {
+                println!("Simulation failed with error: {e:?}");
+
+                // Check if this is the unimplemented error for stoichiometry-based sensitivity
+                let error_string = format!("{e:?}");
+                if error_string.contains("not supported yet")
+                    || error_string.contains("unimplemented")
+                {
+                    println!("CONFIRMED: This is the stoichiometry sensitivity bug!");
+                    panic!("Sensitivity analysis with stoichiometry matrix is not implemented yet - this is the root cause of the zero sensitivities");
+                } else {
+                    panic!("Unexpected simulation error: {e:?}");
+                }
+            }
+        }
     }
 
     /// Creates a test EnzymeML document representing a Michaelis-Menten system
@@ -480,4 +603,101 @@ mod test_simulation {
             Ok(())
         }
     }
+
+    // /// Michaelis-Menten turnover of ABTS by SLAC **plus** first-order SLAC inactivation.
+    // ///
+    // /// State vector layout (8 entries):
+    // ///   0  [ABTS]          (a)
+    // ///   1  [SLAC]          (s)
+    // ///   2  ∂a/∂k_ie
+    // ///   3  ∂a/∂K_m
+    // ///   4  ∂a/∂k_cat
+    // ///   5  ∂s/∂k_ie
+    // ///   6  ∂s/∂K_m
+    // ///   7  ∂s/∂k_cat
+    // pub struct AbtsSlacSystem {
+    //     // --- closures for the RHS and its analytical derivatives
+    //     v_abts: Box<dyn Fn(f64, f64) -> f64>,   // f₁(a,s)
+    //     dv_da: Box<dyn Fn(f64, f64) -> f64>,    // ∂f₁/∂a
+    //     dv_ds: Box<dyn Fn(f64, f64) -> f64>,    // ∂f₁/∂s
+    //     dv_dkm: Box<dyn Fn(f64, f64) -> f64>,   // ∂f₁/∂K_m
+    //     dv_dkcat: Box<dyn Fn(f64, f64) -> f64>, // ∂f₁/∂k_cat
+    //     v_slac: Box<dyn Fn(f64) -> f64>,        // f₂(s)
+    //     df2_ds: Box<dyn Fn() -> f64>,           // ∂f₂/∂s  (constant −k_ie)
+    //     df2_dkie: Box<dyn Fn(f64) -> f64>,      // ∂f₂/∂k_ie  ( = −s )
+    // }
+
+    // impl AbtsSlacSystem {
+    //     pub fn new(k_ie: f64, k_m: f64, k_cat: f64) -> Self {
+    //         // ---- symbols in comments follow the manuscript in the analysis ----------
+    //         let v_abts = move |a: f64, s: f64| -k_cat * s * a / (k_m + a);
+    //         let dv_da = move |a: f64, s: f64| -k_cat * s * k_m / (k_m + a).powi(2);
+    //         let dv_ds = move |a: f64, _s: f64| -k_cat * a / (k_m + a);
+    //         let dv_dkm = move |a: f64, s: f64| k_cat * s * a / (k_m + a).powi(2);
+    //         let dv_dkcat = move |a: f64, s: f64| -s * a / (k_m + a);
+
+    //         let v_slac = move |s: f64| -k_ie * s;
+    //         let df2_ds = move || -k_ie;
+    //         let df2_dkie = move |s: f64| -s;
+
+    //         Self {
+    //             v_abts: Box::new(v_abts),
+    //             dv_da: Box::new(dv_da),
+    //             dv_ds: Box::new(dv_ds),
+    //             dv_dkm: Box::new(dv_dkm),
+    //             dv_dkcat: Box::new(dv_dkcat),
+    //             v_slac: Box::new(v_slac),
+    //             df2_ds: Box::new(df2_ds),
+    //             df2_dkie: Box::new(df2_dkie),
+    //         }
+    //     }
+
+    //     /// Convenience wrapper – integrates states **and** sensitivities.
+    //     pub fn integrate(&self, a0: f64, s0: f64, t0: f64, t1: f64, dt: f64) -> StepperOutput {
+    //         let y0 = vec![a0, s0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    //         let solver = BasicODESolver::new(RK5);
+    //         let (_, y_out) = solver
+    //             .solve(self, (t0, t1), dt, &y0)
+    //             .expect("integration failed");
+    //         y_out.to_vec()
+    //     }
+    // }
+
+    // impl ODEProblem for AbtsSlacSystem {
+    //     fn rhs(&self, _t: f64, y: &[f64], dy: &mut [f64]) -> Result<(), argmin_math::Error> {
+    //         // --- unpack states ------------------------------------------------------
+    //         let a = y[0];
+    //         let s = y[1];
+    //         let da_dkie = y[2];
+    //         let da_dkm = y[3];
+    //         let da_dkcat = y[4];
+    //         let ds_dkie = y[5];
+    //         let ds_dkm = y[6];
+    //         let ds_dkcat = y[7];
+
+    //         // --- original ODEs ------------------------------------------------------
+    //         dy[0] = (self.v_abts)(a, s); // d[ABTS]/dt
+    //         dy[1] = (self.v_slac)(s); // d[SLAC]/dt
+
+    //         // --- common partials used several times --------------------------------
+    //         let df1_da = (self.dv_da)(a, s);
+    //         let df1_ds = (self.dv_ds)(a, s);
+    //         let df2_ds = (self.df2_ds)();
+
+    //         // --- sensitivities: chain rule -----------------------------------------
+    //         // w.r.t. k_ie ------------------------------------------------------------
+    //         dy[2] = df1_da * da_dkie + df1_ds * ds_dkie /* + ∂f₁/∂k_ie (=0) */;
+    //         dy[5] = df2_ds * ds_dkie + (self.df2_dkie)(s);
+
+    //         // w.r.t. K_m -------------------------------------------------------------
+    //         dy[3] = df1_da * da_dkm + df1_ds * ds_dkm + (self.dv_dkm)(a, s);
+    //         dy[6] = df2_ds * ds_dkm; // ∂f₂/∂K_m = 0
+
+    //         // w.r.t. k_cat -----------------------------------------------------------
+    //         dy[4] = df1_da * da_dkcat + df1_ds * ds_dkcat + (self.dv_dkcat)(a, s);
+    //         dy[7] = df2_ds * ds_dkcat; // ∂f₂/∂k_cat = 0
+
+    //         Ok(())
+    //     }
+    // }
 }

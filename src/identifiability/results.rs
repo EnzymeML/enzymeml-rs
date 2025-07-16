@@ -238,17 +238,17 @@ pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
                 result1.ratios.clone(),
             )
             .name(&combined_name)
-            .x_axis(&format!("x{}", n_plots))
-            .y_axis(&format!("y{}", n_plots))
+            .x_axis(&format!("x{n_plots}"))
+            .y_axis(&format!("y{n_plots}"))
             .color_scale(ColorScale::Palette(ColorScalePalette::Viridis));
 
             layout.add_annotation(
                 Annotation::new()
-                    .y_ref(format!("y{} domain", n_plots))
+                    .y_ref(format!("y{n_plots} domain"))
                     .y_anchor(Anchor::Bottom)
                     .y(1)
-                    .text(format!("<b>{}</b>", combined_name))
-                    .x_ref(format!("x{} domain", n_plots))
+                    .text(format!("<b>{combined_name}</b>"))
+                    .x_ref(format!("x{n_plots} domain"))
                     .x_anchor(Anchor::Center)
                     .x(0.5)
                     .show_arrow(false),
@@ -486,6 +486,6 @@ fn to_html_sub(s: &str) -> String {
     if superscript.is_empty() {
         base.to_string()
     } else {
-        format!("{}<sub>{}</sub>", base, superscript)
+        format!("{base}<sub>{superscript}</sub>")
     }
 }

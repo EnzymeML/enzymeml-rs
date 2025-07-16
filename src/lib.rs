@@ -46,7 +46,9 @@ pub mod equation;
 #[cfg(feature = "simulation")]
 pub mod simulation {
     pub use crate::simulation::setup::SimulationSetup;
-    pub use peroxide::fuga::*;
+    pub use peroxide::fuga::{
+        ImplicitSolver, BS23, DP45, GL4, RALS3, RALS4, RK4, RK5, RKF45, TSIT45,
+    };
 
     /// Error types for simulation failures
     pub mod error;
@@ -107,6 +109,16 @@ pub mod optim {
         pub mod srtrust;
         pub(crate) mod utils;
     }
+}
+
+#[cfg(feature = "optimization")]
+pub mod mcmc {
+    pub mod diagnostics;
+    pub mod error;
+    pub mod likelihood;
+    pub mod output;
+    pub mod priors;
+    pub mod problem;
 }
 
 #[cfg(feature = "optimization")]

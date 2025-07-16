@@ -46,7 +46,7 @@ mod test_optim {
 
         let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = bfgs
-            .optimize(&problem, Some(inits))
+            .optimize(&problem, Some(inits), None)
             .expect("Failed to optimize");
 
         // ASSERT
@@ -80,7 +80,7 @@ mod test_optim {
 
         let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = lbfgs
-            .optimize(&problem, Some(inits))
+            .optimize(&problem, Some(inits), None)
             .expect("Failed to optimize");
 
         // ASSERT
@@ -113,7 +113,7 @@ mod test_optim {
 
         let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = sr1trustregion
-            .optimize(&problem, Some(inits))
+            .optimize(&problem, Some(inits), None)
             .expect("Failed to optimize");
 
         // ASSERT
@@ -146,7 +146,7 @@ mod test_optim {
 
         let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = sr1trustregion
-            .optimize(&problem, Some(inits))
+            .optimize(&problem, Some(inits), None)
             .expect("Failed to optimize");
 
         // ASSERT
@@ -178,7 +178,7 @@ mod test_optim {
             .build();
 
         let res = pso
-            .optimize(&problem, None::<Array1<f64>>)
+            .optimize(&problem, None::<Array1<f64>>, None)
             .expect("Failed to optimize");
 
         // ASSERT
@@ -209,7 +209,7 @@ mod test_optim {
             .bound("k_cat", 0.8, 0.9)
             .bound("k_ie", 0.0005, 0.0015)
             .build()
-            .optimize(&problem, None::<Array1<f64>>)
+            .optimize(&problem, None::<Array1<f64>>, None)
             .unwrap();
 
         // ASSERT
@@ -245,7 +245,7 @@ mod test_optim {
 
         let inits = Array1::from_vec(vec![80.0, 0.83, 0.0009]);
         let res = sr1trustregion
-            .optimize(&problem, Some(inits))
+            .optimize(&problem, Some(inits), None)
             .expect("Failed to optimize");
 
         // ASSERT
@@ -280,7 +280,7 @@ mod test_optim {
 
         let inits = Array1::from_vec(vec![80.0, 0.83]);
         let res = sr1trustregion
-            .optimize(&problem, Some(inits))
+            .optimize(&problem, Some(inits), None)
             .expect("Failed to optimize");
 
         // ASSERT

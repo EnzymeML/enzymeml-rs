@@ -9,6 +9,7 @@
 use ndarray::Array1;
 use peroxide::fuga::ODEIntegrator;
 
+use crate::optim::observer::CallbackObserver;
 use crate::optim::report::OptimizationReport;
 use crate::prelude::ObjectiveFunction;
 use crate::{optim::problem::Problem, prelude::EnzymeMLDocument};
@@ -29,6 +30,7 @@ pub trait Optimizer<S: ODEIntegrator + Copy, L: ObjectiveFunction> {
         &self,
         problem: &Problem<S, L>,
         initial_guess: Option<T>,
+        callbacks: Option<CallbackObserver>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>;
@@ -125,7 +127,7 @@ impl TryInto<InitialGuesses> for &EnzymeMLDocument {
             let param = self.parameters.iter().find(|p| p.symbol == *name).ok_or(
                 OptimizeError::ParameterNotFound {
                     param: name.clone(),
-                    message: format!("Parameter {} not found", name),
+                    message: format!("Parameter {name} not found"),
                 },
             )?;
 

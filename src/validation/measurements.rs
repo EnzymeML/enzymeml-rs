@@ -65,7 +65,7 @@ fn check_initial_concentrations(
     if let Some(initial) = meas_data.initial {
         if meas_data.data.first().unwrap() != &initial {
             let result = ValidationResult::new(
-                format!("/measurements/{}/species/{}", meas_idx, data_idx),
+                format!("/measurements/{meas_idx}/species/{data_idx}"),
                 format!(
                 "Initial concentration does not match first data point at t=0 for species '{}'.",
                 meas_data.species_id
@@ -101,7 +101,7 @@ fn check_time_data_consistency(
 
         if data.len() != time.len() {
             let result = ValidationResult::new(
-                format!("/measurements/{}/species/{}", meas_idx, data_idx),
+                format!("/measurements/{meas_idx}/species/{data_idx}"),
                 format!(
                     "Data and time vectors have different lengths for species '{}'. \
                 Got {} data points and {} time points.",
@@ -116,7 +116,7 @@ fn check_time_data_consistency(
         }
     } else if meas_data.data.is_empty() && !meas_data.time.is_empty() {
         let result = ValidationResult::new(
-            format!("/measurements/{}/species/{}", meas_idx, data_idx),
+            format!("/measurements/{meas_idx}/species/{data_idx}"),
             format!(
                 "Time vector is missing for species '{}'.",
                 meas_data.species_id
@@ -127,7 +127,7 @@ fn check_time_data_consistency(
         report.add_result(result);
     } else if !meas_data.data.is_empty() && meas_data.time.is_empty() {
         let result = ValidationResult::new(
-            format!("/measurements/{}/species/{}", meas_idx, data_idx),
+            format!("/measurements/{meas_idx}/species/{data_idx}"),
             format!(
                 "Data vector is missing for species '{}'.",
                 meas_data.species_id
@@ -160,7 +160,7 @@ fn check_species_consistency(
 ) {
     if !all_species.contains(&meas_data.species_id) {
         let result = ValidationResult::new(
-            format!("/measurements/{}/species/{}", meas_idx, data_idx),
+            format!("/measurements/{meas_idx}/species/{data_idx}"),
             format!(
                 "Species '{}' in measurement is not defined in the document.",
                 meas_data.species_id

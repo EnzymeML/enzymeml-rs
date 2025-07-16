@@ -29,7 +29,7 @@ use std::{
 /// ## Design
 /// The module uses an enum-based approach with trait implementations,
 /// allowing easy extension and runtime selection of loss functions.
-use ndarray::Array2;
+use ndarray::{Array2, Axis};
 
 use super::{error::ObjectiveError, objfun::ObjectiveFunction};
 
@@ -74,6 +74,22 @@ impl ObjectiveFunction for LossFunction {
             LossFunction::NLL(nll) => nll.cost(residuals, n_points),
         }
     }
+
+    fn gradient(
+        &self,
+        residuals: Array2<f64>,
+        sensitivities: &ndarray::Array3<f64>,
+        n_points: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        match self {
+            LossFunction::SSE => SumOfSquaredErrors.gradient(residuals, sensitivities, n_points),
+            LossFunction::MSE => MeanSquaredError.gradient(residuals, sensitivities, n_points),
+            LossFunction::RMSE => RootMeanSquaredError.gradient(residuals, sensitivities, n_points),
+            LossFunction::LogCosh => LogCosh.gradient(residuals, sensitivities, n_points),
+            LossFunction::MAE => MeanAbsoluteError.gradient(residuals, sensitivities, n_points),
+            LossFunction::NLL(nll) => nll.gradient(residuals, sensitivities, n_points),
+        }
+    }
 }
 
 impl Display for LossFunction {
@@ -84,7 +100,7 @@ impl Display for LossFunction {
             LossFunction::RMSE => write!(f, "Root Mean Squared Error"),
             LossFunction::LogCosh => write!(f, "Log-Cosh Loss"),
             LossFunction::MAE => write!(f, "Mean Absolute Error"),
-            LossFunction::NLL(sigma) => write!(f, "Negative Log Likelihood (sigma={})", sigma),
+            LossFunction::NLL(sigma) => write!(f, "Negative Log Likelihood (sigma={sigma})"),
         }
     }
 }
@@ -115,11 +131,11 @@ impl FromStr for LossFunction {
                 .ok_or_else(|| "Failed to capture sigma value".to_string())?
                 .as_str()
                 .parse::<f64>()
-                .map_err(|e| format!("Invalid sigma value: {}", e))?;
+                .map_err(|e| format!("Invalid sigma value: {e}"))?;
             return Ok(LossFunction::NLL(NegativeLogLikelihood::new(sigma)));
         }
 
-        Err(format!("Invalid loss function: {}", s))
+        Err(format!("Invalid loss function: {s}"))
     }
 }
 
@@ -130,6 +146,15 @@ impl ObjectiveFunction for SumOfSquaredErrors {
     fn cost(&self, residuals: &Array2<f64>, _: usize) -> Result<f64, ObjectiveError> {
         let squared_residuals = residuals.mapv(|r| r * r);
         Ok(squared_residuals.sum())
+    }
+
+    fn gradient(
+        &self,
+        _: Array2<f64>,
+        _: &ndarray::Array3<f64>,
+        _: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        todo!()
     }
 }
 
@@ -176,6 +201,22 @@ impl ObjectiveFunction for MeanSquaredError {
         let cost = sum_squared_residuals / n_points as f64;
         Ok(cost)
     }
+
+    fn gradient(
+        &self,
+        residuals: Array2<f64>,
+        sensitivities: &ndarray::Array3<f64>,
+        _: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        let n = residuals.len() as f64; // N = T*S
+                                        // element-wise product r ∘ S  →  sum over time & species (axes 0 and 1)
+        let weighted = sensitivities * &residuals.view().insert_axis(Axis(2));
+        let mut g = weighted
+            .sum_axis(Axis(0)) // now (S, P)
+            .sum_axis(Axis(0)); // now (P)
+        g *= 2.0 / n;
+        Ok(g)
+    }
 }
 
 impl Display for MeanSquaredError {
@@ -214,6 +255,15 @@ impl ObjectiveFunction for RootMeanSquaredError {
         let mse = MeanSquaredError;
         let cost = mse.cost(residuals, n_points)?;
         Ok(cost.sqrt())
+    }
+
+    fn gradient(
+        &self,
+        _: Array2<f64>,
+        _: &ndarray::Array3<f64>,
+        _: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        todo!()
     }
 }
 
@@ -254,6 +304,15 @@ impl ObjectiveFunction for LogCosh {
         let log_cosh = residuals.mapv(|r| r.cosh().ln());
         Ok(log_cosh.sum() / n_points as f64)
     }
+
+    fn gradient(
+        &self,
+        _: Array2<f64>,
+        _: &ndarray::Array3<f64>,
+        _: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        todo!()
+    }
 }
 
 impl Display for LogCosh {
@@ -293,6 +352,15 @@ impl ObjectiveFunction for MeanAbsoluteError {
         let abs_residuals = residuals.mapv(|r| r.abs());
         let sum = abs_residuals.sum();
         Ok(sum / n_points as f64)
+    }
+
+    fn gradient(
+        &self,
+        _: Array2<f64>,
+        _: &ndarray::Array3<f64>,
+        _: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        todo!()
     }
 }
 
@@ -345,6 +413,15 @@ impl NegativeLogLikelihood {
     fn cost(&self, residuals: &Array2<f64>, n_points: usize) -> Result<f64, ObjectiveError> {
         let sse: f64 = residuals.mapv(|r| r * r).sum();
         Ok(n_points as f64 * self.log_norm_half + self.half_inv_sigma_sq * sse)
+    }
+
+    fn gradient(
+        &self,
+        _: Array2<f64>,
+        _: &ndarray::Array3<f64>,
+        _: usize,
+    ) -> Result<ndarray::Array1<f64>, ObjectiveError> {
+        todo!()
     }
 }
 

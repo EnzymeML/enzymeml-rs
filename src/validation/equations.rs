@@ -72,7 +72,7 @@ fn check_ode_species_id(
 ) {
     if !all_species.contains(&equation.species_id) {
         let result = ValidationResult::new(
-            format!("/equations/{}/species_id", eq_idx),
+            format!("/equations/{eq_idx}/species_id"),
             format!(
                 "Species ID '{}' is not defined in the document.",
                 equation.species_id
@@ -104,7 +104,7 @@ fn check_equation_variables(
     for (var_idx, var) in equation.variables.iter().enumerate() {
         if !all_species.contains(&var.id) {
             let result = ValidationResult::new(
-                format!("/equations/{}/variables/{}", eq_idx, var_idx),
+                format!("/equations/{eq_idx}/variables/{var_idx}"),
                 format!(
                     "Variable '{}' in equation is not defined in the document.",
                     var.id
@@ -160,7 +160,7 @@ mod tests {
 
         check_equations(&enzmldoc, &mut report);
         if !report.is_valid {
-            println!("Report: {:#?}", report);
+            println!("Report: {report:#?}");
         }
 
         assert!(report.is_valid);
