@@ -13,6 +13,7 @@
 //! and employs a trust region strategy to determine step sizes. This approach is particularly effective
 //! for nonlinear optimization problems where line search methods might struggle with convergence.
 
+use crate::optim::observer::CallbackObserver;
 use crate::optim::observer::ProgressObserver;
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
@@ -95,6 +96,7 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         &self,
         problem: &Problem<S, L>,
         initial_guess: Option<T>,
+        callback: Option<CallbackObserver>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,
@@ -119,12 +121,20 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         );
 
         let best_params = match self.subproblem {
-            SubProblem::Steihaug => {
-                solve_steihaug(problem, initial_guess.clone(), self.max_iters, init_hessian)
-            }
-            SubProblem::Cauchy => {
-                solve_cauchy_point(problem, initial_guess.clone(), self.max_iters, init_hessian)
-            }
+            SubProblem::Steihaug => solve_steihaug(
+                problem,
+                initial_guess.clone(),
+                self.max_iters,
+                init_hessian,
+                callback,
+            ),
+            SubProblem::Cauchy => solve_cauchy_point(
+                problem,
+                initial_guess.clone(),
+                self.max_iters,
+                init_hessian,
+                callback,
+            ),
         }?;
 
         OptimizationReport::new(
@@ -158,10 +168,11 @@ fn solve_steihaug<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
     initial_guess: InitialGuesses,
     max_iters: u64,
     init_hessian: Array2<f64>,
+    callback: Option<CallbackObserver>,
 ) -> Result<Array1<f64>, OptimizeError> {
     let subproblem = Steihaug::new();
     let solver = ArgminSR1TrustRegion::new(subproblem);
-    let res = Executor::new(problem.clone(), solver)
+    let mut res = Executor::new(problem.clone(), solver)
         .configure(|state| {
             state
                 .param(initial_guess.get_values())
@@ -171,9 +182,13 @@ fn solve_steihaug<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction>(
         .add_observer(
             ProgressObserver::new(max_iters, "SR1 Trust Region (Steihaug)"),
             ObserverMode::Always,
-        )
-        .run()
-        .map_err(OptimizeError::ArgMinError)?;
+        );
+
+    if let Some(cb) = callback {
+        res = res.add_observer(cb, ObserverMode::Always);
+    }
+
+    let res = res.run().map_err(OptimizeError::ArgMinError)?;
 
     if let TerminationStatus::Terminated(argmin::core::TerminationReason::SolverExit(_)) =
         res.state.termination_status
@@ -210,10 +225,11 @@ fn solve_cauchy_point<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunctio
     initial_guess: InitialGuesses,
     max_iters: u64,
     init_hessian: Array2<f64>,
+    callback: Option<CallbackObserver>,
 ) -> Result<Array1<f64>, OptimizeError> {
     let subproblem = CauchyPoint::new();
     let solver = ArgminSR1TrustRegion::new(subproblem);
-    let res = Executor::new(problem.clone(), solver)
+    let mut res = Executor::new(problem.clone(), solver)
         .configure(|state| {
             state
                 .param(initial_guess.get_values())
@@ -223,9 +239,13 @@ fn solve_cauchy_point<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunctio
         .add_observer(
             ProgressObserver::new(max_iters, "SR1 Trust Region (Cauchy Point)"),
             ObserverMode::Always,
-        )
-        .run()
-        .map_err(OptimizeError::ArgMinError)?;
+        );
+
+    if let Some(cb) = callback {
+        res = res.add_observer(cb, ObserverMode::Always);
+    }
+
+    let res = res.run().map_err(OptimizeError::ArgMinError)?;
 
     if let TerminationStatus::Terminated(argmin::core::TerminationReason::SolverExit(_)) =
         res.state.termination_status

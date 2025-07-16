@@ -23,6 +23,7 @@ use ndarray::Array2;
 use peroxide::fuga::ODEIntegrator;
 use serde::Serialize;
 
+use crate::optim::observer::CallbackObserver;
 use crate::optim::observer::ProgressObserver;
 use crate::optim::report::OptimizationReport;
 use crate::optim::{InitialGuesses, OptimizeError, Optimizer, Problem};
@@ -88,6 +89,7 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         &self,
         problem: &Problem<S, L>,
         initial_guess: Option<T>,
+        callback: Option<CallbackObserver>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,
@@ -114,7 +116,7 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
             .unwrap();
 
         let solver = ArgminBFGS::new(linesearch);
-        let res = Executor::new(problem.clone(), solver)
+        let mut res = Executor::new(problem.clone(), solver)
             .configure(|state| {
                 state
                     .param(initial_guess.clone().get_values())
@@ -125,9 +127,13 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
             .add_observer(
                 ProgressObserver::new(self.max_iters, "BFGS"),
                 ObserverMode::Always,
-            )
-            .run()
-            .unwrap();
+            );
+
+        if let Some(cb) = callback {
+            res = res.add_observer(cb, ObserverMode::Always);
+        }
+
+        let res = res.run().map_err(OptimizeError::ArgMinError)?;
 
         if let TerminationStatus::Terminated(TerminationReason::SolverExit(_)) =
             res.state.termination_status

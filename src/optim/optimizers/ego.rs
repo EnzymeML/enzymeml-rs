@@ -19,8 +19,8 @@ use peroxide::fuga::ODEIntegrator;
 
 use crate::{
     optim::{
-        bounds_to_array2, report::OptimizationReport, Bound, InitialGuesses, OptimizeError,
-        Optimizer, Problem,
+        bounds_to_array2, observer::CallbackObserver, report::OptimizationReport, Bound,
+        InitialGuesses, OptimizeError, Optimizer, Problem,
     },
     prelude::ObjectiveFunction,
 };
@@ -70,6 +70,7 @@ impl<S: ODEIntegrator + Copy + Send + Sync, L: ObjectiveFunction> Optimizer<S, L
         &self,
         problem: &Problem<S, L>,
         _: Option<T>,
+        _: Option<CallbackObserver>,
     ) -> Result<OptimizationReport, OptimizeError>
     where
         T: Into<InitialGuesses>,

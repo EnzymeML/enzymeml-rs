@@ -826,7 +826,7 @@ pub fn main() {
 
                 // Optimize
                 let report = lbfgs
-                    .optimize(&problem, Some(initial_guesses))
+                    .optimize(&problem, Some(initial_guesses), None)
                     .expect("Failed to optimize");
 
                 // Display the results
@@ -879,7 +879,7 @@ pub fn main() {
 
                 // Optimize
                 let report = bfgs
-                    .optimize(&problem, Some(initial_guesses))
+                    .optimize(&problem, Some(initial_guesses), None)
                     .expect("Failed to optimize");
 
                 // Display the results
@@ -932,7 +932,7 @@ pub fn main() {
 
                 // Optimize
                 let report = sr1trustregion
-                    .optimize(&problem, Some(initial_guesses))
+                    .optimize(&problem, Some(initial_guesses), None)
                     .expect("Failed to optimize");
 
                 // Display the results
@@ -984,7 +984,7 @@ pub fn main() {
 
                 // Optimize
                 let report = optimizer
-                    .optimize(&problem, None::<InitialGuesses>)
+                    .optimize(&problem, None::<InitialGuesses>, None)
                     .expect("Failed to optimize");
 
                 // Display the results
@@ -1032,7 +1032,7 @@ pub fn main() {
 
                 // Optimize
                 let report = optimizer
-                    .optimize(&problem, None::<InitialGuesses>)
+                    .optimize(&problem, None::<InitialGuesses>, None)
                     .expect("Failed to optimize");
 
                 // Display the results
