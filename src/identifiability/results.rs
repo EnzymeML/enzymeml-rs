@@ -7,7 +7,12 @@ use peroxide::{
 use plotly::{
     common::{Anchor, ColorScale, ColorScalePalette, Font, Line, Mode, Title},
     layout::{Annotation, Axis, GridPattern, LayoutGrid},
-    Contour, Layout, Plot, Scatter,
+    Configuration, Contour, Layout, Plot, Scatter,
+};
+use polars::{
+    error::PolarsError,
+    frame::DataFrame,
+    prelude::{NamedFrom, Series},
 };
 
 const DEFAULT_HEIGHT: usize = 400;
@@ -146,6 +151,49 @@ impl From<ProfileResults> for HashMap<String, ProfileResult> {
     }
 }
 
+impl TryFrom<&ProfileResults> for DataFrame {
+    type Error = PolarsError;
+
+    /// Converts the profile results into a DataFrame.
+    ///
+    /// Creates a DataFrame where the first column contains the likelihood values
+    /// and each subsequent column represents a parameter, with the column name being
+    /// the parameter name and the values being the parameter values used in profiling.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `PolarsError` if the DataFrame cannot be created from the series.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no profile results (results is empty).
+    fn try_from(results: &ProfileResults) -> Result<Self, Self::Error> {
+        let ratios = Series::new(
+            "relative_likelihood",
+            results.0.first().unwrap().ratios.clone(),
+        );
+        let mut series = vec![ratios];
+        for result in results.0.iter() {
+            series.push(result.into());
+        }
+        DataFrame::new(series)
+    }
+}
+
+impl From<&ProfileResult> for Series {
+    /// Converts a profile result into a Series.
+    ///
+    /// Creates a Series where the name is the parameter name and the values
+    /// are the parameter values used in profiling.
+    ///
+    /// # Returns
+    ///
+    /// A Series containing the parameter values with the parameter name as the column name.
+    fn from(result: &ProfileResult) -> Self {
+        Series::new(result.param_name.as_str(), result.param_values.clone())
+    }
+}
+
 impl IntoIterator for ProfileResults {
     type Item = ProfileResult;
     type IntoIter = std::vec::IntoIter<ProfileResult>;
@@ -220,6 +268,7 @@ pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
     );
 
     plot.set_layout(layout);
+    plot.set_configuration(Configuration::default().responsive(true).fill_frame(true));
 
     plot
 }
@@ -238,8 +287,8 @@ pub fn plot_pair_contour(results: &ProfileResults) -> Plot {
 /// - Each plot includes a title, x-axis label, and y-axis label.
 /// - The x-axis label is the parameter name.
 /// - The y-axis label is "Likelihood Ratio".
-impl From<ProfileResults> for Plot {
-    fn from(results: ProfileResults) -> Self {
+impl From<&ProfileResults> for Plot {
+    fn from(results: &ProfileResults) -> Self {
         let mut plot = Plot::new();
         let mut layout = Layout::new();
 
@@ -368,6 +417,7 @@ impl From<ProfileResults> for Plot {
             .width(DEFAULT_WIDTH * n_cols);
 
         plot.set_layout(layout);
+        plot.set_configuration(Configuration::default().responsive(true).fill_frame(true));
 
         plot
     }
