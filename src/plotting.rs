@@ -7,8 +7,8 @@ use plotly::{
 use thiserror::Error;
 
 use crate::{
-    optim::measurement_not_empty,
     prelude::{EnzymeMLDocument, Measurement},
+    utils::measurement_not_empty,
 };
 
 #[cfg(feature = "simulation")]

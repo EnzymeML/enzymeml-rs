@@ -22,6 +22,9 @@ pub mod versions {
     pub mod v2;
 }
 
+/// Utility functions
+pub mod utils;
+
 /// Commonly used types and functionality re-exported for convenience
 pub mod prelude {
     pub use crate::io::*;
