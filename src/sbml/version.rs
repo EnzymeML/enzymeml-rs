@@ -15,6 +15,30 @@ pub enum EnzymeMLVersion {
     V2,
 }
 
+impl AsRef<EnzymeMLVersion> for EnzymeMLVersion {
+    fn as_ref(&self) -> &EnzymeMLVersion {
+        self
+    }
+}
+
+impl std::str::FromStr for EnzymeMLVersion {
+    type Err = String;
+
+    /// Parse a string into an EnzymeML version.
+    ///
+    /// # Arguments
+    /// * `s` - The string to parse
+    ///
+    /// # Returns
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1.0" | "1" | "v1" => Ok(EnzymeMLVersion::V1),
+            "2.0" | "2" | "v2" => Ok(EnzymeMLVersion::V2),
+            _ => Err(format!("Invalid EnzymeML version: {s}")),
+        }
+    }
+}
+
 /// Macro to try extracting data annotations from an SBMLDocument across multiple EnzymeML versions.
 ///
 /// This macro attempts to parse annotations using different version-specific annotation types,
