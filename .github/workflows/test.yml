@@ -9,13 +9,6 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/test.yml'
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - '.github/workflows/test.yml'
 env:
   CARGO_TERM_COLOR: always
 
@@ -34,8 +27,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install libSBML (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Install libSBML
         run: |
           cargo install cargo-vcpkg
           cargo vcpkg build
