@@ -123,7 +123,6 @@ impl EnzymeMLDocument {
     /// - Locates the primary SBML model file within the archive
     /// - Processes associated data files (CSV, TSV, or other tabular formats)
     /// - Converts SBML model structure to EnzymeML format
-
     pub fn from_omex(path: &PathBuf) -> Result<Self, SBMLError> {
         let archive = read_omex_file(path)?;
         parse_omex(archive)
