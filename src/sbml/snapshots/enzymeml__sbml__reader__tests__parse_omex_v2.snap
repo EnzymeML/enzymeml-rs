@@ -1,0 +1,712 @@
+---
+source: src/sbml/reader.rs
+expression: enzmldoc
+---
+EnzymeMLDocument {
+    name: "Test",
+    version: "2.0",
+    description: None,
+    created: None,
+    modified: None,
+    creators: [],
+    vessels: [
+        Vessel {
+            id: "v0",
+            name: "Vessel 1",
+            volume: 10.0,
+            unit: UnitDefinition {
+                id: Some(
+                    "u5",
+                ),
+                name: Some(
+                    "ml",
+                ),
+                base_units: [
+                    BaseUnit {
+                        kind: Litre,
+                        exponent: 1,
+                        multiplier: Some(
+                            1.0,
+                        ),
+                        scale: Some(
+                            -3.0,
+                        ),
+                    },
+                ],
+            },
+            constant: true,
+        },
+    ],
+    proteins: [
+        Protein {
+            id: "p0",
+            name: "Enzyme",
+            constant: true,
+            sequence: Some(
+                "MTEY",
+            ),
+            vessel_id: Some(
+                "v0",
+            ),
+            ecnumber: Some(
+                "1.1.1.1",
+            ),
+            organism: Some(
+                "E.coli",
+            ),
+            organism_tax_id: Some(
+                "12345",
+            ),
+            references: [],
+        },
+    ],
+    complexes: [
+        Complex {
+            id: "c0",
+            name: "Enzyme-Substrate Complex",
+            constant: true,
+            vessel_id: Some(
+                "v0",
+            ),
+            participants: [
+                "p0",
+                "s0",
+            ],
+        },
+    ],
+    small_molecules: [
+        SmallMolecule {
+            id: "s0",
+            name: "Substrate",
+            constant: false,
+            vessel_id: Some(
+                "v0",
+            ),
+            canonical_smiles: Some(
+                "CC(=O)O",
+            ),
+            inchi: None,
+            inchikey: Some(
+                "QTBSBXVTEAMEQO-UHFFFAOYSA-N",
+            ),
+            synonymous_names: [],
+            references: [],
+        },
+        SmallMolecule {
+            id: "s1",
+            name: "Product",
+            constant: false,
+            vessel_id: Some(
+                "v0",
+            ),
+            canonical_smiles: Some(
+                "CC(=O)O",
+            ),
+            inchi: None,
+            inchikey: Some(
+                "QTBSBXVTEAMEQO-UHFFFAOYSA-N",
+            ),
+            synonymous_names: [],
+            references: [],
+        },
+    ],
+    reactions: [],
+    measurements: [
+        Measurement {
+            id: "m0",
+            name: "m0",
+            species_data: [
+                MeasurementData {
+                    species_id: "s0",
+                    prepared: Some(
+                        0.0,
+                    ),
+                    initial: Some(
+                        0.0,
+                    ),
+                    data_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u9",
+                            ),
+                            name: Some(
+                                "mmol / l",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Mole,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        -3.0,
+                                    ),
+                                },
+                                BaseUnit {
+                                    kind: Litre,
+                                    exponent: -1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data: [
+                        0.0,
+                        1.0,
+                        2.0,
+                        3.0,
+                        4.0,
+                        5.0,
+                        6.0,
+                        7.0,
+                        8.0,
+                        9.0,
+                        10.0,
+                    ],
+                    time: [
+                        0.0,
+                        1.0,
+                        2.0,
+                        3.0,
+                        4.0,
+                        5.0,
+                        6.0,
+                        7.0,
+                        8.0,
+                        9.0,
+                        10.0,
+                    ],
+                    time_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u10",
+                            ),
+                            name: Some(
+                                "s",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Second,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data_type: Some(
+                        Concentration,
+                    ),
+                    is_simulated: None,
+                },
+                MeasurementData {
+                    species_id: "s1",
+                    prepared: Some(
+                        10.0,
+                    ),
+                    initial: Some(
+                        10.0,
+                    ),
+                    data_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u9",
+                            ),
+                            name: Some(
+                                "mmol / l",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Mole,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        -3.0,
+                                    ),
+                                },
+                                BaseUnit {
+                                    kind: Litre,
+                                    exponent: -1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data: [
+                        10.0,
+                        9.0,
+                        8.0,
+                        7.0,
+                        6.0,
+                        5.0,
+                        4.0,
+                        3.0,
+                        2.0,
+                        1.0,
+                        0.0,
+                    ],
+                    time: [
+                        0.0,
+                        1.0,
+                        2.0,
+                        3.0,
+                        4.0,
+                        5.0,
+                        6.0,
+                        7.0,
+                        8.0,
+                        9.0,
+                        10.0,
+                    ],
+                    time_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u10",
+                            ),
+                            name: Some(
+                                "s",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Second,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data_type: Some(
+                        Concentration,
+                    ),
+                    is_simulated: None,
+                },
+            ],
+            group_id: None,
+            ph: Some(
+                7.0,
+            ),
+            temperature: Some(
+                298.15,
+            ),
+            temperature_unit: Some(
+                UnitDefinition {
+                    id: Some(
+                        "u11",
+                    ),
+                    name: Some(
+                        "K",
+                    ),
+                    base_units: [
+                        BaseUnit {
+                            kind: Kelvin,
+                            exponent: 1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                0.0,
+                            ),
+                        },
+                    ],
+                },
+            ),
+        },
+        Measurement {
+            id: "m1",
+            name: "m1",
+            species_data: [
+                MeasurementData {
+                    species_id: "s0",
+                    prepared: Some(
+                        0.0,
+                    ),
+                    initial: Some(
+                        0.0,
+                    ),
+                    data_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u9",
+                            ),
+                            name: Some(
+                                "mmol / l",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Mole,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        -3.0,
+                                    ),
+                                },
+                                BaseUnit {
+                                    kind: Litre,
+                                    exponent: -1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data: [
+                        0.0,
+                        1.0,
+                        2.0,
+                        3.0,
+                        4.0,
+                        5.0,
+                        6.0,
+                        7.0,
+                        8.0,
+                        9.0,
+                        10.0,
+                    ],
+                    time: [
+                        0.0,
+                        1.0,
+                        2.0,
+                        3.0,
+                        4.0,
+                        5.0,
+                        6.0,
+                        7.0,
+                        8.0,
+                        9.0,
+                        10.0,
+                    ],
+                    time_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u10",
+                            ),
+                            name: Some(
+                                "s",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Second,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data_type: Some(
+                        Concentration,
+                    ),
+                    is_simulated: None,
+                },
+                MeasurementData {
+                    species_id: "s1",
+                    prepared: Some(
+                        10.0,
+                    ),
+                    initial: Some(
+                        10.0,
+                    ),
+                    data_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u9",
+                            ),
+                            name: Some(
+                                "mmol / l",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Mole,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        -3.0,
+                                    ),
+                                },
+                                BaseUnit {
+                                    kind: Litre,
+                                    exponent: -1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data: [
+                        10.0,
+                        9.0,
+                        8.0,
+                        7.0,
+                        6.0,
+                        5.0,
+                        4.0,
+                        3.0,
+                        2.0,
+                        1.0,
+                        0.0,
+                    ],
+                    time: [
+                        0.0,
+                        1.0,
+                        2.0,
+                        3.0,
+                        4.0,
+                        5.0,
+                        6.0,
+                        7.0,
+                        8.0,
+                        9.0,
+                        10.0,
+                    ],
+                    time_unit: Some(
+                        UnitDefinition {
+                            id: Some(
+                                "u10",
+                            ),
+                            name: Some(
+                                "s",
+                            ),
+                            base_units: [
+                                BaseUnit {
+                                    kind: Second,
+                                    exponent: 1,
+                                    multiplier: Some(
+                                        1.0,
+                                    ),
+                                    scale: Some(
+                                        0.0,
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                    data_type: Some(
+                        Concentration,
+                    ),
+                    is_simulated: None,
+                },
+            ],
+            group_id: None,
+            ph: Some(
+                7.0,
+            ),
+            temperature: Some(
+                298.15,
+            ),
+            temperature_unit: Some(
+                UnitDefinition {
+                    id: Some(
+                        "u11",
+                    ),
+                    name: Some(
+                        "K",
+                    ),
+                    base_units: [
+                        BaseUnit {
+                            kind: Kelvin,
+                            exponent: 1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                0.0,
+                            ),
+                        },
+                    ],
+                },
+            ),
+        },
+    ],
+    equations: [
+        Equation {
+            species_id: "s1",
+            equation: "E_tot * kcat * s0 / (K_m + s0)",
+            equation_type: Ode,
+            variables: [],
+        },
+    ],
+    parameters: [
+        Parameter {
+            id: "K_m",
+            name: "K_m",
+            symbol: "K_m",
+            value: None,
+            unit: Some(
+                UnitDefinition {
+                    id: Some(
+                        "u9",
+                    ),
+                    name: Some(
+                        "mmol / l",
+                    ),
+                    base_units: [
+                        BaseUnit {
+                            kind: Mole,
+                            exponent: 1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                -3.0,
+                            ),
+                        },
+                        BaseUnit {
+                            kind: Litre,
+                            exponent: -1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                0.0,
+                            ),
+                        },
+                    ],
+                },
+            ),
+            initial_value: None,
+            upper_bound: Some(
+                100.0,
+            ),
+            lower_bound: Some(
+                0.0,
+            ),
+            stderr: Some(
+                0.1,
+            ),
+            constant: Some(
+                true,
+            ),
+        },
+        Parameter {
+            id: "kcat",
+            name: "kcat",
+            symbol: "kcat",
+            value: None,
+            unit: Some(
+                UnitDefinition {
+                    id: Some(
+                        "u12",
+                    ),
+                    name: Some(
+                        "1 / s",
+                    ),
+                    base_units: [
+                        BaseUnit {
+                            kind: Second,
+                            exponent: -1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                0.0,
+                            ),
+                        },
+                    ],
+                },
+            ),
+            initial_value: None,
+            upper_bound: Some(
+                100.0,
+            ),
+            lower_bound: Some(
+                0.0,
+            ),
+            stderr: Some(
+                0.1,
+            ),
+            constant: Some(
+                true,
+            ),
+        },
+        Parameter {
+            id: "E_tot",
+            name: "E_tot",
+            symbol: "E_tot",
+            value: None,
+            unit: Some(
+                UnitDefinition {
+                    id: Some(
+                        "u9",
+                    ),
+                    name: Some(
+                        "mmol / l",
+                    ),
+                    base_units: [
+                        BaseUnit {
+                            kind: Mole,
+                            exponent: 1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                -3.0,
+                            ),
+                        },
+                        BaseUnit {
+                            kind: Litre,
+                            exponent: -1,
+                            multiplier: Some(
+                                1.0,
+                            ),
+                            scale: Some(
+                                0.0,
+                            ),
+                        },
+                    ],
+                },
+            ),
+            initial_value: None,
+            upper_bound: Some(
+                100.0,
+            ),
+            lower_bound: Some(
+                0.0,
+            ),
+            stderr: Some(
+                0.1,
+            ),
+            constant: Some(
+                true,
+            ),
+        },
+    ],
+    references: [],
+}
