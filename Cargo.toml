@@ -85,12 +85,12 @@ crossbeam = "0.8.4"
 variantly = "0.4.0"
 
 # Feature: sbml
-libsbml = "0.1.1"
+libsbml = { version = "0.1.1", optional = true }
 quick-xml = { version = "0.38.0", features = [
     "serialize",
     "serde-types",
     "overlapped-lists",
-] }
+], optional = true }
 
 [profile.release]
 opt-level = 3
@@ -99,11 +99,12 @@ codegen-units = 1
 debug = false
 
 [features]
-default = ["optimization", "simulation", "llm", "tabular"]
+default = ["optimization", "simulation", "llm", "tabular", "sbml"]
 tabular = ["polars", "calamine", "rust_xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
 llm = ["mdmodels", "tokio"]
+sbml = ["libsbml", "quick-xml"]
 optimization = [
     "argmin-math",
     "argmin",
