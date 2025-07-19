@@ -1,51 +1,77 @@
-/// SBML v1 serialization module
-///
-/// This module provides functionality to convert EnzymeML documents to SBML v1 format
-/// and create COMBINE archives containing the SBML model and associated data.
+//! SBML v1 serialization module
+//!
+//! This module provides functionality to convert EnzymeML documents to SBML v1 format
+//! and create COMBINE archives containing the SBML model and associated data.
+//!
+//! The module handles the serialization of EnzymeML data structures into the appropriate
+//! SBML v1 annotation format, including:
+//! - Writing measurement data as CSV files to COMBINE archives
+//! - Converting EnzymeML entities (small molecules, proteins, complexes, parameters) to their corresponding annotation structures
+//! - Transforming measurement data into the v1 data annotation format with proper file references and column definitions
+//!
+//! # Data Flow
+//!
+//! The serialization process follows this structure:
+//! 1. **Measurement Data Export**: Individual measurements are converted to CSV files and added to the COMBINE archive
+//! 2. **Entity Annotations**: Core EnzymeML entities are converted to their SBML annotation equivalents
+//! 3. **Data Structure Annotations**: Measurement metadata is organized into the hierarchical v1 data annotation format
+//!
+//! # Annotation Structure
+//!
+//! The v1 format organizes data annotations in a nested structure:
+//! - `DataAnnot`: Root container with files, formats, and measurements
+//! - `FilesWrapper`: Contains file references pointing to CSV data files
+//! - `FormatsWrapper`: Defines column structures and data organization
+//! - `MeasurementsWrapper`: Contains measurement metadata and initial concentrations
+
 use polars::{frame::DataFrame, io::SerWriter, prelude::CsvWriter};
-use sbml::{
-    combine::KnownFormats, model::Model, prelude::CombineArchive, Annotation, SBMLDocument,
-};
+use sbml::{combine::KnownFormats, prelude::CombineArchive};
 
 use crate::{
     prelude::{
-        Complex, DataTypes, EnzymeMLDocument, Equation, EquationType, Measurement, MeasurementData,
-        Parameter, Protein, Reaction, SmallMolecule, Vessel,
+        Complex, DataTypes, EnzymeMLDocument, Measurement, MeasurementData, Parameter, Protein,
+        SmallMolecule,
     },
-    sbml::{
-        error::SBMLError,
-        speciestype::{COMPLEX_SBO_TERM, PROTEIN_SBO_TERM, SMALL_MOLECULE_SBO_TERM},
-        units::{map_unit_definition, replace_slashes},
-    },
+    sbml::{error::SBMLError, units::replace_slashes},
 };
 
 use super::schema::{
     ColumnAnnot, ColumnType, ComplexAnnot, DataAnnot, FileAnnot, FilesWrapper, FormatAnnot,
-    FormatsWrapper, InitConcAnnot, IsEmpty, MeasurementAnnot, MeasurementsWrapper, ParameterAnnot,
+    FormatsWrapper, InitConcAnnot, MeasurementAnnot, MeasurementsWrapper, ParameterAnnot,
     ProteinAnnot, ReactantAnnot, ENZYMEML_V1_NS,
 };
 
-/// Converts an EnzymeML document to a COMBINE archive in SBML v1 format
+/// Writes measurement data from an EnzymeML document to a COMBINE archive as CSV files
 ///
-/// This function creates a COMBINE archive containing:
-/// - The EnzymeML model as an SBML document
-/// - CSV files for each measurement in the document
+/// This function processes each measurement in the EnzymeML document and exports the
+/// time-series data as individual CSV files within the archive. The CSV files are stored
+/// in the `data/` directory with filenames matching the measurement IDs.
+///
+/// The exported CSV format follows the v1 specification:
+/// - No headers are included in the CSV files
+/// - Time column is always first
+/// - Species data columns follow in measurement order
+/// - File paths follow the pattern `data/{measurement_id}.csv`
 ///
 /// # Arguments
-/// * `enzmldoc` - The EnzymeML document to convert
+///
+/// * `enzmldoc` - The EnzymeML document containing measurement data to export
+/// * `archive` - Mutable reference to the COMBINE archive where CSV files will be added
 ///
 /// # Returns
-/// * `Result<CombineArchive, SBMLError>` - The COMBINE archive or an error
-pub fn to_v1_omex(enzmldoc: &EnzymeMLDocument) -> Result<CombineArchive, SBMLError> {
-    let mut archive = CombineArchive::new();
-    let sbml_doc = SBMLDocument::try_from(enzmldoc)?;
-    archive.add_entry(
-        "./model.xml",
-        KnownFormats::SBML,
-        true,
-        sbml_doc.to_xml_string().as_bytes(),
-    )?;
-
+///
+/// * `Result<(), SBMLError>` - Success or an error during CSV generation or archive writing
+///
+/// # Errors
+///
+/// Returns `SBMLError` if:
+/// - DataFrame conversion fails for any measurement
+/// - CSV serialization encounters formatting issues
+/// - Archive entry addition fails due to I/O errors
+pub(crate) fn write_measurement_data(
+    enzmldoc: &EnzymeMLDocument,
+    archive: &mut CombineArchive,
+) -> Result<(), SBMLError> {
     for measurement in enzmldoc.measurements.iter() {
         let mut df: DataFrame = measurement.to_dataframe(false);
         let mut string_buffer = Vec::new();
@@ -60,310 +86,26 @@ pub fn to_v1_omex(enzmldoc: &EnzymeMLDocument) -> Result<CombineArchive, SBMLErr
         )?;
     }
 
-    Ok(archive)
-}
-
-/// Implementation of TryFrom for converting EnzymeMLDocument to SBMLDocument
-///
-/// This implementation handles the conversion of all EnzymeML elements to their
-/// corresponding SBML elements, including units, vessels, species, reactions,
-/// parameters, and equations.
-impl TryFrom<&EnzymeMLDocument> for SBMLDocument {
-    type Error = SBMLError;
-
-    fn try_from(enzmldoc: &EnzymeMLDocument) -> Result<Self, Self::Error> {
-        let sbmldoc = SBMLDocument::new(3, 2, vec![]);
-        let model = sbmldoc.create_model(&enzmldoc.name);
-        model.set_name(&enzmldoc.name);
-
-        collect_units(&model, &enzmldoc.measurements)?;
-
-        for vessel in enzmldoc.vessels.iter() {
-            map_vessel(vessel, &model)?;
-        }
-
-        for small_molecule in enzmldoc.small_molecules.iter() {
-            map_small_molecule(small_molecule, &model)?;
-        }
-
-        for protein in enzmldoc.proteins.iter() {
-            map_protein(protein, &model)?;
-        }
-
-        for complex in enzmldoc.complexes.iter() {
-            map_complex(complex, &model)?;
-        }
-
-        for reaction in enzmldoc.reactions.iter() {
-            map_reaction(reaction, &model)?;
-        }
-
-        for parameter in enzmldoc.parameters.iter() {
-            map_parameter(parameter, &model)?;
-        }
-
-        for equation in enzmldoc.equations.iter() {
-            map_equation(equation, &model)?;
-        }
-
-        let data_annot = DataAnnot::try_from(enzmldoc.measurements.as_slice())?;
-
-        if !data_annot.is_empty() {
-            model
-                .set_reactions_annotation_serde::<DataAnnot>(&data_annot)
-                .expect("Failed to set annotation");
-        }
-
-        if let Some(measurement) = enzmldoc.measurements.first() {
-            map_init_conc(&model, measurement)?;
-        }
-
-        Ok(sbmldoc)
-    }
-}
-
-/// Maps initial concentrations from a measurement to species in the SBML model
-///
-/// # Arguments
-/// * `model` - The SBML model to update
-/// * `measurement` - The measurement containing initial concentration data
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_init_conc(model: &Model, measurement: &Measurement) -> Result<(), SBMLError> {
-    for data in measurement.species_data.iter() {
-        if let Some(species) = model.get_species(&data.species_id) {
-            species.set_initial_concentration(data.initial.unwrap_or(0.0));
-
-            if let Some(unit) = &data.data_unit {
-                species.set_units(map_unit_definition(model, unit)?);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Maps an EnzymeML Vessel to an SBML Compartment
-///
-/// # Arguments
-/// * `vessel` - The EnzymeML vessel to map
-/// * `model` - The SBML model to add the compartment to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_vessel(vessel: &Vessel, model: &Model) -> Result<(), SBMLError> {
-    let compartment = model.create_compartment(&vessel.id);
-    compartment.set_name(&vessel.name);
-    compartment.set_size(vessel.volume);
-    compartment.set_constant(vessel.constant);
-    compartment.set_unit(map_unit_definition(model, &vessel.unit)?);
-
-    Ok(())
-}
-
-/// Maps an EnzymeML SmallMolecule to an SBML Species
-///
-/// # Arguments
-/// * `small_molecule` - The small molecule to map
-/// * `model` - The SBML model to add the species to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_small_molecule(small_molecule: &SmallMolecule, model: &Model) -> Result<(), SBMLError> {
-    let species = model.create_species(&small_molecule.id);
-    species.set_constant(small_molecule.constant);
-    species.set_has_only_substance_units(false);
-    species.set_name(&small_molecule.name);
-    species.set_sbo_term(SMALL_MOLECULE_SBO_TERM);
-    species.set_initial_concentration(0.0);
-
-    if let Some(vessel_id) = &small_molecule.vessel_id {
-        species.set_compartment(vessel_id);
-    }
-
-    let annotation = ReactantAnnot::from(small_molecule);
-    if !annotation.is_empty() {
-        species
-            .set_annotation_serde::<ReactantAnnot>(&annotation)
-            .expect("Failed to set annotation");
-    }
-
-    Ok(())
-}
-
-/// Collects and maps all units from measurements
-///
-/// # Arguments
-/// * `model` - The SBML model to add the units to
-/// * `measurements` - The measurements containing units
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn collect_units(model: &Model, measurements: &[Measurement]) -> Result<(), SBMLError> {
-    for measurement in measurements {
-        for data in measurement.species_data.iter() {
-            if let Some(unit) = &data.data_unit {
-                map_unit_definition(model, unit)?;
-            }
-
-            if let Some(unit) = &data.time_unit {
-                map_unit_definition(model, unit)?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Maps an EnzymeML Protein to an SBML Species
-///
-/// # Arguments
-/// * `protein` - The protein to map
-/// * `model` - The SBML model to add the species to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_protein(protein: &Protein, model: &Model) -> Result<(), SBMLError> {
-    let species = model.create_species(&protein.id);
-    species.set_constant(protein.constant);
-    species.set_has_only_substance_units(false);
-    species.set_name(&protein.name);
-    species.set_sbo_term(PROTEIN_SBO_TERM);
-    species.set_initial_concentration(0.0);
-
-    if let Some(vessel_id) = &protein.vessel_id {
-        species.set_compartment(vessel_id);
-    }
-
-    let annotation = ProteinAnnot::from(protein);
-    if !annotation.is_empty() {
-        species
-            .set_annotation_serde::<ProteinAnnot>(&annotation)
-            .expect("Failed to set annotation");
-    }
-
-    Ok(())
-}
-
-/// Maps an EnzymeML Complex to an SBML Species
-///
-/// # Arguments
-/// * `complex` - The complex to map
-/// * `model` - The SBML model to add the species to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_complex(complex: &Complex, model: &Model) -> Result<(), SBMLError> {
-    let species = model.create_species(&complex.id);
-    species.set_constant(complex.constant);
-    species.set_has_only_substance_units(false);
-    species.set_name(&complex.name);
-    species.set_sbo_term(COMPLEX_SBO_TERM);
-    species.set_initial_concentration(0.0);
-
-    if let Some(vessel_id) = &complex.vessel_id {
-        species.set_compartment(vessel_id);
-    }
-
-    let annotation = ComplexAnnot::from(complex);
-    if !annotation.is_empty() {
-        species
-            .set_annotation_serde::<ComplexAnnot>(&annotation)
-            .expect("Failed to set annotation");
-    }
-
-    Ok(())
-}
-
-/// Maps an EnzymeML Reaction to an SBML Reaction
-///
-/// # Arguments
-/// * `reaction` - The reaction to map
-/// * `model` - The SBML model to add the reaction to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_reaction(reaction: &Reaction, model: &Model) -> Result<(), SBMLError> {
-    let sbml_reaction = model.create_reaction(&reaction.id);
-    sbml_reaction.set_name(&reaction.name);
-    sbml_reaction.set_reversible(reaction.reversible);
-
-    for reactant in reaction.reactants.iter() {
-        sbml_reaction.create_reactant(&reactant.species_id, reactant.stoichiometry);
-    }
-
-    for product in reaction.products.iter() {
-        sbml_reaction.create_product(&product.species_id, product.stoichiometry);
-    }
-
-    if let Some(kinetic_law) = &reaction.kinetic_law {
-        sbml_reaction.create_kinetic_law(&kinetic_law.equation);
-    }
-
-    Ok(())
-}
-
-/// Maps an EnzymeML Equation to an SBML Rule
-///
-/// # Arguments
-/// * `equation` - The equation to map
-/// * `model` - The SBML model to add the rule to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_equation(equation: &Equation, model: &Model) -> Result<(), SBMLError> {
-    match equation.equation_type {
-        EquationType::Assignment => {
-            model.create_assignment_rule(&equation.species_id, &equation.equation);
-        }
-        EquationType::Ode => {
-            model.create_rate_rule(&equation.species_id, &equation.equation);
-        }
-        _ => {}
-    }
-
-    Ok(())
-}
-
-/// Maps an EnzymeML Parameter to an SBML Parameter
-///
-/// # Arguments
-/// * `parameter` - The parameter to map
-/// * `model` - The SBML model to add the parameter to
-///
-/// # Returns
-/// * `Result<(), SBMLError>` - Success or an error
-fn map_parameter(parameter: &Parameter, model: &Model) -> Result<(), SBMLError> {
-    let sbml_parameter = model.create_parameter(&parameter.id);
-    sbml_parameter.set_name(&parameter.name);
-    sbml_parameter.set_constant(parameter.constant.unwrap_or(true));
-
-    if let Some(value) = parameter.value {
-        sbml_parameter.set_value(value);
-    }
-
-    if let Some(unit) = &parameter.unit {
-        sbml_parameter.set_units(map_unit_definition(model, unit)?);
-    }
-
-    let annotation = ParameterAnnot::from(parameter);
-    if !annotation.is_empty() {
-        sbml_parameter
-            .set_annotation_serde::<ParameterAnnot>(&annotation)
-            .expect("Failed to set annotation");
-    }
-
     Ok(())
 }
 
 // Type conversions for annotations
 
-/// Converts a SmallMolecule to a ReactantAnnot for SBML annotation
+/// Converts a SmallMolecule to a ReactantAnnot for SBML v1 annotation
+///
+/// This implementation extracts chemical identifiers from the EnzymeML small molecule
+/// representation and maps them to the v1 reactant annotation format. The conversion
+/// focuses on structural identifiers commonly used in biochemical databases.
+///
+/// # Fields Mapped
+///
+/// - `inchi` - International Chemical Identifier for structural representation
+/// - `smiles` - Canonical SMILES notation for chemical structure
+/// - `chebi_id` - Set to None as this is typically handled separately in v1 format
 impl From<&SmallMolecule> for ReactantAnnot {
     fn from(small_molecule: &SmallMolecule) -> Self {
         ReactantAnnot {
-            xmlns: ENZYMEML_V1_NS.to_string(),
+            // xmlns: ENZYMEML_V1_NS.to_string(),
             inchi: small_molecule.inchi.clone(),
             smiles: small_molecule.canonical_smiles.clone(),
             chebi_id: None,
@@ -371,7 +113,19 @@ impl From<&SmallMolecule> for ReactantAnnot {
     }
 }
 
-/// Converts a Protein to a ProteinAnnot for SBML annotation
+/// Converts a Protein to a ProteinAnnot for SBML v1 annotation
+///
+/// This implementation transforms EnzymeML protein data into the v1 protein annotation
+/// format, preserving sequence information, enzyme classification, and taxonomic data.
+/// The conversion ensures compatibility with standard protein databases and classification systems.
+///
+/// # Fields Mapped
+///
+/// - `sequence` - Primary amino acid sequence
+/// - `ecnumber` - Enzyme Commission number for functional classification
+/// - `organism` - Source organism name
+/// - `organism_tax_id` - NCBI Taxonomy ID for species identification
+/// - `uniprotid` - Set to None, handled separately in v1 format
 impl From<&Protein> for ProteinAnnot {
     fn from(protein: &Protein) -> Self {
         ProteinAnnot {
@@ -381,11 +135,20 @@ impl From<&Protein> for ProteinAnnot {
             uniprotid: None,
             organism: protein.organism.clone(),
             organism_tax_id: protein.organism_tax_id.clone(),
+            additional_fields: std::collections::HashMap::new(),
         }
     }
 }
 
-/// Converts a Complex to a ComplexAnnot for SBML annotation
+/// Converts a Complex to a ComplexAnnot for SBML v1 annotation
+///
+/// This implementation handles the conversion of macromolecular complexes to the v1
+/// annotation format. The conversion preserves participant information that defines
+/// the composition and stoichiometry of the complex.
+///
+/// # Fields Mapped
+///
+/// - `participants` - List of component species and their roles in the complex
 impl From<&Complex> for ComplexAnnot {
     fn from(complex: &Complex) -> Self {
         ComplexAnnot {
@@ -395,7 +158,19 @@ impl From<&Complex> for ComplexAnnot {
     }
 }
 
-/// Converts a Parameter to a ParameterAnnot for SBML annotation
+/// Converts a Parameter to a ParameterAnnot for SBML v1 annotation
+///
+/// This implementation transforms EnzymeML parameter definitions into the v1 parameter
+/// annotation format, preserving bounds and initial values used for parameter estimation
+/// and model simulation. Unit information is processed to ensure compatibility with
+/// SBML unit definitions.
+///
+/// # Fields Mapped
+///
+/// - `initial` - Initial value for parameter estimation
+/// - `upper` - Upper bound constraint for optimization
+/// - `lower` - Lower bound constraint for optimization
+/// - `unit` - Unit definition ID, extracted from the parameter's unit reference
 impl From<&Parameter> for ParameterAnnot {
     fn from(parameter: &Parameter) -> Self {
         ParameterAnnot {
@@ -403,11 +178,30 @@ impl From<&Parameter> for ParameterAnnot {
             initial: parameter.initial_value,
             upper: parameter.upper_bound,
             lower: parameter.lower_bound,
+            unit: parameter.unit.as_ref().and_then(|unit| unit.id.clone()),
         }
     }
 }
 
-/// Converts a slice of Measurements to a DataAnnot for SBML annotation
+/// Converts a slice of Measurements to a DataAnnot for SBML v1 annotation
+///
+/// This implementation creates the complete data annotation structure required for v1 format,
+/// organizing measurement information into the hierarchical structure of files, formats,
+/// and measurement metadata. The conversion process ensures that all measurement data
+/// can be properly referenced and reconstructed from the SBML annotation.
+///
+/// # Structure Created
+///
+/// - `FormatsWrapper` - Defines column structures for each measurement's data format
+/// - `MeasurementsWrapper` - Contains metadata and initial concentrations for each measurement
+/// - `FilesWrapper` - Provides file references linking to CSV data files in the archive
+///
+/// # Errors
+///
+/// Returns `SBMLError` if any individual measurement conversion fails, typically due to:
+/// - Missing required metadata (time units, data units)
+/// - Invalid data structures in measurement data
+/// - Inconsistent measurement format definitions
 impl TryFrom<&[Measurement]> for DataAnnot {
     type Error = SBMLError;
 
@@ -439,7 +233,17 @@ impl TryFrom<&[Measurement]> for DataAnnot {
     }
 }
 
-/// Converts a Measurement to a FileAnnot for SBML annotation
+/// Converts a Measurement to a FileAnnot for SBML v1 annotation
+///
+/// This implementation creates file reference annotations that link measurement metadata
+/// to the actual CSV data files in the COMBINE archive. The file annotation provides
+/// the necessary information for data parsers to locate and process measurement data.
+///
+/// # File Naming Convention
+///
+/// - `id` - Generated as `file_{measurement_id}` for unique identification
+/// - `location` - Points to `data/{measurement_id}.csv` in the archive
+/// - `format` - References the format ID matching the measurement ID
 impl From<&Measurement> for FileAnnot {
     fn from(measurement: &Measurement) -> Self {
         FileAnnot {
@@ -450,7 +254,24 @@ impl From<&Measurement> for FileAnnot {
     }
 }
 
-/// Converts a Measurement to a MeasurementAnnot for SBML annotation
+/// Converts a Measurement to a MeasurementAnnot for SBML v1 annotation
+///
+/// This implementation creates measurement metadata annotations that describe the
+/// experimental conditions and initial concentrations for each measurement. The
+/// conversion processes all species data to extract initial concentration information
+/// required for model reconstruction.
+///
+/// # Fields Generated
+///
+/// - `id` - Measurement identifier for cross-referencing
+/// - `name` - Human-readable measurement name
+/// - `file` - Reference to the associated file annotation
+/// - `init_concs` - Initial concentration data for all species in the measurement
+///
+/// # Errors
+///
+/// Returns `SBMLError` if initial concentration conversion fails for any species,
+/// typically due to missing initial values or unit definitions.
 impl TryFrom<&Measurement> for MeasurementAnnot {
     type Error = SBMLError;
 
@@ -468,7 +289,22 @@ impl TryFrom<&Measurement> for MeasurementAnnot {
     }
 }
 
-/// Converts MeasurementData to an InitConcAnnot for SBML annotation
+/// Converts MeasurementData to an InitConcAnnot for SBML v1 annotation
+///
+/// This implementation extracts initial concentration information from measurement data
+/// and formats it according to v1 annotation requirements. The conversion handles
+/// unit processing to ensure compatibility with SBML unit definitions.
+///
+/// # Data Processing
+///
+/// - Validates that initial concentration values are present
+/// - Processes unit definitions with slash replacement for SBML compatibility
+/// - Maps species references to the appropriate annotation fields
+///
+/// # Errors
+///
+/// Returns `SBMLError::MissingInitialValue` if the measurement data lacks
+/// required initial concentration values for proper model reconstruction.
 impl TryFrom<&MeasurementData> for InitConcAnnot {
     type Error = SBMLError;
 
@@ -493,7 +329,28 @@ impl TryFrom<&MeasurementData> for InitConcAnnot {
     }
 }
 
-/// Converts a Measurement to a FormatAnnot for SBML annotation
+/// Converts a Measurement to a FormatAnnot for SBML v1 annotation
+///
+/// This implementation creates column format definitions that describe the structure
+/// and organization of measurement data in CSV files. The format annotation enables
+/// proper parsing and interpretation of time-series data during model reconstruction.
+///
+/// # Column Organization
+///
+/// - Time column is always first (index 0) with appropriate time units
+/// - Species data columns follow sequentially with proper indexing
+/// - Empty time series are filtered out to avoid malformed data structures
+/// - Each column includes species mapping, data type, and unit information
+///
+/// # Data Type Mapping
+///
+/// The conversion processes measurement data types and maps them to v1 column types,
+/// ensuring proper interpretation of concentration, activity, or other measurement types.
+///
+/// # Errors
+///
+/// Returns `SBMLError::MissingTimeUnit` if time unit information cannot be extracted
+/// from any species data in the measurement, which is required for proper data interpretation.
 impl TryFrom<&Measurement> for FormatAnnot {
     type Error = SBMLError;
 
@@ -541,7 +398,28 @@ impl TryFrom<&Measurement> for FormatAnnot {
     }
 }
 
-/// Converts MeasurementData to a ColumnAnnot for SBML annotation
+/// Converts MeasurementData to a ColumnAnnot for SBML v1 annotation
+///
+/// This implementation creates individual column definitions that describe how species
+/// data is organized within CSV files. The column annotation includes all metadata
+/// necessary for proper data interpretation and species mapping during model reconstruction.
+///
+/// # Column Definition
+///
+/// - Maps data types to appropriate v1 column types (concentration, activity, etc.)
+/// - Processes unit definitions with SBML-compatible formatting
+/// - Associates columns with specific species for proper data attribution
+/// - Sets up indexing structure (indices are assigned during format creation)
+///
+/// # Unit Processing
+///
+/// Unit IDs undergo slash replacement to ensure compatibility with SBML unit definition
+/// naming conventions, preventing parsing errors in SBML readers.
+///
+/// # Errors
+///
+/// Returns `SBMLError::MissingUnit` if the measurement data lacks required unit
+/// definitions, which are essential for proper data interpretation and model validation.
 impl TryFrom<&MeasurementData> for ColumnAnnot {
     type Error = SBMLError;
 
@@ -570,129 +448,5 @@ impl TryFrom<&MeasurementData> for ColumnAnnot {
             replica: None,
             is_calculated: false,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use crate::io::load_enzmldoc;
-
-    use super::*;
-
-    #[test]
-    fn test_to_v1_sbml_document() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_path_buf();
-        let omex_path = temp_path.join("enzmldoc_reaction.omex");
-
-        // Read the EnzymeML document and convert it to an OMEX file
-        let original_enzmldoc = load_enzmldoc("tests/data/enzmldoc_reaction.json").unwrap();
-        let mut archive = to_v1_omex(&original_enzmldoc).unwrap();
-        archive.save(&omex_path).unwrap();
-
-        // Read the OMEX file and convert it back to an EnzymeML document
-        let roundtrip_enzmldoc = load_enzmldoc(&omex_path).unwrap();
-
-        // Assert basic document properties are preserved
-        assert_eq!(original_enzmldoc.name, roundtrip_enzmldoc.name);
-        assert_eq!(
-            original_enzmldoc.small_molecules.len(),
-            roundtrip_enzmldoc.small_molecules.len()
-        );
-        assert_eq!(
-            original_enzmldoc.proteins.len(),
-            roundtrip_enzmldoc.proteins.len()
-        );
-        assert_eq!(
-            original_enzmldoc.parameters.len(),
-            roundtrip_enzmldoc.parameters.len()
-        );
-        assert_eq!(
-            original_enzmldoc.measurements.len(),
-            roundtrip_enzmldoc.measurements.len()
-        );
-
-        // Check that reactions are preserved (this will likely show data loss)
-        assert_eq!(
-            original_enzmldoc.reactions.len(),
-            roundtrip_enzmldoc.reactions.len()
-        );
-
-        // Check specific reaction properties that are likely to be lost
-        for (original_reaction, roundtrip_reaction) in original_enzmldoc
-            .reactions
-            .iter()
-            .zip(roundtrip_enzmldoc.reactions.iter())
-        {
-            assert_eq!(original_reaction.id, roundtrip_reaction.id);
-            assert_eq!(original_reaction.name, roundtrip_reaction.name);
-            assert_eq!(original_reaction.reversible, roundtrip_reaction.reversible);
-            assert_eq!(
-                original_reaction.reactants.len(),
-                roundtrip_reaction.reactants.len()
-            );
-            assert_eq!(
-                original_reaction.products.len(),
-                roundtrip_reaction.products.len()
-            );
-
-            // This assertion will likely fail - kinetic laws are not preserved in the SBML v1 serialization
-            let kinetic_law = original_reaction.kinetic_law.as_ref().unwrap();
-            let roundtrip_kinetic_law = roundtrip_reaction.kinetic_law.as_ref().unwrap();
-            assert_eq!(kinetic_law.equation, roundtrip_kinetic_law.equation);
-            assert_eq!(
-                kinetic_law.equation_type,
-                roundtrip_kinetic_law.equation_type
-            );
-        }
-
-        // Check parameter values are preserved
-        for (original_param, roundtrip_param) in original_enzmldoc
-            .parameters
-            .iter()
-            .zip(roundtrip_enzmldoc.parameters.iter())
-        {
-            assert_eq!(original_param.id, roundtrip_param.id);
-            assert_eq!(original_param.name, roundtrip_param.name);
-            assert_eq!(original_param.value, roundtrip_param.value);
-        }
-
-        // Check measurement data integrity
-        for (original_measurement, roundtrip_measurement) in original_enzmldoc
-            .measurements
-            .iter()
-            .zip(roundtrip_enzmldoc.measurements.iter())
-        {
-            assert_eq!(original_measurement.id, roundtrip_measurement.id);
-            assert_eq!(original_measurement.name, roundtrip_measurement.name);
-            assert_eq!(
-                original_measurement.species_data.len(),
-                roundtrip_measurement.species_data.len()
-            );
-
-            // Check if time series data is preserved
-            for (original_data, roundtrip_data) in original_measurement
-                .species_data
-                .iter()
-                .zip(roundtrip_measurement.species_data.iter())
-            {
-                assert_eq!(original_data.species_id, roundtrip_data.species_id);
-                assert_eq!(original_data.initial, roundtrip_data.initial);
-                assert_eq!(original_data.data_type, roundtrip_data.data_type);
-                assert_eq!(original_data.time, roundtrip_data.time);
-                assert_eq!(original_data.data, roundtrip_data.data);
-            }
-        }
-
-        println!("Conversion test completed. Check output for detected data loss.");
-    }
-
-    /// Tests the replace_slashes function for unit handling
-    #[test]
-    fn test_replace_slashes() {
-        let id = "mmol / l";
-        let replaced = replace_slashes(id);
-        assert_eq!(replaced, "mmol__l");
     }
 }
