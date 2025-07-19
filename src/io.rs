@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use colored::Colorize;
 use thiserror::Error;
 
-use crate::{prelude::EnzymeMLDocument, sbml::read::from_omex, validation::validate_json};
+use crate::{prelude::EnzymeMLDocument, sbml::reader::from_omex, validation::validate_json};
 
 /// Loads and parses an EnzymeML document from a JSON file.
 ///
@@ -74,7 +74,7 @@ fn validate_by_schema(path: &PathBuf) -> Result<(), String> {
     if !report.valid {
         println!("{}", "EnzymeML document is invalid".bold().red());
         for error in report.errors {
-            println!("   {}", error);
+            println!("   {error}");
         }
         return Err("EnzymeML document is invalid".to_string());
     }
