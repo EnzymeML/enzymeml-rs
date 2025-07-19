@@ -74,6 +74,25 @@ pub(crate) fn map_unit_definition(
     Ok(id.clone())
 }
 
+/// Gets a unit definition from an SBML model
+///
+/// This function retrieves a unit definition from an SBML model based on its ID.
+///
+/// # Arguments
+///
+pub(crate) fn get_unit_definition(
+    model: &SBMLModel,
+    unit_id: &str,
+) -> Result<UnitDefinition, SBMLError> {
+    let unit_def = model.get_unit_definition(unit_id);
+
+    if let Some(unit_def) = unit_def {
+        return unit_def.as_ref().try_into();
+    }
+
+    Err(SBMLError::MissingUnitDefinitionId(unit_id.to_string()))
+}
+
 /// Converts an SBML UnitDefinition to our EnzymeML UnitDefinition
 ///
 /// This implementation extracts the id, name, and all base units from an SBML UnitDefinition
