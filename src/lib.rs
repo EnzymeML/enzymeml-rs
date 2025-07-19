@@ -132,19 +132,25 @@ pub mod objective {
 }
 
 pub mod sbml {
-    pub use crate::sbml::v1::serializer::to_v1_omex;
+    pub(crate) mod annotations;
     pub mod error;
-    pub mod read;
+    pub(crate) mod reader;
     pub(super) mod speciestype;
     pub(super) mod units;
+    pub(super) mod utils;
+    pub(super) mod version;
+    pub mod writer;
     pub(super) mod v1 {
-        pub(crate) mod parser;
+        pub(crate) use crate::sbml::v1::schema::*;
+        pub(crate) mod extract;
         pub(super) mod schema;
         pub mod serializer;
     }
     pub(super) mod v2 {
-        pub(super) mod parser;
+        pub(crate) use crate::sbml::v2::schema::*;
+        pub(super) mod extract;
         pub(super) mod schema;
+        pub mod serializer;
     }
 }
 
