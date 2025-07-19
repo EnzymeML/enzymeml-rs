@@ -1,7 +1,6 @@
 use std::string::FromUtf8Error;
 
 use polars::error::PolarsError;
-use quick_xml::DeError;
 use sbml::combine::error::CombineArchiveError;
 use thiserror::Error;
 
@@ -17,10 +16,6 @@ pub enum SBMLError {
     /// Error when an invalid SBOTerm is encountered
     #[error("Invalid SBOTerm: {0}")]
     InvalidSBOTerm(String),
-
-    /// Error when annotation deserialization fails
-    #[error("Failed to deserialize annotation: {0}")]
-    DeserializeError(#[from] DeError),
 
     /// Error when an invalid species type is encountered during conversion
     #[error("Invalid species type: {0}")]
@@ -97,4 +92,20 @@ pub enum SBMLError {
     /// Error when a time column is missing in a measurement's DataFrame
     #[error("Cannot convert measurement to DataFrame: missing time column in measurement {0}")]
     MissingTimeColumnInDataFrame(String),
+
+    /// Error when a data annotation is missing
+    #[error("Missing data annotation")]
+    MissingDataAnnotation,
+
+    /// Error when serializing an annotation fails
+    #[error("Failed to serialize annotation: {0}")]
+    SerializeError(#[from] quick_xml::SeError),
+
+    /// Error when deserializing an annotation fails
+    #[error("Failed to deserialize annotation: {0}")]
+    DeserializeError(#[from] quick_xml::DeError),
+
+    /// No existing annotation found
+    #[error("No existing annotation found for {0}")]
+    NoExistingAnnotation(String),
 }
