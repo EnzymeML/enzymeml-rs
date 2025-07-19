@@ -1105,7 +1105,7 @@ pub fn main() {
                     let plot = if profile_result.len() > 1 {
                         plot_pair_contour(&profile_result)
                     } else {
-                        profile_result.into()
+                        (&profile_result).into()
                     };
 
                     if profile_params.show {
