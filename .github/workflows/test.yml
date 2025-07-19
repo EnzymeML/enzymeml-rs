@@ -26,9 +26,8 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Install libSBML
+      - name: Install libSBML (Windows)
+        if: matrix.os == 'windows-latest'
         run: |
           cargo install cargo-vcpkg
           cargo vcpkg build
