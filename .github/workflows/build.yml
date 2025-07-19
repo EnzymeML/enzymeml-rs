@@ -30,6 +30,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
       - name: Install libSBML (Windows)
         if: matrix.os == 'windows-latest'
         run: |
@@ -37,11 +40,11 @@ jobs:
           cargo vcpkg build
 
       - name: Build binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --bin enzymeml
-        continue-on-error: true
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+          RUSTC_WRAPPER: 'sccache'
+        run: |
+          cargo build --release --bin enzymeml
 
       - name: Rename binary (Windows)
         if: matrix.os == 'windows-latest'
