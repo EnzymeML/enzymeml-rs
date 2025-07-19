@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use colored::Colorize;
 use thiserror::Error;
 
-use crate::{prelude::EnzymeMLDocument, sbml::reader::from_omex, validation::validate_json};
+use crate::{prelude::EnzymeMLDocument, validation::validate_json};
 
 /// Loads and parses an EnzymeML document from a JSON file.
 ///
@@ -29,7 +29,10 @@ use crate::{prelude::EnzymeMLDocument, sbml::reader::from_omex, validation::vali
 pub fn load_enzmldoc(path: impl Into<PathBuf>) -> Result<EnzymeMLDocument, IOError> {
     let path = path.into();
 
-    if let Ok(enzmldoc) = from_omex(&path) {
+    #[cfg(feature = "sbml")]
+    if let Ok(enzmldoc) = EnzymeMLDocument::from_omex(&path) {
+        return Ok(enzmldoc);
+    } else if let Ok(enzmldoc) = EnzymeMLDocument::from_sbml(&path) {
         return Ok(enzmldoc);
     }
 
