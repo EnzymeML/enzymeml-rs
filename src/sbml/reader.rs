@@ -57,13 +57,13 @@ use sbml::{
         CombineArchive, Compartment, KineticLaw, LocalParameter, Parameter as SBMLParameter,
         Reaction as SBMLReaction, SpeciesReference,
     },
+    reader::SBMLReader,
     rule::{Rule, RuleType},
     species::Species,
     SBMLDocument,
 };
 
 use crate::{
-    io::save_enzmldoc,
     prelude::{
         Complex, EnzymeMLDocument, Equation, EquationType, ModifierElement, ModifierRole,
         Parameter, Protein, Reaction, ReactionElement, SmallMolecule, UnitDefinition, Vessel,
@@ -76,6 +76,59 @@ use crate::{
         version::EnzymeMLAnnotation,
     },
 };
+
+impl EnzymeMLDocument {
+    /// Reads an SBML file and converts it to an EnzymeML document.
+    ///
+    /// This function provides a direct conversion pathway from standalone SBML files
+    /// to EnzymeML documents. It handles SBML parsing, model structure validation,
+    /// and annotation processing to create a complete EnzymeML representation.
+    ///
+    /// The conversion process includes:
+    /// - Parsing SBML model structure (compartments, species, reactions, parameters)
+    /// - Extracting EnzymeML-specific annotations and metadata
+    /// - Converting SBML kinetic laws to EnzymeML equation formats
+    /// - Mapping SBML unit definitions to EnzymeML unit systems
+    /// - Processing mathematical rules and assignments
+    ///
+    /// # Arguments
+    /// * `path` - Path to the SBML file to be converted
+    ///
+    /// # Returns
+    /// * `Result<EnzymeMLDocument, SBMLError>` - Complete EnzymeML document or conversion error
+    ///
+    /// # Errors
+    /// Returns `SBMLError` if:
+    /// - SBML file cannot be read or parsed
+    /// - Required model elements are missing or invalid
+    /// - EnzymeML annotations are malformed or incompatible
+    /// - Unit definitions cannot be resolved
+    /// - Mathematical expressions cannot be converted
+    pub fn from_sbml(path: &PathBuf) -> Result<Self, SBMLError> {
+        let xml = std::fs::read_to_string(path).map_err(SBMLError::from)?;
+        let sbmldoc = SBMLReader::from_xml_string(&xml);
+        let enzmldoc = EnzymeMLDocument::try_from(&sbmldoc)?;
+        Ok(enzmldoc)
+    }
+
+    /// Reads an OMEX archive and converts it to an EnzymeML document.
+    ///
+    /// This function handles the complete workflow for importing OMEX (Open Modeling EXchange)
+    /// archives that contain SBML models with associated data files. OMEX archives provide
+    /// a standardized way to package computational models with their experimental data,
+    /// metadata, and documentation.
+    ///
+    /// The function performs the following operations:
+    /// - Extracts and validates the OMEX archive structure
+    /// - Locates the primary SBML model file within the archive
+    /// - Processes associated data files (CSV, TSV, or other tabular formats)
+    /// - Converts SBML model structure to EnzymeML format
+
+    pub fn from_omex(path: &PathBuf) -> Result<Self, SBMLError> {
+        let archive = read_omex_file(path)?;
+        parse_omex(archive)
+    }
+}
 
 /// Reads an OMEX archive from file and converts it to an EnzymeML document.
 ///
@@ -128,8 +181,6 @@ pub fn parse_omex(mut archive: CombineArchive) -> Result<EnzymeMLDocument, SBMLE
     if let Ok(data_annot) = DataAnnot::try_from(&sbml) {
         enzmldoc.measurements = data_annot.extract_measurements(&sbml, &mut archive)?;
     }
-
-    save_enzmldoc("test.json", &enzmldoc).expect("Save has failed!");
 
     Ok(enzmldoc)
 }
