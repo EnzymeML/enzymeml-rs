@@ -222,9 +222,6 @@ pub(crate) enum ProteinAnnot {
     V1(v1::schema::ProteinAnnot),
     /// EnzymeML v2 protein annotation
     V2(v2::schema::ProteinAnnot),
-
-    #[serde(other)]
-    Other,
 }
 
 impl_deserialize_for_internally_tagged_enum! {
@@ -232,7 +229,6 @@ impl_deserialize_for_internally_tagged_enum! {
     ("http://sbml.org/enzymeml/version1"    => V1(v1::schema::ProteinAnnot)),
     ("http://sbml.org/enzymeml/version2" => V1(v1::schema::ProteinAnnot)),
     ("https://www.enzymeml.org/v2" => V2(v2::schema::ProteinAnnot)),
-    ("Other"  => Other),
 }
 
 impl EnzymeMLAnnotation<Protein> for ProteinAnnot {
@@ -257,7 +253,6 @@ impl EnzymeMLAnnotation<Protein> for ProteinAnnot {
                 protein.organism = annot.organism;
                 protein.organism_tax_id = annot.organism_tax_id;
             }
-            _ => {}
         }
     }
 
