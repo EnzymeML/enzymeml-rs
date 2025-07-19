@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 120
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         include:
@@ -23,7 +24,6 @@ jobs:
           - os: macos-latest
             artifact_name: enzymeml-macos
             asset_name: enzymeml-macos
-      fail-fast: false
 
     steps:
       - uses: actions/checkout@v4
