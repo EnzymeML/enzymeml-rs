@@ -30,5 +30,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Install libSBML (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cargo install cargo-vcpkg
+          cargo vcpkg build
+
       - name: Run tests
         run: cargo test --verbose

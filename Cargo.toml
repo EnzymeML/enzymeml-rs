@@ -139,3 +139,17 @@ path = "benches/simulation.rs"
 
 [lints.clippy]
 result_large_err = "allow"
+
+[package.metadata.vcpkg]
+git = "https://github.com/microsoft/vcpkg"
+rev = "ce613c41372b23b1f51333815feb3edd87ef8a8b"
+dependencies = ["libsbml[core,expat,zlib,fbc]"]
+
+[package.metadata.vcpkg.target]
+x86_64-pc-windows-msvc = { dependencies = [
+    "libsbml[core,expat,zlib,fbc]",
+], triplet = "x64-windows-static-md" }
+
+x86_64-pc-windows-gnu = { dependencies = [
+    "libsbml[core,expat,zlib,fbc]",
+], triplet = "x64-windows-static-md" }
