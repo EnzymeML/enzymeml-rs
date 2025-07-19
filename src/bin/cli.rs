@@ -1150,6 +1150,7 @@ pub fn main() {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+#[allow(clippy::upper_case_acronyms)]
 enum ConversionTarget {
     /// Convert to XLSX
     Xlsx,
