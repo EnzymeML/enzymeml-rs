@@ -77,9 +77,11 @@ impl ProgressObserver {
         let pb = ProgressBar::new(total);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} (Cost: {msg})")
+            .template(&format!(
+                "Fitting {name}: {{spinner:.green}} [{{bar:40.green/blue}}] {{pos}}/{{len}} | {{elapsed}}/{{eta}} | {{msg}}"
+            ))
                 .unwrap()
-                .progress_chars("=>-"),
+                .progress_chars("█▉▊▋▌▍▎▏ "),
         );
         Self {
             pb,

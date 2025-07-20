@@ -7,8 +7,8 @@ use plotly::{
 use thiserror::Error;
 
 use crate::{
-    optim::measurement_not_empty,
     prelude::{EnzymeMLDocument, Measurement},
+    utils::measurement_not_empty,
 };
 
 #[cfg(feature = "simulation")]
@@ -45,7 +45,10 @@ impl EnzymeMLDocument {
         &self,
         measurement_ids: impl Into<Option<Vec<String>>>,
         show_fit: bool,
+        with_lines: Option<bool>,
     ) -> Result<Plot, PlotError> {
+        let with_lines = with_lines.unwrap_or(false);
+
         // Extract measurements from the document
         let measurements: Vec<&Measurement> = match measurement_ids.into() {
             Some(ids) => self
@@ -86,12 +89,18 @@ impl EnzymeMLDocument {
             let y_axis = format!("y{}", i + 1);
 
             for (j, trace) in traces.into_iter().enumerate() {
-                let trace = trace
+                let mut trace = trace
                     .clone()
                     .x_axis(&x_axis)
                     .y_axis(&y_axis)
                     .marker(Marker::new().color(COLORS[j % COLORS.len()]).size(7))
                     .show_legend(i == 0);
+
+                if with_lines {
+                    trace = trace
+                        .line(Line::new().width(1.5).color(COLORS[j % COLORS.len()]))
+                        .mode(Mode::LinesMarkers);
+                }
 
                 plot.add_trace(trace);
             }

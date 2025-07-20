@@ -1,19 +1,29 @@
 //! EnzymeML Rust Library
 //!
 //! This library provides functionality for working with EnzymeML documents, including:
-//! - Parsing and generating EnzymeML models from markdown
+//!
 //! - Simulating enzyme kinetics through ODE systems
 //! - Optimizing kinetic parameters
+//! - Bayesian parameter estimation
+//! - Profile likelihood computation
+//! - Identifiability analysis
+//! - Language model integration
+//! - SBML format reading and writing
+//! - Tabular data handling
+//! - Plotting and visualization
 //! - Validating EnzymeML documents
-//! - Reading/writing tabular data
-//! - Plotting results
 
 #![warn(unused_imports)]
 
+/// EnzymeML version management and schema definitions
 pub mod versions {
     pub use crate::versions::v2 as latest;
+    /// EnzymeML version 2 schema and data structures
     pub mod v2;
 }
+
+/// Utility functions
+pub mod utils;
 
 /// Commonly used types and functionality re-exported for convenience
 pub mod prelude {
@@ -71,6 +81,7 @@ pub mod simulation {
     pub mod macros;
 }
 
+/// Optimization algorithms and parameter estimation for enzyme kinetics
 #[cfg(feature = "optimization")]
 pub mod optim {
     pub use crate::optim::bound::*;
@@ -85,15 +96,24 @@ pub mod optim {
         ImplicitSolver, BS23, DP45, GL4, RALS3, RALS4, RK4, RK5, RKF45, TSIT45,
     };
 
+    /// Parameter bounds and constraints for optimization
     pub mod bound;
+    /// Error types for optimization failures
     pub mod error;
+    /// Performance metrics and convergence criteria
     pub mod metrics;
+    /// Observer patterns for monitoring optimization progress
     pub mod observer;
+    /// Problem formulation and setup for optimization tasks
     pub mod problem;
+    /// Result reporting and analysis for optimization runs
     pub mod report;
+    /// System dynamics and equation handling for optimization
     pub mod system;
+    /// Parameter transformations for optimization algorithms
     pub mod transformation;
 
+    /// Collection of optimization algorithms and solvers
     pub mod optimizers {
         pub use crate::optim::optimizers::bfgs::*;
         pub use crate::optim::optimizers::ego::*;
@@ -101,51 +121,122 @@ pub mod optim {
         pub use crate::optim::optimizers::optimizer::*;
         pub use crate::optim::optimizers::pso::*;
         pub use crate::optim::optimizers::srtrust::*;
+        /// Broyden-Fletcher-Goldfarb-Shanno optimization algorithm
         pub mod bfgs;
+        /// Efficient Global Optimization using Gaussian processes
         pub mod ego;
+        /// Limited-memory BFGS optimization algorithm
         pub mod lbfgs;
+        /// Common optimizer traits and interfaces
         pub mod optimizer;
+        /// Particle Swarm Optimization algorithm
         pub mod pso;
+        /// Stochastic Rust Trust region optimization algorithm
         pub mod srtrust;
+        /// Utility functions for optimization algorithms
         pub(crate) mod utils;
     }
 }
 
+/// Markov Chain Monte Carlo sampling for Bayesian parameter estimation
 #[cfg(feature = "optimization")]
 pub mod mcmc {
+    /// Diagnostic tools for MCMC chain quality assessment
     pub mod diagnostics;
+    /// Error types for MCMC sampling failures
     pub mod error;
+    /// Likelihood function definitions for Bayesian inference
     pub mod likelihood;
+    /// Output formatting and storage for MCMC results
     pub mod output;
+    /// Prior distribution specifications for Bayesian analysis
     pub mod priors;
+    /// Problem setup and configuration for MCMC sampling
     pub mod problem;
 }
 
+/// Objective function definitions and loss calculations for optimization
 #[cfg(feature = "optimization")]
 pub mod objective {
     pub use crate::objective::loss::*;
     pub use crate::objective::objfun::*;
 
+    /// Error types for objective function evaluation failures
     pub mod error;
+    /// Loss function definitions and implementations
     pub mod loss;
+    /// Objective function construction and evaluation
     pub mod objfun;
 }
 
+/// SBML format reading and writing functionality for EnzymeML documents
+#[cfg(feature = "sbml")]
+pub mod sbml {
+    pub use crate::sbml::reader as sbml_reader;
+    pub use crate::sbml::version::EnzymeMLVersion;
+    pub use crate::sbml::writer as sbml_writer;
+
+    /// Annotation handling for SBML metadata
+    pub(crate) mod annotations;
+    /// Error types for SBML processing failures
+    pub mod error;
+    /// SBML document reading and parsing functionality
+    pub mod reader;
+    /// Species type definitions and handling
+    pub(super) mod speciestype;
+    /// Unit handling and conversion for SBML
+    pub(super) mod units;
+    /// Utility functions for SBML processing
+    pub(super) mod utils;
+    /// Version detection and handling for EnzymeML formats
+    pub mod version;
+    /// SBML document writing and serialization functionality
+    pub mod writer;
+    /// EnzymeML version 1 support and schema definitions
+    pub(super) mod v1 {
+        pub(crate) use crate::sbml::v1::schema::*;
+        /// Data extraction utilities for v1 format
+        pub(crate) mod extract;
+        /// Schema definitions for EnzymeML v1
+        pub(super) mod schema;
+        /// Serialization utilities for v1 format
+        pub mod serializer;
+    }
+    /// EnzymeML version 2 support and schema definitions
+    pub(super) mod v2 {
+        pub(crate) use crate::sbml::v2::schema::*;
+        /// Data extraction utilities for v2 format
+        pub(super) mod extract;
+        /// Schema definitions for EnzymeML v2
+        pub(super) mod schema;
+        /// Serialization utilities for v2 format
+        pub mod serializer;
+    }
+}
+
+/// Parameter identifiability analysis and profile likelihood computation
 #[cfg(feature = "optimization")]
 pub mod identifiability {
     pub use crate::identifiability::egoprofile::*;
     pub use crate::identifiability::parameter::*;
     pub use crate::identifiability::profile::*;
 
+    /// Efficient Global Optimization for profile likelihood computation
     pub mod egoprofile;
+    /// Grid-based parameter space exploration
     pub mod grid;
+    /// Parameter definition and handling for identifiability analysis
     pub mod parameter;
+    /// Profile likelihood computation and analysis
     pub mod profile;
+    /// Result storage and analysis for identifiability studies
     pub mod results;
+    /// Utility functions for identifiability analysis
     pub mod utils;
 }
 
 #[cfg(feature = "llm")]
+/// Language model integration for automated EnzymeML document generation and analysis
 pub mod llm;
 
 /// Validation of EnzymeML documents and components
@@ -183,7 +274,9 @@ pub mod macros {
     pub mod unit_maps;
 }
 
+/// Language bindings and interfaces for other programming environments
 pub mod bindings {
+    /// WebAssembly bindings for browser and Node.js environments
     #[cfg(feature = "wasm")]
     pub mod wasm;
 }

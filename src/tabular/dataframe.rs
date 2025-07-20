@@ -40,7 +40,7 @@ impl From<Measurement> for DataFrame {
     ///
     /// Returns a DataFrame representing the Measurement.
     fn from(measurement: Measurement) -> DataFrame {
-        measurement_to_dataframe(&measurement)
+        measurement_to_dataframe(&measurement, None)
     }
 }
 
@@ -55,7 +55,7 @@ impl From<&Measurement> for DataFrame {
     ///
     /// Returns a DataFrame representing the Measurement.
     fn from(measurement: &Measurement) -> DataFrame {
-        measurement_to_dataframe(measurement)
+        measurement_to_dataframe(measurement, None)
     }
 }
 
@@ -65,8 +65,8 @@ impl Measurement {
     /// # Returns
     ///
     /// Returns a DataFrame representing the Measurement.
-    pub fn to_dataframe(&self) -> DataFrame {
-        measurement_to_dataframe(self)
+    pub fn to_dataframe(&self, include_non_measured: impl Into<Option<bool>>) -> DataFrame {
+        measurement_to_dataframe(self, include_non_measured)
     }
 
     /// Converts a DataFrame into a MeasurementBuilder.
@@ -162,61 +162,74 @@ impl MeasurementBuilder {
 /// # Returns
 ///
 /// Returns a DataFrame representing the Measurement.
-pub fn measurement_to_dataframe(measurement: &Measurement) -> DataFrame {
+pub fn measurement_to_dataframe(
+    measurement: &Measurement,
+    include_non_measured: impl Into<Option<bool>>,
+) -> DataFrame {
+    let include_non_measured = include_non_measured.into().unwrap_or(true);
     let mut series = vec![];
     let mut non_measured = vec![];
     let mut times = vec![];
 
-    for data in measurement.species_data.iter() {
+    // Collect all data in one pass
+    measurement.species_data.iter().for_each(|data| {
         collect_data(&mut series, &mut non_measured, &mut times, data);
-    }
-
-    if series.is_empty() {
-        series.push(Series::new("time", vec![0.0; 1])); // Use floating-point values (f64)
-        for (species, initial) in non_measured {
-            series.push(Series::new(species, vec![*initial; 1])); // Dereference `initial`
-        }
-        return DataFrame::new(series).unwrap();
-    }
-
-    if !times.is_empty() {
-        let first_time = &times[0];
-        for time in &times {
-            assert_eq!(first_time, time, "Time series do not match");
-        }
-
-        series.push(Series::new("time", first_time));
-    } else {
-        // Seems to only contain initials
-        series.push(Series::new("time", vec![0; 1]));
-    }
-
-    let length = if let Some(s) = series.first() {
-        s.len()
-    } else {
-        1
-    };
-
-    for s in &series {
-        assert_eq!(length, s.len(), "Time series do not have the same length");
-    }
-
-    for (species, _) in non_measured {
-        series.push(Series::new_null(species, length));
-    }
-
-    // Sort series with time first and other alphabetical
-    series.sort_by(|a, b| {
-        if a.name() == "time" {
-            std::cmp::Ordering::Less
-        } else if b.name() == "time" {
-            std::cmp::Ordering::Greater
-        } else {
-            a.name().cmp(b.name())
-        }
     });
 
-    DataFrame::new(series).unwrap()
+    // Handle case with no time series data
+    if series.is_empty() {
+        let time_series = Series::new("time", vec![0.0; 1]);
+        let mut all_series = vec![time_series];
+
+        // Add initial values for non-measured species
+        all_series.extend(
+            non_measured
+                .into_iter()
+                .map(|(species, initial)| Series::new(species, vec![*initial; 1])),
+        );
+
+        return DataFrame::new(all_series).unwrap();
+    }
+
+    // Add time series
+    let time_series = if !times.is_empty() {
+        // Verify all time series match
+        let first_time = &times[0];
+        debug_assert!(
+            times.iter().all(|time| time == first_time),
+            "Time series do not match"
+        );
+
+        Series::new("time", first_time)
+    } else {
+        // Only contains initials
+        Series::new("time", vec![0.0; 1])
+    };
+
+    // Get length of data for consistency checks
+    let length = series.first().map_or(1, |s| s.len());
+
+    // Verify all series have same length
+    debug_assert!(
+        series.iter().all(|s| s.len() == length),
+        "Time series do not have the same length"
+    );
+
+    // Add null series for non-measured species
+    let null_series: Vec<Series> = non_measured
+        .into_iter()
+        .map(|(species, _)| Series::new_null(species, length))
+        .collect();
+
+    // Combine all series
+    let mut all_series = vec![time_series];
+    all_series.extend(series);
+
+    if include_non_measured {
+        all_series.extend(null_series);
+    }
+
+    DataFrame::new(all_series).unwrap()
 }
 
 /// Collects data from a `MeasurementData` instance and updates the provided vectors.

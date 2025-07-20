@@ -110,13 +110,12 @@ use enzymeml::{
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
+    sbml::EnzymeMLVersion,
     tabular::writer::create_workbook,
     validation::{consistency, schema},
 };
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
-
-// TODO: This is very ugly, we should extract the WASM feature into a separate crate
 
 // List all available transformations
 const AVAILABLE_TRANSFORMATIONS: &[&str] =
@@ -664,6 +663,21 @@ pub fn main() {
                         .expect("Failed to convert EnzymeML document to XLSX");
                     workbook.save(output).expect("Failed to save XLSX file");
                 }
+                ConversionTarget::V1 => {
+                    let mut archive = enzmldoc
+                        .to_sbml(&EnzymeMLVersion::V1)
+                        .expect("Failed to convert EnzymeML document to SBML");
+                    archive.save(output).expect("Failed to save SBML file");
+                }
+                ConversionTarget::V2 => {
+                    save_enzmldoc(output, &enzmldoc).expect("Failed to save EnzymeML document")
+                }
+                ConversionTarget::SBML => {
+                    let mut archive = enzmldoc
+                        .to_sbml(&EnzymeMLVersion::V2)
+                        .expect("Failed to convert EnzymeML document to SBML");
+                    archive.save(output).expect("Failed to save SBML file");
+                }
             }
         }
 
@@ -1105,7 +1119,7 @@ pub fn main() {
                     let plot = if profile_result.len() > 1 {
                         plot_pair_contour(&profile_result)
                     } else {
-                        profile_result.into()
+                        (&profile_result).into()
                     };
 
                     if profile_params.show {
@@ -1136,8 +1150,16 @@ pub fn main() {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+#[allow(clippy::upper_case_acronyms)]
 enum ConversionTarget {
+    /// Convert to XLSX
     Xlsx,
+    /// Convert to EnzymeML v2
+    V2,
+    /// Convert to EnzymeML v1
+    V1,
+    /// Convert to SBML
+    SBML,
 }
 
 /// Performs comprehensive validation of an EnzymeML document
@@ -1186,8 +1208,21 @@ fn check_consistency(path: &PathBuf) -> Result<EnzymeMLDocument, String> {
 /// * `Ok(())` - Valid document
 /// * `Err(String)` - Error message if validation fails
 fn validate_by_schema(path: &PathBuf) -> Result<(), String> {
+    // Check file extension, if omex or xml, skip validation
+    if path.extension().and_then(|ext| ext.to_str()) == Some("omex")
+        || path.extension().and_then(|ext| ext.to_str()) == Some("xml")
+    {
+        return Ok(());
+    }
+
     // Check if the file is a valid EnzymeML document
     let content = std::fs::read_to_string(path).expect("Failed to read EnzymeML document");
+
+    if serde_json::from_str::<serde_json::Value>(&content).is_err() {
+        // This is not a JSON file, we can't validate it here
+        return Ok(());
+    }
+
     let report = schema::validate_json(&content).expect("Failed to validate EnzymeML document");
 
     if !report.valid {

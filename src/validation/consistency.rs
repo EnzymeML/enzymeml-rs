@@ -227,14 +227,10 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_invalid_enzmldoc() {
         let path = PathBuf::from("tests/data/enzymeml_inconsistent_invalid.json");
-        if let Err(e) = load_enzmldoc(&path) {
-            match e {
-                IOError::JsonParseError(_) => {}
-                _ => panic!("Unexpected error: {e:?}"),
-            }
-        }
+        load_enzmldoc(&path).expect("Failed to load document");
     }
 
     #[test]

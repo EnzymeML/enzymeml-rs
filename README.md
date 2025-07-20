@@ -20,6 +20,7 @@
 - ✅ **Validation** - Ensure models are consistent and correct
 - 📋 **Data Handling** - Read/write measurement data in various tabular formats
 - 📈 **Visualization** - Beautiful plots for simulation results and experimental data
+- 📊 **SBML Support** - Read and write SBML documents
 - 🌐 **WebAssembly Support** - Use in web applications
 
 ## 🚀 Installation
@@ -196,3 +197,9 @@ For complete documentation, check out the [API docs](https://docs.rs/enzymeml).
 ## 📜 License
 
 This project is licensed under the MIT License.
+
+---
+
+<div align="center">
+<strong>Made with ❤️ by the EnzymeML Team</strong>
+</div>
