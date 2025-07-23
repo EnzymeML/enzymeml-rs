@@ -110,10 +110,12 @@ use enzymeml::{
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
-    sbml::EnzymeMLVersion,
     tabular::writer::create_workbook,
     validation::{consistency, schema},
 };
+
+#[cfg(feature = "sbml")]
+use enzymeml::sbml::EnzymeMLVersion;
 
 use peroxide::fuga::{self, anyhow, ODEIntegrator, ODEProblem};
 
@@ -663,6 +665,7 @@ pub fn main() {
                         .expect("Failed to convert EnzymeML document to XLSX");
                     workbook.save(output).expect("Failed to save XLSX file");
                 }
+                #[cfg(feature = "sbml")]
                 ConversionTarget::V1 => {
                     let mut archive = enzmldoc
                         .to_sbml(&EnzymeMLVersion::V1)
@@ -672,6 +675,7 @@ pub fn main() {
                 ConversionTarget::V2 => {
                     save_enzmldoc(output, &enzmldoc).expect("Failed to save EnzymeML document")
                 }
+                #[cfg(feature = "sbml")]
                 ConversionTarget::SBML => {
                     let mut archive = enzmldoc
                         .to_sbml(&EnzymeMLVersion::V2)
@@ -1157,8 +1161,10 @@ enum ConversionTarget {
     /// Convert to EnzymeML v2
     V2,
     /// Convert to EnzymeML v1
+    #[cfg(feature = "sbml")]
     V1,
     /// Convert to SBML
+    #[cfg(feature = "sbml")]
     SBML,
 }
 

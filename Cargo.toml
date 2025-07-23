@@ -99,7 +99,7 @@ codegen-units = 1
 debug = false
 
 [features]
-default = ["optimization", "simulation", "llm", "tabular", "sbml"]
+default = ["optimization", "simulation", "llm", "tabular"]
 tabular = ["polars", "calamine", "rust_xlsxwriter"]
 wasm = ["wasm-bindgen", "serde-wasm-bindgen", "tsify-next"]
 simulation = ["peroxide", "evalexpr-jit", "splines"]
