@@ -39,25 +39,6 @@ struct DocumentResponse {
 /// * `Ok(EnzymeMLDocument)` - The successfully fetched and parsed EnzymeML document
 /// * `Err(SuiteError)` - An error occurred during the fetch or parsing process
 ///
-/// # Examples
-///
-/// ```no_run
-/// use enzymeml::suite::fetch_document_from_suite;
-///
-/// // Fetch a specific document from the default Suite instance
-/// let document = fetch_document_from_suite("my-document-id", None)?;
-/// println!("Fetched document: {}", document.name);
-///
-/// // Fetch the current document from a custom Suite instance
-/// let document = fetch_document_from_suite(None, "http://localhost:8080")?;
-/// println!("Current document: {}", document.name);
-///
-/// // Fetch the current document from the default Suite instance
-/// let document = fetch_document_from_suite(None, None)?;
-/// println!("Current document: {}", document.name);
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
 /// # Errors
 ///
 /// This function will return an error if:
