@@ -1202,7 +1202,7 @@ fn load_document(path: &Option<PathBuf>, use_suite: bool) -> Result<EnzymeMLDocu
         println!("Loading document from {:?}", path.clone().unwrap());
         load_enzmldoc(path.clone().unwrap()).map_err(|e| e.to_string())
     } else {
-        return Err("Either path or suite must be provided".to_string());
+        Err("Either path or suite must be provided".to_string())
     }
 }
 

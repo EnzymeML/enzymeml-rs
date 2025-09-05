@@ -29,10 +29,8 @@ struct DocumentResponse {
 ///
 /// # Arguments
 ///
-/// * `id` - The unique identifier of the document to fetch from the Suite.
-///          If `None` or empty, defaults to ":current" to fetch the current document.
-/// * `base_url` - The base URL of the Suite instance. If `None`, defaults to
-///                "http://127.0.0.1:13452".
+/// * `id` - The unique identifier of the document to fetch from the Suite. If `None` or empty, defaults to ":current" to fetch the current document.
+/// * `base_url` - The base URL of the Suite instance. If `None`, defaults to "http://127.0.0.1:13452".
 ///
 /// # Returns
 ///
@@ -55,7 +53,7 @@ pub fn fetch_document_from_suite(
     let doc_id = id.into().unwrap_or_else(|| ":current".to_string());
     let base_url = base_url
         .into()
-        .unwrap_or_else(|| format!("http://127.0.0.1:13452"));
+        .unwrap_or_else(|| "http://127.0.0.1:13452".to_string());
     let url = format!("{base_url}/docs/{doc_id}");
 
     let response = reqwest::blocking::get(&url).map_err(SuiteError::RequestError)?;
@@ -98,14 +96,14 @@ mod tests {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(httpmock::Method::GET)
-                .path(format!("/docs/:current").as_str());
+                .path("/docs/:current".to_string().as_str());
             then.status(200).body(
                 serde_json::to_string(&mock_suite_response())
                     .expect("Failed to serialize mock suite response"),
             );
         });
 
-        let base_url = format!("http://{}", mock.server_address().to_string());
+        let base_url = format!("http://{}", mock.server_address());
         let document =
             fetch_document_from_suite(None, base_url).expect("Failed to fetch document from suite");
         assert_eq!(document.name, "Test Document");
@@ -115,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_fetch_document_from_suite_invalid_address() {
-        let base_url = format!("http://invalid");
+        let base_url = "http://invalid".to_string();
         fetch_document_from_suite(None, base_url)
             .expect_err("Should have failed to fetch document from suite");
     }
