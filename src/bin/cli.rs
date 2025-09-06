@@ -110,6 +110,7 @@ use enzymeml::{
         SubProblem, Transformation,
     },
     prelude::{EnzymeMLDocument, LossFunction, NegativeLogLikelihood},
+    suite::fetch_document_from_suite,
     tabular::writer::create_workbook,
     validation::{consistency, schema},
 };
@@ -393,8 +394,16 @@ enum ProfileAlgorithm {
 #[derive(Args, Debug)]
 struct BaseIntegratorParams {
     /// Path to the EnzymeML document
-    #[arg(short, long)]
-    path: PathBuf,
+    #[arg(short, long, conflicts_with = "suite")]
+    path: Option<PathBuf>,
+
+    /// Whether to fetch the document from the EnzymeML Suite
+    #[arg(
+        long,
+        help = "Whether to fetch the document from the EnzymeML Suite",
+        conflicts_with = "path"
+    )]
+    suite: bool,
 
     /// Whether to use the log transformation for the initial guesses
     #[arg(short, long, conflicts_with = "transform", default_value_t = true)]
@@ -436,7 +445,8 @@ impl BaseIntegratorParams {
         &self,
         objective: impl Into<LossFunction>,
     ) -> Result<Problem<Solvers, LossFunction>, OptimizeError> {
-        let enzmldoc = load_enzmldoc(&self.path).expect("Failed to load EnzymeML document");
+        let enzmldoc =
+            load_document(&self.path, self.suite).expect("Failed to load EnzymeML document");
 
         let transformations = if self.log_transform {
             create_log_transformations(&enzmldoc)
@@ -564,7 +574,7 @@ struct PSOParams {
     #[arg(long, default_value_t = 50)]
     pop_size: usize,
 
-    /// Bounds for the optimization
+    /// Bounds for the optimization: Example: --bound k_cat=0.2:1.2
     #[arg(short, long, value_parser = parse_key_bounds)]
     bound: Vec<(String, (f64, f64))>,
 }
@@ -755,7 +765,8 @@ pub fn main() {
             dir,
         } => {
             // Load the enzymeml document and init a problem
-            let doc = load_enzmldoc(&params.path).unwrap();
+            let doc = load_document(&params.path, params.suite)
+                .expect("Failed to load EnzymeML document");
             let problem = ProblemBuilder::new(&doc, params.solver, *likelihood)
                 .dt(params.dt)
                 .build()
@@ -1131,9 +1142,13 @@ pub fn main() {
                     }
 
                     if let Some(out) = &profile_params.out {
-                        let fname = opt_params
-                            .params
-                            .path
+                        let path = opt_params.params.path.clone().unwrap_or_else(|| {
+                            PathBuf::from(format!(
+                                "{}.json",
+                                problem.enzmldoc().name.replace(" ", "_").to_lowercase()
+                            ))
+                        });
+                        let fname = path
                             .file_name()
                             .expect("Failed to get file name")
                             .to_str()
@@ -1166,6 +1181,29 @@ enum ConversionTarget {
     /// Convert to SBML
     #[cfg(feature = "sbml")]
     SBML,
+}
+
+/// Loads an EnzymeML document from a path or from the EnzymeML Suite
+///
+/// # Arguments
+///
+/// * `path` - Path to the EnzymeML document
+/// * `use_suite` - Whether to use the EnzymeML Suite
+///
+/// # Returns
+///
+/// * `Ok(EnzymeMLDocument)` - The loaded EnzymeML document
+/// * `Err(String)` - Error message if loading fails
+fn load_document(path: &Option<PathBuf>, use_suite: bool) -> Result<EnzymeMLDocument, String> {
+    if use_suite && path.is_none() {
+        println!("Loading document from EnzymeML Suite");
+        fetch_document_from_suite(None, None).map_err(|e| e.to_string())
+    } else if !use_suite && path.is_some() {
+        println!("Loading document from {:?}", path.clone().unwrap());
+        load_enzmldoc(path.clone().unwrap()).map_err(|e| e.to_string())
+    } else {
+        Err("Either path or suite must be provided".to_string())
+    }
 }
 
 /// Performs comprehensive validation of an EnzymeML document
@@ -1313,7 +1351,7 @@ fn parse_key_bounds(s: &str) -> Result<(String, (f64, f64)), String> {
     }
     let key = parts[0].to_string();
     let bounds = parts[1]
-        .split(',')
+        .split(':')
         .map(|s| s.trim().parse::<f64>().unwrap())
         .collect::<Vec<_>>();
     Ok((key, (bounds[0], bounds[1])))
@@ -1343,12 +1381,18 @@ fn add_cli_bounds(enzmldoc: &mut EnzymeMLDocument, cli_bounds: &[(String, (f64, 
 /// * `enzmldoc` - The fitted EnzymeML document
 /// * `output_dir` - The output directory
 fn save_results(
-    doc_path: &Path,
+    doc_path: &Option<PathBuf>,
     report: &OptimizationReport,
     enzmldoc: &EnzymeMLDocument,
     output_dir: &Path,
     optimizer: &str,
 ) {
+    let doc_path = doc_path.clone().unwrap_or_else(|| {
+        PathBuf::from(format!(
+            "{}.json",
+            enzmldoc.name.replace(" ", "_").to_lowercase()
+        ))
+    });
     let doc_name = format!(
         "{}_{}.json",
         doc_path

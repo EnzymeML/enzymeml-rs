@@ -306,3 +306,6 @@ pub mod system;
 
 /// Conversion functionality
 pub mod conversion;
+
+/// EnzymeML Suite
+pub mod suite;
