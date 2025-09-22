@@ -37,9 +37,10 @@ fn main() {
         // Create a new file with the same name as the markdown file
         let out_path: PathBuf = format!("src/versions/{fname}.rs").into();
 
-        // If the file doesn't exist, or if it exists but is different from the generated code, write the code to the file
+        // If the file doesn't exist, write the code to the file
         if !out_path.exists() {
-            fs::write(out_path, code).expect("Failed to write file");
+            fs::write(&out_path, code).expect("Failed to write file");
+            println!("cargo:warning=Updated file {}", out_path.display());
         }
     }
 }

@@ -618,6 +618,7 @@ impl TryFrom<&SBMLParameter<'_>> for Parameter {
             lower_bound: None,
             stderr: None,
             constant: parameter.constant(),
+            fit: None,
         };
 
         annotation.apply(&mut parameter);

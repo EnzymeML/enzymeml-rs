@@ -495,6 +495,12 @@ pub struct Parameter {
     #[builder(default, setter(into))]
     pub lower_bound: Option<f64>,
 
+    /// Whether this parameter should be varied or not in the context of an
+    /// optimization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default = "true.into()", setter(into))]
+    pub fit: Option<bool>,
+
     /// Standard error of the estimated parameter.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[builder(default, setter(into))]
