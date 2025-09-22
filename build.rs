@@ -37,12 +37,8 @@ fn main() {
         // Create a new file with the same name as the markdown file
         let out_path: PathBuf = format!("src/versions/{fname}.rs").into();
 
-        // Get hash of new and old code
-        let new_hash = md5::compute(code.clone());
-        let old_hash = md5::compute(fs::read_to_string(&out_path).expect("Failed to read file"));
-
-        // If the file doesn't exist, or if it exists but is different from the generated code, write the code to the file
-        if !out_path.exists() || new_hash != old_hash {
+        // If the file doesn't exist, write the code to the file
+        if !out_path.exists() {
             fs::write(&out_path, code).expect("Failed to write file");
             println!("cargo:warning=Updated file {}", out_path.display());
         }
