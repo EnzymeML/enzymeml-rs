@@ -50,7 +50,7 @@ pub fn check_consistency(enzmldoc: &EnzymeMLDocument) -> Report {
 ///
 /// Contains a boolean indicating overall validity and a vector of individual validation results.
 /// The document is considered invalid if any validation results have Error severity.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 #[cfg_attr(feature = "wasm", derive(Tsify))]
 #[cfg_attr(feature = "wasm", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Report {
