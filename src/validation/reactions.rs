@@ -48,6 +48,7 @@ fn check_reaction_species(
                     reac_elem.species_id
                 ),
                 Severity::Error,
+                Some(reaction.id.clone()),
             );
 
             report.add_result(result);
@@ -77,6 +78,7 @@ fn check_reaction_stoichiometry(report: &mut Report, reaction: &Reaction, reacti
                 reaction.id
             ),
             Severity::Error,
+            Some(reaction.id.clone()),
         );
 
         report.add_result(result);

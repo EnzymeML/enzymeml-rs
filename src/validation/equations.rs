@@ -44,6 +44,7 @@ pub fn has_both_system_types(enzmldoc: &EnzymeMLDocument, report: &mut Report) -
             "/enzmldoc".to_string(),
             "Document contains both ODEs and kinetic laws. Only one is allowed.".to_string(),
             Severity::Error,
+            None,
         );
         report.add_result(result);
         return true;
@@ -78,6 +79,7 @@ fn check_ode_species_id(
                 equation.species_id
             ),
             Severity::Error,
+            Some(equation.species_id.clone()),
         );
 
         report.add_result(result);
@@ -110,6 +112,7 @@ fn check_equation_variables(
                     var.id
                 ),
                 Severity::Error,
+                Some(var.id.clone()),
             );
 
             report.add_result(result);

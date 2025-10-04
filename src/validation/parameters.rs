@@ -35,6 +35,7 @@ fn check_parameter_units(report: &mut Report, parameter: &Parameter, param_idx: 
                 parameter.id
             ),
             Severity::Warning,
+            Some(parameter.id.clone()),
         );
 
         report.add_result(result);

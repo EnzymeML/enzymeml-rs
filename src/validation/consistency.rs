@@ -102,6 +102,8 @@ pub struct ValidationResult {
     message: String,
     /// Severity level of the validation issue
     severity: Severity,
+    /// The identifier of the object, if any
+    identifier: Option<String>,
 }
 
 impl ValidationResult {
@@ -116,11 +118,17 @@ impl ValidationResult {
     /// # Returns
     ///
     /// Returns a new `ValidationResult` with the provided details.
-    pub fn new(location: String, message: String, severity: Severity) -> Self {
+    pub fn new(
+        location: String,
+        message: String,
+        severity: Severity,
+        identifier: Option<String>,
+    ) -> Self {
         Self {
             location,
             message,
             severity,
+            identifier,
         }
     }
 }

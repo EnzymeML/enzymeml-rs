@@ -18,10 +18,11 @@ pub(super) fn check_measurements(enzmldoc: &EnzymeMLDocument, report: &mut Repor
     let all_species = get_species_ids(enzmldoc);
 
     for (meas_idx, measurement) in enzmldoc.measurements.iter().enumerate() {
+        let meas_id = &measurement.id;
         for (data_idx, meas_data) in measurement.species_data.iter().enumerate() {
-            check_initial_concentrations(report, meas_idx, data_idx, meas_data);
-            check_time_data_consistency(report, meas_idx, data_idx, meas_data);
-            check_species_consistency(report, meas_idx, data_idx, meas_data, &all_species);
+            check_initial_concentrations(report, meas_id, meas_idx, data_idx, meas_data);
+            check_time_data_consistency(report, meas_id, meas_idx, data_idx, meas_data);
+            check_species_consistency(report, meas_id, meas_idx, data_idx, meas_data, &all_species);
         }
     }
 }
@@ -30,6 +31,7 @@ pub(super) fn check_measurements(enzmldoc: &EnzymeMLDocument, report: &mut Repor
 ///
 /// # Arguments
 /// * `report` - Validation report to add any errors to
+/// * `meas_id` - ID of the measurement
 /// * `meas_idx` - Index of the measurement in the document's measurements list
 /// * `data_idx` - Index of the species data in the measurement's data list
 /// * `meas_data` - The measurement data to validate
@@ -42,6 +44,7 @@ pub(super) fn check_measurements(enzmldoc: &EnzymeMLDocument, report: &mut Repor
 /// - First time point is not 0
 fn check_initial_concentrations(
     report: &mut Report,
+    meas_id: &str,
     meas_idx: usize,
     data_idx: usize,
     meas_data: &MeasurementData,
@@ -71,6 +74,7 @@ fn check_initial_concentrations(
                 meas_data.species_id
             ),
                 Severity::Warning,
+                Some(meas_id.to_string()),
             );
 
             report.add_result(result);
@@ -91,6 +95,7 @@ fn check_initial_concentrations(
 /// Adds an error to the report if the lengths don't match.
 fn check_time_data_consistency(
     report: &mut Report,
+    meas_id: &str,
     meas_idx: usize,
     data_idx: usize,
     meas_data: &MeasurementData,
@@ -110,6 +115,7 @@ fn check_time_data_consistency(
                     time.len()
                 ),
                 Severity::Error,
+                Some(meas_id.to_string()),
             );
 
             report.add_result(result);
@@ -122,6 +128,7 @@ fn check_time_data_consistency(
                 meas_data.species_id
             ),
             Severity::Error,
+            Some(meas_id.to_string()),
         );
 
         report.add_result(result);
@@ -133,6 +140,7 @@ fn check_time_data_consistency(
                 meas_data.species_id
             ),
             Severity::Error,
+            Some(meas_id.to_string()),
         );
 
         report.add_result(result);
@@ -153,6 +161,7 @@ fn check_time_data_consistency(
 /// Adds an error to the report if the species is not found.
 fn check_species_consistency(
     report: &mut Report,
+    meas_id: &str,
     meas_idx: usize,
     data_idx: usize,
     meas_data: &MeasurementData,
@@ -166,6 +175,7 @@ fn check_species_consistency(
                 meas_data.species_id
             ),
             Severity::Error,
+            Some(meas_id.to_string()),
         );
 
         report.add_result(result);
