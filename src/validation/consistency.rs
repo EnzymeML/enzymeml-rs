@@ -87,6 +87,23 @@ impl Report {
             self.is_valid = false;
         }
     }
+
+    /// Filters the results by the identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The identifier of the object.
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of `ValidationResult`s with the given identifier.
+    pub fn filter_results(&self, identifier: &str) -> Vec<ValidationResult> {
+        self.errors
+            .iter()
+            .filter(|result| result.identifier == Some(identifier.to_string()))
+            .cloned()
+            .collect()
+    }
 }
 
 /// The `ValidationResult` struct represents a single validation issue found during checking.
