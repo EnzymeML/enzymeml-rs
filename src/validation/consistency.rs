@@ -148,6 +148,60 @@ impl ValidationResult {
             identifier,
         }
     }
+
+    /// Returns a reference to the location where the validation issue was found.
+    ///
+    /// The location is represented as a JSON pointer path that identifies the specific
+    /// position within the document structure where the validation issue occurred.
+    /// This allows for precise identification and navigation to the problematic area.
+    ///
+    /// # Returns
+    ///
+    /// A string slice containing the JSON pointer path to the validation issue location.
+    pub fn location(&self) -> &str {
+        &self.location
+    }
+
+    /// Returns a reference to the human-readable message describing the validation issue.
+    ///
+    /// The message provides detailed information about what validation rule was violated
+    /// or what issue was detected, helping users understand the nature of the problem
+    /// and how they might address it.
+    ///
+    /// # Returns
+    ///
+    /// A string slice containing the descriptive message for this validation issue.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Returns a reference to the severity level of the validation issue.
+    ///
+    /// The severity indicates how critical the validation issue is, ranging from
+    /// informational messages to warnings and critical errors. This helps users
+    /// prioritize which issues to address first and understand the impact of each issue.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `Severity` enum value indicating the issue's severity level.
+    pub fn severity(&self) -> &Severity {
+        &self.severity
+    }
+
+    /// Returns a reference to the optional identifier associated with the validation issue.
+    ///
+    /// The identifier provides additional context about which specific object or entity
+    /// the validation issue relates to. This is particularly useful when validating
+    /// collections of objects where multiple items might have similar issues, allowing
+    /// for more precise identification of the problematic element.
+    ///
+    /// # Returns
+    ///
+    /// A reference to an `Option<String>` that contains the identifier if available,
+    /// or `None` if no specific identifier is associated with this validation issue.
+    pub fn identifier(&self) -> &Option<String> {
+        &self.identifier
+    }
 }
 
 impl fmt::Display for ValidationResult {
