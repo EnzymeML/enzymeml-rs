@@ -74,7 +74,7 @@ fn check_reaction_stoichiometry(report: &mut Report, reaction: &Reaction, reacti
         let result = ValidationResult::new(
             format!("/reactions/{reaction_idx}"),
             format!(
-                "Reaction '{}' must have at least one reactant (stoichiometry < 0) and one product (stoichiometry > 0).",
+                "Reaction '{}' must have at least one reactant and one product.",
                 reaction.id
             ),
             Severity::Error,
