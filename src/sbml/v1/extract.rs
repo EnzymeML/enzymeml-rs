@@ -301,6 +301,7 @@ fn create_measurement_data(
         time: vec![],
         data_type,
         is_simulated: None,
+        ..Default::default()
     };
 
     // Extract time-series data if available

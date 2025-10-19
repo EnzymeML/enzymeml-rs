@@ -3,12 +3,12 @@
 //! WARNING: This is an auto-generated file.
 //! Do not edit directly - any changes will be overwritten.
 
-use derivative::Derivative;
 use derive_builder::Builder;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use derivative::Derivative;
 use std::collections::HashMap;
+use serde_json::Value;
 use uuid;
 
 //
@@ -222,7 +222,7 @@ pub struct Vessel {
     /// Whether the volume of the vessel is constant or not. Default is True.
 
     #[builder(default = "true.into()", setter(into))]
-    #[derivative(Default(value = "true.into()"))]
+    #[derivative(Default(value = "true"))]
     pub constant: bool,
 
     /// Additional properties outside of the schema
@@ -261,7 +261,7 @@ pub struct Protein {
     /// experiment or not. Default is True.
 
     #[builder(default = "true.into()", setter(into))]
-    #[derivative(Default(value = "true.into()"))]
+    #[derivative(Default(value = "true"))]
     pub constant: bool,
 
     /// Amino acid sequence of the protein
@@ -530,7 +530,7 @@ pub struct ReactionElement {
     /// Float number representing the associated stoichiometry.
 
     #[builder(default = "1.0.into()", setter(into))]
-    #[derivative(Default(value = "1.0.into()"))]
+    #[derivative(Default(value = "1.0"))]
     pub stoichiometry: f64,
 
     /// Additional properties outside of the schema
@@ -1165,92 +1165,53 @@ pub fn default_enzymemldocument_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "name".to_string(),
-        TermDef::Simple("schema:title".to_string()),
-    );
-    context.terms.insert(
-        "created".to_string(),
-        TermDef::Simple("schema:dateCreated".to_string()),
-    );
-    context.terms.insert(
-        "modified".to_string(),
-        TermDef::Simple("schema:dateModified".to_string()),
-    );
-    context.terms.insert(
-        "creators".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:creator".to_string()),
-            type_: None,
-            container: Some("@list".to_string()),
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "references".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:citation".to_string()),
-            type_: Some("@id".to_string()),
-            container: Some("@list".to_string()),
-            context: None,
-        }),
-    );
+    context.terms.insert("name".to_string(), TermDef::Simple("schema:title".to_string()));
+    context.terms.insert("created".to_string(), TermDef::Simple("schema:dateCreated".to_string()));
+    context.terms.insert("modified".to_string(), TermDef::Simple("schema:dateModified".to_string()));
+    context.terms.insert("creators".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:creator".to_string()),
+        type_: None,
+        container: Some("@list".to_string()),
+        context: None,
+    }));
+    context.terms.insert("references".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:citation".to_string()),
+        type_: Some("@id".to_string()),
+        container: Some("@list".to_string()),
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:EnzymeMLDocument/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:EnzymeMLDocument".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:EnzymeMLDocument".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_creator_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "given_name".to_string(),
-        TermDef::Simple("schema:givenName".to_string()),
-    );
-    context.terms.insert(
-        "family_name".to_string(),
-        TermDef::Simple("schema:familyName".to_string()),
-    );
-    context.terms.insert(
-        "mail".to_string(),
-        TermDef::Simple("schema:email".to_string()),
-    );
+    context.terms.insert("given_name".to_string(), TermDef::Simple("schema:givenName".to_string()));
+    context.terms.insert("family_name".to_string(), TermDef::Simple("schema:familyName".to_string()));
+    context.terms.insert("mail".to_string(), TermDef::Simple("schema:email".to_string()));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
@@ -1258,47 +1219,30 @@ pub fn default_creator_jsonld_header() -> Option<JsonLdHeader> {
         type_: Some(TypeOrVec::Multi(vec![
             "enzml:Creator".to_string(),
             "schema:person".to_string(),
-        ])),
+        ]))
     })
 }
+
 
 pub fn default_vessel_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "name".to_string(),
-        TermDef::Simple("schema:name".to_string()),
-    );
-    context.terms.insert(
-        "volume".to_string(),
-        TermDef::Simple("OBO:OBI_0002139".to_string()),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("name".to_string(), TermDef::Simple("schema:name".to_string()));
+    context.terms.insert("volume".to_string(), TermDef::Simple("OBO:OBI_0002139".to_string()));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
@@ -1306,78 +1250,49 @@ pub fn default_vessel_jsonld_header() -> Option<JsonLdHeader> {
         type_: Some(TypeOrVec::Multi(vec![
             "enzml:Vessel".to_string(),
             "OBO:OBI_0400081".to_string(),
-        ])),
+        ]))
     })
 }
+
 
 pub fn default_protein_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "name".to_string(),
-        TermDef::Simple("schema:name".to_string()),
-    );
-    context.terms.insert(
-        "sequence".to_string(),
-        TermDef::Simple("OBO:GSSO_007262".to_string()),
-    );
-    context.terms.insert(
-        "vessel_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "organism".to_string(),
-        TermDef::Simple("OBO:OBI_0100026".to_string()),
-    );
-    context.terms.insert(
-        "organism_tax_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: None,
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "references".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:citation".to_string()),
-            type_: Some("@id".to_string()),
-            container: Some("@list".to_string()),
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("name".to_string(), TermDef::Simple("schema:name".to_string()));
+    context.terms.insert("sequence".to_string(), TermDef::Simple("OBO:GSSO_007262".to_string()));
+    context.terms.insert("vessel_id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("organism".to_string(), TermDef::Simple("OBO:OBI_0100026".to_string()));
+    context.terms.insert("organism_tax_id".to_string(), TermDef::Detailed(TermDetail {
+        id: None,
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("references".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:citation".to_string()),
+        type_: Some("@id".to_string()),
+        container: Some("@list".to_string()),
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
@@ -1385,488 +1300,366 @@ pub fn default_protein_jsonld_header() -> Option<JsonLdHeader> {
         type_: Some(TypeOrVec::Multi(vec![
             "enzml:Protein".to_string(),
             "OBO:PR_000000001".to_string(),
-        ])),
+        ]))
     })
 }
+
 
 pub fn default_complex_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "name".to_string(),
-        TermDef::Simple("schema:name".to_string()),
-    );
-    context.terms.insert(
-        "vessel_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "participants".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: None,
-            type_: Some("@id".to_string()),
-            container: Some("@list".to_string()),
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("name".to_string(), TermDef::Simple("schema:name".to_string()));
+    context.terms.insert("vessel_id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("participants".to_string(), TermDef::Detailed(TermDetail {
+        id: None,
+        type_: Some("@id".to_string()),
+        container: Some("@list".to_string()),
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:Complex/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:Complex".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:Complex".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_smallmolecule_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "name".to_string(),
-        TermDef::Simple("schema:name".to_string()),
-    );
-    context.terms.insert(
-        "vessel_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "references".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:citation".to_string()),
-            type_: Some("@id".to_string()),
-            container: Some("@list".to_string()),
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("name".to_string(), TermDef::Simple("schema:name".to_string()));
+    context.terms.insert("vessel_id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("references".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:citation".to_string()),
+        type_: Some("@id".to_string()),
+        container: Some("@list".to_string()),
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:SmallMolecule/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:SmallMolecule".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:SmallMolecule".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_reaction_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:Reaction/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:Reaction".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:Reaction".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_reactionelement_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "species_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("species_id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:ReactionElement/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:ReactionElement".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:ReactionElement".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_modifierelement_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "species_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("species_id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:ModifierElement/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:ModifierElement".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:ModifierElement".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_equation_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "species_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("species_id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:Equation/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:Equation".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:Equation".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_variable_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:Variable/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:Variable".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:Variable".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_parameter_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:Parameter/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:Parameter".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:Parameter".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_measurement_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: Some("schema:identifier".to_string()),
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
-    context.terms.insert(
-        "group_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: None,
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("id".to_string(), TermDef::Detailed(TermDetail {
+        id: Some("schema:identifier".to_string()),
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
+    context.terms.insert("group_id".to_string(), TermDef::Detailed(TermDetail {
+        id: None,
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:Measurement/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:Measurement".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:Measurement".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_measurementdata_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
-    context.terms.insert(
-        "species_id".to_string(),
-        TermDef::Detailed(TermDetail {
-            id: None,
-            type_: Some("@id".to_string()),
-            container: None,
-            context: None,
-        }),
-    );
+    context.terms.insert("species_id".to_string(), TermDef::Detailed(TermDetail {
+        id: None,
+        type_: Some("@id".to_string()),
+        container: None,
+        context: None,
+    }));
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:MeasurementData/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:MeasurementData".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:MeasurementData".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_unitdefinition_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:UnitDefinition/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:UnitDefinition".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:UnitDefinition".to_string(),
+        ]))
     })
 }
+
 
 pub fn default_baseunit_jsonld_header() -> Option<JsonLdHeader> {
     let mut context = SimpleContext::default();
 
     // Add main prefix and repository URL
-    context.terms.insert(
-        "enzml".to_string(),
-        TermDef::Simple("http://www.enzymeml.org/v2/".to_string()),
-    );
+    context.terms.insert("enzml".to_string(), TermDef::Simple("http://www.enzymeml.org/v2/".to_string()));
 
     // Add configured prefixes
-    context.terms.insert(
-        "schema".to_string(),
-        TermDef::Simple("https://schema.org/".to_string()),
-    );
-    context.terms.insert(
-        "OBO".to_string(),
-        TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()),
-    );
+    context.terms.insert("OBO".to_string(), TermDef::Simple("http://purl.obolibrary.org/obo/".to_string()));
+    context.terms.insert("schema".to_string(), TermDef::Simple("https://schema.org/".to_string()));
 
     // Add attribute terms
 
     Some(JsonLdHeader {
         context: Some(JsonLdContext::Object(context)),
         id: Some(format!("enzml:BaseUnit/{}", uuid::Uuid::new_v4())),
-        type_: Some(TypeOrVec::Multi(vec!["enzml:BaseUnit".to_string()])),
+        type_: Some(TypeOrVec::Multi(vec![
+            "enzml:BaseUnit".to_string(),
+        ]))
     })
 }
+
 
 /// JSON-LD Header
 ///
