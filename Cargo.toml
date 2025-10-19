@@ -91,6 +91,8 @@ quick-xml = { version = "0.38.0", features = [
     "serde-types",
     "overlapped-lists",
 ], optional = true }
+uuid = { version = "1.18.1", features = ["v4"] }
+derivative = "2.2.0"
 
 [profile.release]
 opt-level = 3
