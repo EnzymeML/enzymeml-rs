@@ -22,6 +22,8 @@
 macro_rules! build_base_unit {
     ($prefix:tt, $unit:ident, $exponent:expr) => {
         $crate::prelude::BaseUnit {
+            jsonld: $crate::prelude::default_baseunit_jsonld_header(),
+            additional_properties: None,
             scale: Some(
                 $crate::macros::unit_maps::PREFIX_MAPPING
                     .get(stringify!($prefix))
@@ -75,6 +77,8 @@ macro_rules! collect_base_units {
 macro_rules! inverse_unit {
     ($([$prefix:tt $unit:ident])+) => {
         $crate::prelude::UnitDefinition {
+            jsonld: $crate::prelude::default_unitdefinition_jsonld_header(),
+            additional_properties: None,
             id: None,
             name: format!("1 / {}", $crate::build_unit_name!($([$prefix $unit])+)).into(),
             base_units: $crate::collect_base_units!(-1; $([$prefix $unit])+),
@@ -87,6 +91,8 @@ macro_rules! inverse_unit {
 macro_rules! ratio_unit {
     ($([$num_prefix:tt $num_unit:ident])+; $([$den_prefix:tt $den_unit:ident])+) => {
         $crate::prelude::UnitDefinition {
+            jsonld: $crate::prelude::default_unitdefinition_jsonld_header(),
+            additional_properties: None,
             id: None,
             name: format!(
                 "{} / {}",
@@ -107,6 +113,8 @@ macro_rules! ratio_unit {
 macro_rules! simple_unit {
     ($([$prefix:tt $unit:ident])+) => {
         $crate::prelude::UnitDefinition {
+            jsonld: $crate::prelude::default_unitdefinition_jsonld_header(),
+            additional_properties: None,
             id: None,
             name: $crate::build_unit_name!($([$prefix $unit])+).into(),
             base_units: $crate::collect_base_units!(1; $([$prefix $unit])+),
@@ -140,6 +148,7 @@ mod tests {
     #[test]
     fn test_unit_ratio_macro() {
         let unit = unit!([_ mole] / [_ liter]);
+        assert_eq!(unit.additional_properties, None);
         assert_eq!(unit.name, Some("mole / liter".to_string()));
         assert_eq!(unit.base_units.len(), 2);
         assert_eq!(unit.base_units[0].kind, UnitType::Mole);
@@ -153,6 +162,7 @@ mod tests {
     #[test]
     fn test_unit_ratio_macro_with_prefix() {
         let unit = unit!([m mol] / [_ liter]);
+        assert_eq!(unit.additional_properties, None);
         assert_eq!(unit.name, Some("mmol / liter".to_string()));
         assert_eq!(unit.base_units.len(), 2);
         assert_eq!(unit.base_units[0].kind, UnitType::Mole);
