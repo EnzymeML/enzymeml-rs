@@ -317,6 +317,7 @@ impl TryFrom<&Compartment<'_>> for Vessel {
             volume: compartment.size().unwrap_or(1.0),
             unit,
             constant: compartment.constant().unwrap_or(true),
+            ..Default::default()
         })
     }
 }
@@ -357,6 +358,7 @@ impl TryFrom<&Species<'_>> for SmallMolecule {
             inchikey: None,
             synonymous_names: vec![],
             references: vec![],
+            ..Default::default()
         };
 
         annotation.apply(&mut smallmol);
@@ -401,6 +403,7 @@ impl TryFrom<&Species<'_>> for Protein {
             ecnumber: None,
             organism: None,
             organism_tax_id: None,
+            ..Default::default()
         };
 
         annotation.apply(&mut protein);
@@ -441,6 +444,7 @@ impl TryFrom<&Species<'_>> for Complex {
             constant: species.constant(),
             vessel_id: species.compartment(),
             participants: vec![],
+            ..Default::default()
         };
 
         annotation.apply(&mut complex);
@@ -468,6 +472,7 @@ impl TryFrom<&KineticLaw<'_>> for Equation {
             equation: kinetic_law.formula(),
             equation_type: EquationType::RateLaw,
             variables: vec![],
+            ..Default::default()
         })
     }
 }
@@ -533,6 +538,7 @@ impl TryFrom<&SBMLReaction<'_>> for Reaction {
             products,
             modifiers,
             kinetic_law,
+            ..Default::default()
         })
     }
 }
@@ -554,6 +560,7 @@ impl TryFrom<&SpeciesReference<'_>> for ReactionElement {
         Ok(ReactionElement {
             species_id: species_reference.species(),
             stoichiometry: species_reference.stoichiometry(),
+            ..Default::default()
         })
     }
 }
@@ -577,6 +584,7 @@ impl TryFrom<&ModifierSpeciesReference<'_>> for ModifierElement {
         Ok(ModifierElement {
             species_id: modifier_species_reference.species(),
             role: ModifierRole::Biocatalyst,
+            ..Default::default()
         })
     }
 }
@@ -619,6 +627,7 @@ impl TryFrom<&SBMLParameter<'_>> for Parameter {
             stderr: None,
             constant: parameter.constant(),
             fit: None,
+            ..Default::default()
         };
 
         annotation.apply(&mut parameter);
@@ -706,6 +715,7 @@ impl TryFrom<&Rule<'_>> for Equation {
             equation: rate_rule.formula(),
             equation_type,
             variables: vec![],
+            ..Default::default()
         })
     }
 }

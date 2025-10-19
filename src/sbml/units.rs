@@ -115,6 +115,7 @@ impl TryFrom<&SBMLUnitDefinition<'_>> for UnitDefinition {
             id: Some(unit_definition.id()),
             name: unit_definition.name(),
             base_units,
+            ..Default::default()
         })
     }
 }
@@ -153,6 +154,7 @@ impl TryFrom<&SBMLUnit<'_>> for BaseUnit {
             exponent: unit.exponent().into(),
             multiplier: unit.multiplier().into(),
             scale: Some(unit.scale().into()),
+            ..Default::default()
         })
     }
 }

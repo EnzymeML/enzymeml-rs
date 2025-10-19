@@ -362,6 +362,7 @@ impl From<&MeasurementAnnot> for Measurement {
             ph: conditions.ph.and_then(|ph| ph.value),
             temperature: conditions.temperature.and_then(|temp| temp.value),
             temperature_unit: None,
+            ..Default::default()
         }
     }
 }
@@ -400,6 +401,7 @@ impl From<&SpeciesDataAnnot> for MeasurementData {
             time_unit: None,
             data_type: Some(species_data.data_type.clone()),
             is_simulated: None,
+            ..Default::default()
         }
     }
 }
