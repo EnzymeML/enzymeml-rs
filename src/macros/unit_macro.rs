@@ -135,7 +135,7 @@ macro_rules! unit {
 
 #[cfg(test)]
 mod tests {
-    use crate::{prelude::UnitType, unit};
+    use crate::prelude::UnitType;
 
     #[test]
     fn test_unit_ratio_macro() {
