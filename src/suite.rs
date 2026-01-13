@@ -68,6 +68,46 @@ pub fn fetch_document_from_suite(
     Ok(suite_response.data.content)
 }
 
+/// Pushes an EnzymeML document to the EnzymeML Suite
+///
+/// This function connects to a local EnzymeML Suite instance and pushes
+/// the specified document to the current document. If no base URL is provided,
+/// it defaults to the local Suite instance running on port 13452.
+///
+/// # Arguments
+///
+/// * `document` - The EnzymeML document to push to the Suite.
+/// * `base_url` - The base URL of the Suite instance. If `None`, defaults to "http://127.0.0.1:13452".
+///
+/// # Returns
+///
+/// * `Ok(())` - The document was successfully pushed to the Suite
+pub fn push_document_to_suite(
+    document: &EnzymeMLDocument,
+    base_url: impl Into<Option<String>>,
+) -> Result<(), SuiteError> {
+    let base_url = base_url
+        .into()
+        .unwrap_or_else(|| "http://127.0.0.1:13452".to_string());
+    let url = format!("{base_url}/docs/:current");
+
+    // Send PUT request to the Suite API to update the current document
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .put(&url)
+        .body(serde_json::to_string(document).map_err(SuiteError::JSONError)?)
+        .send()
+        .map_err(SuiteError::RequestError)?;
+
+    if response.status() != 200 {
+        return Err(SuiteError::InvalidDocument(
+            response.text().map_err(SuiteError::RequestError)?,
+        ));
+    }
+
+    Ok(())
+}
+
 /// Errors that can occur when interacting with the EnzymeML Suite
 #[derive(Error, Debug)]
 pub enum SuiteError {
@@ -129,5 +169,28 @@ mod tests {
             },
             status: 200,
         }
+    }
+
+    #[test]
+    fn test_push_document_to_suite() {
+        let server = MockServer::start();
+        let test_document = EnzymeMLDocument {
+            name: "Test Push Document".to_string(),
+            ..Default::default()
+        };
+        let expected_body =
+            serde_json::to_string(&test_document).expect("Failed to serialize test document");
+
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::PUT)
+                .path("/docs/:current")
+                .body(&expected_body);
+            then.status(200);
+        });
+
+        let base_url = format!("http://{}", mock.server_address());
+        push_document_to_suite(&test_document, base_url).expect("Failed to push document to suite");
+
+        mock.assert();
     }
 }
