@@ -5,8 +5,11 @@
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use url::Url;
 
 use crate::{io::IOError, prelude::EnzymeMLDocument};
+
+const DEFAULT_BASE_URL: &str = "http://127.0.0.1:13452";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SuiteResponse<T> {
@@ -51,12 +54,19 @@ pub fn fetch_document_from_suite(
     base_url: impl Into<Option<String>>,
 ) -> Result<EnzymeMLDocument, SuiteError> {
     let doc_id = id.into().unwrap_or_else(|| ":current".to_string());
-    let base_url = base_url
+    let base_url_str = base_url
         .into()
-        .unwrap_or_else(|| "http://127.0.0.1:13452".to_string());
-    let url = format!("{base_url}/docs/{doc_id}");
+        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
 
-    let response = reqwest::blocking::get(&url).map_err(SuiteError::RequestError)?;
+    let base = Url::parse(&base_url_str).map_err(|e| {
+        SuiteError::InvalidDocument(format!("Invalid base URL '{}': {}", base_url_str, e))
+    })?;
+
+    let url = base
+        .join(&format!("docs/{}", doc_id))
+        .map_err(|e| SuiteError::InvalidDocument(format!("Failed to join path: {}", e)))?;
+
+    let response = reqwest::blocking::get(url.as_str()).map_err(SuiteError::RequestError)?;
     let body = response.text().map_err(SuiteError::RequestError)?;
     let suite_response: SuiteResponse<DocumentResponse> =
         serde_json::from_str(&body).map_err(SuiteError::JSONError)?;
@@ -86,16 +96,23 @@ pub fn push_document_to_suite(
     document: &EnzymeMLDocument,
     base_url: impl Into<Option<String>>,
 ) -> Result<(), SuiteError> {
-    let base_url = base_url
+    let base_url_str = base_url
         .into()
-        .unwrap_or_else(|| "http://127.0.0.1:13452".to_string());
-    let url = format!("{base_url}/docs/:current");
+        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+
+    let base = Url::parse(&base_url_str).map_err(|e| {
+        SuiteError::InvalidDocument(format!("Invalid base URL '{}': {}", base_url_str, e))
+    })?;
+
+    let url = base
+        .join("docs/:current")
+        .map_err(|e| SuiteError::InvalidDocument(format!("Failed to join path: {}", e)))?;
 
     // Send PUT request to the Suite API to update the current document
     let client = reqwest::blocking::Client::new();
     let response = client
-        .put(&url)
-        .body(serde_json::to_string(document).map_err(SuiteError::JSONError)?)
+        .put(url.as_str())
+        .json(document)
         .send()
         .map_err(SuiteError::RequestError)?;
 
@@ -128,6 +145,8 @@ pub enum SuiteError {
 #[cfg(test)]
 mod tests {
     use httpmock::MockServer;
+
+    use crate::prelude::Protein;
 
     use super::*;
 
@@ -189,6 +208,62 @@ mod tests {
         });
 
         let base_url = format!("http://{}", mock.server_address());
+        push_document_to_suite(&test_document, base_url).expect("Failed to push document to suite");
+
+        mock.assert();
+    }
+
+    #[test]
+    fn test_live_push_document_to_suite() {
+        let document = EnzymeMLDocument {
+            name: "Test Push Document".to_string(),
+            proteins: vec![Protein {
+                id: "P00001".to_string(),
+                name: "Protein 1".to_string(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        push_document_to_suite(&document, None).expect("Failed to push document to suite");
+    }
+
+    #[test]
+    fn test_fetch_with_trailing_slash_base_url() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::GET).path("/docs/:current");
+            then.status(200).body(
+                serde_json::to_string(&mock_suite_response())
+                    .expect("Failed to serialize mock suite response"),
+            );
+        });
+
+        let base_url = format!("http://{}/", mock.server_address());
+        let document =
+            fetch_document_from_suite(None, base_url).expect("Failed to fetch document from suite");
+        assert_eq!(document.name, "Test Document");
+
+        mock.assert();
+    }
+
+    #[test]
+    fn test_push_with_trailing_slash_base_url() {
+        let server = MockServer::start();
+        let test_document = EnzymeMLDocument {
+            name: "Test Push Document".to_string(),
+            ..Default::default()
+        };
+        let expected_body =
+            serde_json::to_string(&test_document).expect("Failed to serialize test document");
+
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::PUT)
+                .path("/docs/:current")
+                .body(&expected_body);
+            then.status(200);
+        });
+
+        let base_url = format!("http://{}/", mock.server_address());
         push_document_to_suite(&test_document, base_url).expect("Failed to push document to suite");
 
         mock.assert();
