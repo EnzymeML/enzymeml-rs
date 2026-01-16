@@ -206,8 +206,6 @@ pub enum SuiteError {
 mod tests {
     use httpmock::MockServer;
 
-    
-
     use super::*;
 
     #[test]
