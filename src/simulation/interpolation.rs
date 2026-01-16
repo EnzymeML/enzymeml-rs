@@ -90,10 +90,11 @@ fn setup_splines(
     let mut splines = Vec::with_capacity(n_species);
 
     for species in 0..n_species {
-        let mut keys = Vec::with_capacity(sim_times.len());
-        for i in 0..sim_times.len() {
-            keys.push(Key::new(sim_times[i], sim_data[i][species], interpol));
-        }
+        let keys: Vec<_> = sim_times
+            .iter()
+            .enumerate()
+            .map(|(i, &time)| Key::new(time, sim_data[i][species], interpol))
+            .collect();
         splines.push(Spline::from_vec(keys));
     }
 
