@@ -380,6 +380,7 @@ impl EnzymeMLAnnotation<Parameter> for ParameterAnnot {
 /// This annotation type is exclusive to EnzymeML v2 and provides enhanced variable
 /// tracking and metadata for mathematical expressions and equations within the model.
 /// Variables annotations are not available in EnzymeML v1.
+#[allow(dead_code)]
 #[derive(Debug, PartialEq, Serialize, Clone)]
 pub(crate) enum VariablesAnnot {
     /// EnzymeML v2 variables annotation (not available in v1)

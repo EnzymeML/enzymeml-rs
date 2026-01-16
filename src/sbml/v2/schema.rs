@@ -59,6 +59,7 @@ fn default_xmlns() -> String {
 /// - **Experimental Data**: Time-series measurements with conditions and metadata
 /// - **Parameters**: Kinetic parameters with statistical properties and constraints
 /// - **Variables**: Mathematical variables for kinetic equations and model definitions
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename = "annotation")]
 pub struct V2Annotation {
@@ -267,6 +268,7 @@ impl IsEmpty for ComplexAnnot {
 /// The modifier annotation enables precise specification of regulatory mechanisms
 /// and supports comprehensive modeling of complex enzymatic regulation patterns
 /// while maintaining compatibility with SBML modifier specifications.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename = "modifier")]
 pub struct ModifierAnnot {
@@ -620,6 +622,7 @@ impl IsEmpty for ParameterAnnot {
 /// The variables annotation facilitates organization of mathematical expressions
 /// while maintaining clear variable identification and enabling systematic
 /// variable management across different model components and equation systems.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename = "variables")]
 pub struct VariablesAnnot {
@@ -651,6 +654,7 @@ impl IsEmpty for VariablesAnnot {
 /// The variable annotation enables precise mathematical expression definition
 /// while supporting variable resolution and symbolic manipulation in complex
 /// kinetic modeling systems and equation-based analysis approaches.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename = "variable")]
 pub struct VariableAnnot {

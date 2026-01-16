@@ -70,6 +70,7 @@ fn default_xmlns() -> String {
 ///   </enzymeml:protein>
 /// </annotation>
 /// ```
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename = "annotation")]
 pub struct V1Annotation {
