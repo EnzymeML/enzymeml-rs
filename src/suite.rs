@@ -56,10 +56,13 @@ pub struct DatabaseEntry {
 /// - The response indicates an error status (non-200)
 /// - The response cannot be parsed as a valid EnzymeML document
 pub fn fetch_document_from_suite(
-    id: impl Into<Option<String>>,
+    id: impl Into<Option<u64>>,
     base_url: impl Into<Option<String>>,
 ) -> Result<EnzymeMLDocument, SuiteError> {
-    let doc_id = id.into().unwrap_or_else(|| ":current".to_string());
+    let doc_id = id
+        .into()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| ":current".to_string());
     let base_url_str = base_url
         .into()
         .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
