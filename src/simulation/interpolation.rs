@@ -77,6 +77,7 @@ pub fn interpolate(
 /// # Returns
 ///
 /// A vector of splines, where each spline interpolates one column of the simulation data
+#[allow(clippy::needless_range_loop)]
 fn setup_splines(
     sim_data: &[Vec<f64>],
     sim_times: &[f64],
