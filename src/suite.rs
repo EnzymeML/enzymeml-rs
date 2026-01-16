@@ -23,6 +23,12 @@ struct DocumentResponse {
     content: EnzymeMLDocument,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseEntry {
+    pub id: u64,
+    pub title: String,
+}
+
 /// Fetches an EnzymeML document from the EnzymeML Suite
 ///
 /// This function connects to a local EnzymeML Suite instance and retrieves
@@ -76,6 +82,57 @@ pub fn fetch_document_from_suite(
     }
 
     Ok(suite_response.data.content)
+}
+
+/// Lists all documents from the EnzymeML Suite
+///
+/// This function connects to a local EnzymeML Suite instance and lists all documents in the database. If no base URL is provided, it defaults to the local Suite instance running on port 13452.
+///
+/// # Arguments
+///
+/// * `base_url` - The base URL of the Suite instance. If `None`, defaults to "http://127.0.0.1:13452".
+///
+/// # Returns
+///
+/// * `Ok(Vec<DatabaseEntry>)` - The list of documents in the database
+/// * `Err(SuiteError)` - An error occurred during the list operation
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The Suite API is not accessible at the specified URL
+/// - The HTTP request fails (network issues, timeouts, etc.)
+/// - The response cannot be parsed as valid JSON
+/// - The response indicates an error status (non-200)
+/// - The response cannot be parsed as a valid list of database entries
+pub fn list_documents_from_suite(
+    base_url: impl Into<Option<String>>,
+) -> Result<Vec<DatabaseEntry>, SuiteError> {
+    let base_url_str = base_url
+        .into()
+        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+
+    let base = Url::parse(&base_url_str).map_err(|e| {
+        SuiteError::InvalidDocument(format!("Invalid base URL '{}': {}", base_url_str, e))
+    })?;
+
+    let url = base
+        .join("docs")
+        .map_err(|e| SuiteError::InvalidDocument(format!("Failed to join path: {}", e)))?;
+
+    let response = reqwest::blocking::get(url.as_str()).map_err(SuiteError::RequestError)?;
+    let body = response.text().map_err(SuiteError::RequestError)?;
+    let suite_response: SuiteResponse<Vec<DatabaseEntry>> =
+        serde_json::from_str(&body).map_err(SuiteError::JSONError)?;
+
+    Ok(suite_response
+        .data
+        .into_iter()
+        .map(|entry| DatabaseEntry {
+            id: entry.id,
+            title: entry.title,
+        })
+        .collect())
 }
 
 /// Pushes an EnzymeML document to the EnzymeML Suite
@@ -177,19 +234,6 @@ mod tests {
             .expect_err("Should have failed to fetch document from suite");
     }
 
-    fn mock_suite_response() -> SuiteResponse<DocumentResponse> {
-        SuiteResponse {
-            data: DocumentResponse {
-                title: "Test Document".to_string(),
-                content: EnzymeMLDocument {
-                    name: "Test Document".to_string(),
-                    ..Default::default()
-                },
-            },
-            status: 200,
-        }
-    }
-
     #[test]
     fn test_push_document_to_suite() {
         let server = MockServer::start();
@@ -267,5 +311,49 @@ mod tests {
         push_document_to_suite(&test_document, base_url).expect("Failed to push document to suite");
 
         mock.assert();
+    }
+
+    #[test]
+    fn test_list_documents_from_suite() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::GET).path("/docs");
+            then.status(200).body(
+                serde_json::to_string(&mock_suite_response_list())
+                    .expect("Failed to serialize mock suite response"),
+            );
+        });
+
+        let base_url = format!("http://{}", mock.server_address());
+        let documents =
+            list_documents_from_suite(base_url).expect("Failed to list documents from suite");
+        assert_eq!(documents.len(), 1);
+        assert_eq!(documents[0].id, 1);
+        assert_eq!(documents[0].title, "Test Document");
+
+        mock.assert();
+    }
+
+    fn mock_suite_response() -> SuiteResponse<DocumentResponse> {
+        SuiteResponse {
+            data: DocumentResponse {
+                title: "Test Document".to_string(),
+                content: EnzymeMLDocument {
+                    name: "Test Document".to_string(),
+                    ..Default::default()
+                },
+            },
+            status: 200,
+        }
+    }
+
+    fn mock_suite_response_list() -> SuiteResponse<Vec<DatabaseEntry>> {
+        SuiteResponse {
+            data: vec![DatabaseEntry {
+                id: 1,
+                title: "Test Document".to_string(),
+            }],
+            status: 200,
+        }
     }
 }
