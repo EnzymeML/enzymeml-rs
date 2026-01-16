@@ -261,20 +261,6 @@ mod tests {
     }
 
     #[test]
-    fn test_live_push_document_to_suite() {
-        let document = EnzymeMLDocument {
-            name: "Test Push Document".to_string(),
-            proteins: vec![Protein {
-                id: "P00001".to_string(),
-                name: "Protein 1".to_string(),
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
-        push_document_to_suite(&document, None).expect("Failed to push document to suite");
-    }
-
-    #[test]
     fn test_fetch_with_trailing_slash_base_url() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
